@@ -1,0 +1,58 @@
+// src/lib/db-adapter.ts
+// ملف وسيط للتعامل مع قاعدة البيانات
+
+import { Student } from '@/types/student';
+import { getStudentsFromDatabase, saveStudentToDatabase } from './database-service';
+
+/**
+ * استرجاع قائمة الطلاب من قاعدة البيانات المحلية
+ */
+export const getStudents = async () => {
+  try {
+    // استخدام قاعدة البيانات المحلية
+    const result = await getStudentsFromDatabase();
+    return {
+      success: result.success,
+      message: result.message,
+      data: result.data
+    };
+  } catch (error) {
+    console.error('خطأ في استرجاع البيانات:', error);
+    return {
+      success: false,
+      message: 'حدث خطأ أثناء استرجاع البيانات',
+      data: []
+    };
+  }
+};
+
+/**
+ * حفظ بيانات طالب جديد في قاعدة البيانات المحلية
+ */
+export const saveStudent = async (studentData: Student) => {
+  try {
+    // التحقق أولاً من عدم وجود تكرار في قاعدة البيانات المحلية
+    const result = await saveStudentToDatabase(studentData);
+    
+    if (!result.success && result.duplicated) {
+      return {
+        success: false,
+        message: 'هذا الطالب موجود بالفعل في قاعدة البيانات',
+        duplicated: true
+      };
+    }
+
+    return {
+      success: true,
+      message: 'تم حفظ البيانات بنجاح في قاعدة البيانات المحلية',
+      studentId: result.studentId
+    };
+  } catch (error) {
+    console.error('خطأ في حفظ بيانات الطالب:', error);
+    return {
+      success: false,
+      message: 'حدث خطأ أثناء حفظ بيانات الطالب',
+      error: error instanceof Error ? error.message : 'خطأ غير معروف'
+    };
+  }
+};

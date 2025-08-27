@@ -1,0 +1,320 @@
+// أداة للتواصل المباشر مع Supabase API دون استخدام SDK
+// يمكن استخدام هذا الملف إذا كانت هناك مشكلات مع SDK
+
+import { getUserJWTToken } from './supabase-client';
+
+// الحصول على مفاتيح Supabase من ملف البيئة
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ikeicbxkjgdhhofuhehr.supabase.co';
+const ANON_KEY = import.meta.env.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrZWljYnhramdkaGhvZnVoZWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3ODQzNzQsImV4cCI6MjA2OTM2MDM3NH0.4Qv_Z37pH_clIOHBDnNg_e0qpJ4AAEU20YvP_ETxOGc';
+const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrZWljYnhramdkaGhvZnVoZWhyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY4NDUwMDU3MiwiZXhwIjozODM5ODU4MTcyfQ.xsNLA6IXtEUXLo5UF9q0TKoTeG1vqcM5yE7eX0sSAo0';
+
+// طباعة المفاتيح للتصحيح
+console.log('SupabaseREST: تهيئة مع المفاتيح:', {
+  url: SUPABASE_URL,
+  anonKey: ANON_KEY ? `${ANON_KEY.substring(0, 10)}...` : 'غير معرف',
+  serviceKey: SERVICE_KEY ? `${SERVICE_KEY.substring(0, 10)}...` : 'غير معرف'
+});
+
+/**
+ * إنشاء رؤوس HTTP للطلبات
+ * @param useServiceKey استخدام مفتاح الخدمة بدلاً من المفتاح العام
+ * @param options خيارات إضافية للرؤوس
+ */
+const createHeaders = (useServiceKey = true, options = {}) => {
+  // إذا كان هناك JWT token للمستخدم، نستخدمه بدلاً من المفاتيح
+  const userToken = getUserJWTToken();
+  
+  if (userToken) {
+    console.log('SupabaseREST: استخدام JWT token للمستخدم');
+    // لا نضيف apikey مع JWT token لتجنب تضارب المصادقة
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${userToken}`,
+      ...options
+    };
+  }
+  
+  // إذا لم يكن هناك JWT token للمستخدم، نستخدم المفاتيح
+  const apiKey = useServiceKey ? SERVICE_KEY : ANON_KEY;
+  
+  return {
+    'Content-Type': 'application/json',
+    'apikey': apiKey,
+    'Authorization': `Bearer ${apiKey}`,
+    ...options
+  };
+};
+
+/**
+ * إنشاء سجل في جدول معين
+ * @param table اسم الجدول
+ * @param data البيانات المراد إنشاؤها
+ */
+export const createRecord = async (table, data) => {
+  try {
+    console.log(`SupabaseREST: إنشاء سجل في جدول ${table}`);
+    
+    // التحقق من وجود JWT token للمستخدم
+    const userToken = getUserJWTToken();
+    console.log('SupabaseREST: JWT token للمستخدم موجود؟', userToken ? 'نعم' : 'لا');
+    
+    // استخدام الرؤوس المناسبة بناءً على وجود JWT token
+    const headers = createHeaders(true, { 'Prefer': 'return=representation' });
+    console.log('SupabaseREST: رؤوس الطلب:', {
+      hasAuthHeader: !!headers.Authorization,
+      authType: headers.Authorization?.substring(0, 15) + '...',
+    });
+    
+    // أولاً نحاول باستخدام JWT token إذا كان موجودًا
+    const requestBody = JSON.stringify(Array.isArray(data) ? data : [data]);
+    console.log('SupabaseREST: محتوى الطلب:', requestBody.substring(0, 100) + (requestBody.length > 100 ? '...' : ''));
+    
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers,
+      body: requestBody
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`SupabaseREST: تم إنشاء السجل بنجاح في جدول ${table}`);
+      return { success: true, data: result };
+    }
+    
+    // إذا فشل، نحصل على رسالة الخطأ ونحاول طريقة أخرى
+    console.log(`SupabaseREST: فشلت المحاولة الأولى، نحاول مرة أخرى باستخدام مفتاح الخدمة`);
+    const errorText = await response.text();
+    console.warn(`SupabaseREST: خطأ في المحاولة الأولى:`, {
+      status: response.status,
+      statusText: response.statusText,
+      error: errorText
+    });
+    
+    // إذا كان الخطأ متعلق بالمصادقة وكان لدينا JWT token، فقد يكون منتهي الصلاحية
+    if ((response.status === 401 || response.status === 403) && userToken) {
+      console.warn('SupabaseREST: فشل المصادقة باستخدام JWT token، قد يكون منتهي الصلاحية');
+    }
+    
+    // تجربة باستخدام مفتاح الخدمة مباشرة بدون JWT token
+    const serviceHeaders = {
+      'Content-Type': 'application/json',
+      'apikey': SERVICE_KEY,
+      'Authorization': `Bearer ${SERVICE_KEY}`,
+      'Prefer': 'return=representation'
+    };
+    
+    console.log('SupabaseREST: محاولة استخدام مفتاح الخدمة مباشرة');
+    
+    const serviceResponse = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: serviceHeaders,
+      body: requestBody
+    });
+    
+    if (serviceResponse.ok) {
+      const result = await serviceResponse.json();
+      console.log(`SupabaseREST: تم إنشاء السجل بنجاح في جدول ${table} باستخدام مفتاح الخدمة المباشر`);
+      return { success: true, data: result };
+    }
+    
+    // إذا فشل أيضًا، نحاول بالمفتاح العام
+    console.log(`SupabaseREST: فشل إنشاء السجل باستخدام مفتاح الخدمة المباشر، نجرب بالمفتاح العام`);
+    const serviceErrorText = await serviceResponse.text();
+    console.warn(`SupabaseREST: خطأ باستخدام مفتاح الخدمة المباشر:`, {
+      status: serviceResponse.status,
+      statusText: serviceResponse.statusText,
+      error: serviceErrorText
+    });
+    
+    const anonResponse = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': ANON_KEY,
+        'Authorization': `Bearer ${ANON_KEY}`,
+        'Prefer': 'return=representation'
+      },
+      body: requestBody
+    });
+    
+    if (anonResponse.ok) {
+      const result = await anonResponse.json();
+      console.log(`SupabaseREST: تم إنشاء السجل بنجاح في جدول ${table} باستخدام المفتاح العام`);
+      return { success: true, data: result };
+    }
+    
+    const anonErrorText = await anonResponse.text();
+    console.error(`SupabaseREST: فشل إنشاء السجل في جدول ${table}:`, anonErrorText);
+    
+    return { 
+      success: false, 
+      error: anonErrorText,
+      status: anonResponse.status,
+      statusText: anonResponse.statusText
+    };
+  } catch (error) {
+    console.error(`SupabaseREST: خطأ أثناء إنشاء السجل في جدول ${table}:`, error);
+    return { success: false, error: String(error) };
+  }
+};
+
+/**
+ * تحديث سجل في جدول معين
+ * @param table اسم الجدول
+ * @param id معرف السجل
+ * @param data البيانات المراد تحديثها
+ */
+export const updateRecord = async (table, id, data) => {
+  try {
+    console.log(`SupabaseREST: تحديث سجل في جدول ${table} بمعرف ${id}`);
+    
+    // استخدام JWT token للمستخدم إذا كان موجودًا
+    const headers = createHeaders(true, { 'Prefer': 'return=representation' });
+    
+    const requestBody = JSON.stringify(data);
+    console.log('SupabaseREST: محتوى الطلب:', requestBody.substring(0, 100) + (requestBody.length > 100 ? '...' : ''));
+    
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers,
+      body: requestBody
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`SupabaseREST: تم تحديث السجل بنجاح في جدول ${table}`);
+      return { success: true, data: result };
+    }
+    
+    // إذا فشل، نحاول باستخدام مفتاح الخدمة مباشرة
+    console.log(`SupabaseREST: فشل تحديث السجل، نحاول مرة أخرى باستخدام مفتاح الخدمة`);
+    const errorText = await response.text();
+    console.warn(`SupabaseREST: خطأ في تحديث السجل:`, errorText);
+    
+    // تجربة باستخدام مفتاح الخدمة مباشرة
+    const serviceHeaders = {
+      'Content-Type': 'application/json',
+      'apikey': SERVICE_KEY,
+      'Authorization': `Bearer ${SERVICE_KEY}`,
+      'Prefer': 'return=representation'
+    };
+    
+    const serviceResponse = await fetch(`${SUPABASE_URL}/rest/v1/${table}?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: serviceHeaders,
+      body: requestBody
+    });
+    
+    if (serviceResponse.ok) {
+      const result = await serviceResponse.json();
+      console.log(`SupabaseREST: تم تحديث السجل بنجاح في جدول ${table} باستخدام مفتاح الخدمة`);
+      return { success: true, data: result };
+    }
+    
+    const serviceErrorText = await serviceResponse.text();
+    console.error(`SupabaseREST: فشل تحديث السجل في جدول ${table}:`, serviceErrorText);
+    
+    return { 
+      success: false, 
+      error: serviceErrorText,
+      status: serviceResponse.status,
+      statusText: serviceResponse.statusText
+    };
+  } catch (error) {
+    console.error(`SupabaseREST: خطأ أثناء تحديث السجل في جدول ${table}:`, error);
+    return { success: false, error: String(error) };
+  }
+};
+
+/**
+ * البحث عن ملف شخصي بواسطة اسم المستخدم
+ * @param username اسم المستخدم
+ */
+export const findProfileByUsername = async (username) => {
+  try {
+    console.log(`SupabaseREST: البحث عن ملف شخصي باسم المستخدم: ${username}`);
+    
+    // استخدام JWT token للمستخدم إذا كان موجودًا
+    const headers = createHeaders(true);
+    
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/profiles?username=eq.${encodeURIComponent(username)}&limit=1`, {
+      headers
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      
+      if (data && data.length > 0) {
+        console.log('SupabaseREST: تم العثور على ملف شخصي:', data[0].id);
+        return { success: true, data: data[0] };
+      } else {
+        console.log('SupabaseREST: لم يتم العثور على ملف شخصي باسم المستخدم هذا');
+        return { success: false, error: 'لم يتم العثور على ملف شخصي' };
+      }
+    }
+    
+    // إذا فشل، نحاول باستخدام مفتاح الخدمة مباشرة
+    console.log('SupabaseREST: فشل البحث عن ملف شخصي، نحاول مرة أخرى باستخدام مفتاح الخدمة');
+    const errorText = await response.text();
+    console.warn('SupabaseREST: خطأ في البحث عن ملف شخصي:', errorText);
+    
+    const serviceHeaders = {
+      'Content-Type': 'application/json',
+      'apikey': SERVICE_KEY,
+      'Authorization': `Bearer ${SERVICE_KEY}`
+    };
+    
+    const serviceResponse = await fetch(`${SUPABASE_URL}/rest/v1/profiles?username=eq.${encodeURIComponent(username)}&limit=1`, {
+      headers: serviceHeaders
+    });
+    
+    if (serviceResponse.ok) {
+      const data = await serviceResponse.json();
+      
+      if (data && data.length > 0) {
+        console.log('SupabaseREST: تم العثور على ملف شخصي باستخدام مفتاح الخدمة:', data[0].id);
+        return { success: true, data: data[0] };
+      } else {
+        console.log('SupabaseREST: لم يتم العثور على ملف شخصي باسم المستخدم هذا (مفتاح الخدمة)');
+        return { success: false, error: 'لم يتم العثور على ملف شخصي' };
+      }
+    }
+    
+    const serviceErrorText = await serviceResponse.text();
+    console.error('SupabaseREST: فشل البحث عن ملف شخصي:', serviceErrorText);
+    
+    return { 
+      success: false, 
+      error: serviceErrorText,
+      status: serviceResponse.status,
+      statusText: serviceResponse.statusText
+    };
+  } catch (error) {
+    console.error('SupabaseREST: خطأ أثناء البحث عن ملف شخصي:', error);
+    return { success: false, error: String(error) };
+  }
+};
+
+/**
+ * تحديث محاولات تسجيل الدخول ووقت آخر تسجيل دخول
+ * @param userId معرف المستخدم
+ * @param loginAttempts عدد محاولات تسجيل الدخول
+ * @param lastLoginAt وقت آخر تسجيل دخول
+ */
+export const updateLoginAttempts = async (userId, loginAttempts, lastLoginAt = null) => {
+  const updateData = { login_attempts: loginAttempts };
+  
+  if (lastLoginAt) {
+    updateData.last_login_at = lastLoginAt;
+  }
+  
+  return updateRecord('profiles', userId, updateData);
+};
+
+/**
+ * إنشاء ملف شخصي جديد
+ * @param profile بيانات الملف الشخصي
+ */
+export const createProfile = async (profile) => {
+  return createRecord('profiles', profile);
+};
