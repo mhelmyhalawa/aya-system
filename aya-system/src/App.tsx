@@ -244,12 +244,12 @@ const App = () => {
           <div className="flex flex-1 relative pt-16">
             {/* القائمة الجانبية ثابتة في جميع الشاشات إذا كان المستخدم مسجل دخول */}
             {userRole && (
-              <Sidebar 
-                userRole={userRole} 
+              <Sidebar                 
                 onNavigate={handleNavigate} 
                 onLogout={handleLogout}
                 isOpen={sidebarOpen}  // استخدام حالة القائمة الجانبية
                 setIsOpen={setSidebarOpen}  // تمرير وظيفة تغيير الحالة
+                userRole={userRole} 
               />
             )}
             

@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-type UserRole = 'superadmin' | 'admin' | 'teacher' | null;
+type UserRole = 'superadmin' | 'admin' | 'teacher' | 'parent' | 'guardian' | null;
 
 interface SidebarProps {
   userRole?: UserRole | null;

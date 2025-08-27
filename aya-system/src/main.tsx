@@ -1,5 +1,3 @@
-// main.tsx
-import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
@@ -12,7 +10,7 @@ import './lib/show-hashed-password';
 
 // Render التطبيق مع BrowserRouter وبناء basename تلقائي من PUBLIC_URL
 createRoot(document.getElementById('root')!).render(
-  <BrowserRouter basename={process.env.PUBLIC_URL}>
+  <BrowserRouter basename={import.meta.env.VITE_PUBLIC_URL}>
     <App />
   </BrowserRouter>
 );

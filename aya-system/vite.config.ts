@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { Plugin } from 'vite';
@@ -27,26 +27,31 @@ function replaceHtmlLabels(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => ({
-  base: '/aya-system/', // <-- هذا السطر مهم جدًا
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [
-    react(),
-    replaceHtmlLabels(),
-  ],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-      fs: path.resolve(__dirname, "./src/lib/shims/fs-shim.js"),
-      path: path.resolve(__dirname, "./src/lib/shims/path-shim.js"),
-      dotenv: path.resolve(__dirname, "./src/lib/shims/dotenv-shim.js"),
-      process: path.resolve(__dirname, "./src/lib/shims/process-shim.js"),
+export default defineConfig(({ mode }) => {
+  // Load .env files based on mode
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    base: env.VITE_PUBLIC_URL || '/', // استخدم قيمة VITE_PUBLIC_URL من env
+    server: {
+      host: "::",
+      port: 8080,
     },
-  },
-  optimizeDeps: {
-    exclude: ["fs", "path", "dotenv"],
-  },
-}));
+    plugins: [
+      react(),
+      replaceHtmlLabels(),
+    ],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+        fs: path.resolve(__dirname, "./src/lib/shims/fs-shim.js"),
+        path: path.resolve(__dirname, "./src/lib/shims/path-shim.js"),
+        dotenv: path.resolve(__dirname, "./src/lib/shims/dotenv-shim.js"),
+        process: path.resolve(__dirname, "./src/lib/shims/process-shim.js"),
+      },
+    },
+    optimizeDeps: {
+      exclude: ["fs", "path", "dotenv"],
+    },
+  };
+});
