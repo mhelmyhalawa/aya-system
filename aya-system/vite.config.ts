@@ -16,49 +16,19 @@ function replaceHtmlLabels(): Plugin {
   return {
     name: 'replace-html-labels',
     transformIndexHtml(html) {
-      // Replace title
-      html = html.replace(
-        /<title>.*?<\/title>/,
-        `<title>${indexHtmlLabels.title}</title>`
-      );
-      
-      // Replace description
-      html = html.replace(
-        /<meta name="description" content=".*?"/,
-        `<meta name="description" content="${indexHtmlLabels.description}"`
-      );
-      
-      // Replace author
-      html = html.replace(
-        /<meta name="author" content=".*?"/,
-        `<meta name="author" content="${indexHtmlLabels.author}"`
-      );
-      
-      // Replace keywords
-      html = html.replace(
-        /<meta name="keywords" content=".*?"/,
-        `<meta name="keywords" content="${indexHtmlLabels.keywords}"`
-      );
-      
-      // Replace og:title
-      html = html.replace(
-        /<meta property="og:title" content=".*?"/,
-        `<meta property="og:title" content="${indexHtmlLabels.title}"`
-      );
-      
-      // Replace og:description
-      html = html.replace(
-        /<meta property="og:description" content=".*?"/,
-        `<meta property="og:description" content="${indexHtmlLabels.description}"`
-      );
-      
+      html = html.replace(/<title>.*?<\/title>/, `<title>${indexHtmlLabels.title}</title>`);
+      html = html.replace(/<meta name="description" content=".*?"/, `<meta name="description" content="${indexHtmlLabels.description}"`);
+      html = html.replace(/<meta name="author" content=".*?"/, `<meta name="author" content="${indexHtmlLabels.author}"`);
+      html = html.replace(/<meta name="keywords" content=".*?"/, `<meta name="keywords" content="${indexHtmlLabels.keywords}"`);
+      html = html.replace(/<meta property="og:title" content=".*?"/, `<meta property="og:title" content="${indexHtmlLabels.title}"`);
+      html = html.replace(/<meta property="og:description" content=".*?"/, `<meta property="og:description" content="${indexHtmlLabels.description}"`);
       return html;
     }
   };
 }
 
-// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  base: '/aya-system/', // <-- هذا السطر مهم جدًا
   server: {
     host: "::",
     port: 8080,
@@ -70,7 +40,6 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // تجاوز وحدات Node.js غير المدعومة في المتصفح
       fs: path.resolve(__dirname, "./src/lib/shims/fs-shim.js"),
       path: path.resolve(__dirname, "./src/lib/shims/path-shim.js"),
       dotenv: path.resolve(__dirname, "./src/lib/shims/dotenv-shim.js"),

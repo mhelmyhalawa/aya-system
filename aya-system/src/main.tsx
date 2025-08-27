@@ -1,11 +1,18 @@
-import { createRoot } from 'react-dom/client'
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
-import './index.css'
-// استيراد ملف تهيئة التطبيق لإنشاء المستخدم المسؤول الرئيسي
-import './lib/app-startup'
-// مؤقتًا لعرض كلمة المرور المشفرة (قم بإزالة هذا السطر بعد الحصول على كلمة المرور)
-import './lib/show-hashed-password'
+// main.tsx
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+import './index.css';
 
-createRoot(document.getElementById("root")!).render(<App />);
+// استيراد ملفات التهيئة
+import './lib/app-startup';
+// مؤقتًا لعرض كلمة المرور المشفرة (قم بإزالة هذا السطر بعد الحصول على كلمة المرور)
+import './lib/show-hashed-password';
+
+// Render التطبيق مع BrowserRouter وبناء basename تلقائي من PUBLIC_URL
+createRoot(document.getElementById('root')!).render(
+  <BrowserRouter basename={process.env.PUBLIC_URL}>
+    <App />
+  </BrowserRouter>
+);
