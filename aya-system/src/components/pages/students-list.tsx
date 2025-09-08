@@ -1199,69 +1199,27 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             <Table className="min-w-full border border-green-300 rounded-2xl overflow-hidden shadow-lg">
               <TableHeader className="bg-islamic-green">
                 <TableRow>
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between">
-                      <span>{'#️⃣'}</span>
-                    </div>
-                  </TableHead>
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between flex-row-reverse">
-                      <span>الاسم</span>
-                      <span className="ml-1">👤</span>
-                    </div>
-                  </TableHead>
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between flex-row-reverse">
-                      <span>ولي الأمر</span>
-                      <span className="ml-1">👪</span>
-                    </div>
-                  </TableHead>
-
-                  {userRole !== 'teacher' && (
-                    <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                      <div className="flex items-center justify-between flex-row-reverse">
-                        <span>المعلم</span>
-                        <span className="ml-1">🎓</span>
+                  {[
+                    { label: '#️⃣', key: 'index' },
+                    { label: 'الاسم', key: 'full_name', icon: '👤' },
+                    { label: 'ولي الأمر', key: 'guardian', icon: '👪' },
+                    ...(userRole !== 'teacher' ? [{ label: 'المعلم', key: 'teacher', icon: '🎓' }] : []),
+                    { label: 'الحلقة', key: 'circle', icon: '📚' },
+                    { label: 'مستوى الحفظ', key: 'memorized_parts', icon: '🕋' },
+                    { label: 'الصف', key: 'grade', icon: '🏫' },
+                    { label: 'الجنس', key: 'gender', icon: '👤' },
+                    { label: '⚙️ إجراءات', key: 'actions', icon: null },
+                  ].map(col => (
+                    <TableHead
+                      key={col.key}
+                      className="text-center font-bold text-white py-3 px-4 border-r border-green-700"
+                    >
+                      <div className={`flex items-center justify-center ${col.icon ? 'flex-row-reverse gap-1' : ''}`}>
+                        <span>{col.label}</span>
+                        {col.icon && <span>{col.icon}</span>}
                       </div>
                     </TableHead>
-                  )}
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between flex-row-reverse">
-                      <span>الحلقة</span>
-                      <span className="ml-1">📚</span>
-                    </div>
-                  </TableHead>
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between flex-row-reverse">
-                      <span>مستوى الحفظ</span>
-                      <span className="ml-1">🕋</span>
-                    </div>
-                  </TableHead>
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between flex-row-reverse">
-                      <span>الصف</span>
-                      <span className="ml-1">🏫</span>
-                    </div>
-                  </TableHead>
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-between flex-row-reverse">
-                      <span>الجنس</span>
-                      <span className="ml-1">👤</span>
-                    </div>
-                  </TableHead>
-
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center justify-center gap-1">
-                      ⚙️ إجراءات
-                    </div>
-                  </TableHead>
-
+                  ))}
                 </TableRow>
               </TableHeader>
 
@@ -1270,8 +1228,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                   <TableRow
                     key={student.id}
                     className={`border-b border-green-200 transition-colors duration-200
-        ${index % 2 === 0 ? 'bg-green-50 dark:bg-green-900' : 'bg-white dark:bg-gray-800'}
-        hover:bg-green-100 dark:hover:bg-green-700`}
+                      ${index % 2 === 0 ? 'bg-green-50 dark:bg-green-900' : 'bg-white dark:bg-gray-800'}
+                      hover:bg-green-100 dark:hover:bg-green-700`}
                   >
                     <TableCell className="text-center border-r border-green-200 font-medium text-islamic-green/80 py-2 px-3">
                       {(currentPage - 1) * itemsPerPage + index + 1}
@@ -1311,11 +1269,15 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     </TableCell>
 
                     <TableCell className="border-r border-green-200 py-2 px-3">
-                      <span className="text-islamic-green/80">{studentsLabels.quranPartsOptions.find(part => part.value === student.memorized_parts)?.label || student.memorized_parts}</span>
+                      <span className="text-islamic-green/80">
+                        {studentsLabels.quranPartsOptions.find(p => p.value === student.memorized_parts)?.label || student.memorized_parts}
+                      </span>
                     </TableCell>
 
                     <TableCell className="border-r border-green-200 py-2 px-3">
-                      <span className="text-islamic-green/80">{studentsLabels.gradeOptions.find(g => g.value === (student.grade_level || student.grade))?.label || (student.grade_level || student.grade || "-")}</span>
+                      <span className="text-islamic-green/80">
+                        {studentsLabels.gradeOptions.find(g => g.value === (student.grade_level || student.grade))?.label || (student.grade_level || student.grade || "-")}
+                      </span>
                     </TableCell>
 
                     <TableCell className="border-r border-green-200 py-2 px-3 text-center">
@@ -1338,11 +1300,9 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                   </TableRow>
                 ))}
               </TableBody>
-
-
-
             </Table>
           </div>
+
 
 
           {filteredStudents.length > itemsPerPage && (
