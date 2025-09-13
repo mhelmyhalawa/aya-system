@@ -93,7 +93,8 @@ export function FormDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
-                className={`sm:max-w-[${maxWidth}] w-full`}
+                className="sm:max-w-[480px] w-full"
+                style={{ maxWidth: maxWidth }}
                 dir="rtl"
             >
                 {/* الإطار الداخلي */}

@@ -689,9 +689,9 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                         variant="outline"
                         size="sm"
                         className="flex items-center gap-3 rounded-3xl border-2 border-green-600 text-green-900 
-          hover:bg-green-100 hover:text-green-800 hover:scale-105 
-          dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
-          shadow-lg transition-all duration-200 px-5 py-2 font-semibold"
+                                  hover:bg-green-100 hover:text-green-800 hover:scale-105 
+                                  dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
+                                  shadow-lg transition-all duration-200 px-5 py-2 font-semibold"
                         onClick={handleClearSelection}
                       >
                         إلغاء التحديد
@@ -702,7 +702,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                           onClick={handleAddSchedule}
                           size="sm"
                           className="flex items-center gap-3 rounded-3xl bg-green-600 hover:bg-green-700 
-            dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-5 py-2 font-semibold"
+                                     dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-5 py-2 font-semibold"
                         >
                           <Plus className="h-4 w-4" />
                           إضافة موعد
@@ -743,50 +743,40 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                         {[...circleSchedules]
                           .sort((a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time))
                           .map(schedule => {
-                            const isFriday = schedule.weekday === 5;
                             const isConflict = conflictIds.has(schedule.id);
 
                             return (
                               <div
                                 key={schedule.id}
                                 role="listitem"
-                                className={`rounded-lg border shadow-sm p-2.5 flex flex-col gap-2 text-[12px] relative transition-colors
-                                ${isFriday
-                                    ? 'border-amber-400 bg-amber-50/80 ring-1 ring-amber-300'
-                                    : isConflict
-                                      ? 'border-red-300 bg-red-50'
-                                      : 'border-green-300 bg-white'}`}
+                                className={`rounded-lg border shadow-sm p-2.5 flex flex-col gap-2 text-[12px] relative transition-colors`}
                                 aria-label={`موعد يوم ${getWeekdayName(schedule.weekday)}`}
                               >
-                                {isConflict && (
-                                  <div className="absolute -top-2 -left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow">
-                                    <AlertTriangle className="h-3 w-3" /> تعارض
-                                  </div>
-                                )}
 
-                                <div className="flex items-center justify-between">
-                                  <span className={`font-bold flex items-center gap-1 ${isFriday ? 'text-amber-700' : 'text-green-800'}`}>
-                                    📅 {getWeekdayName(schedule.weekday)}
-                                  </span>
+                                <div className="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-green-400 to-green-600 rounded-xl shadow-md border border-green-300">
+                                  <h3 className="font-bold flex items-center gap-2 text-sm text-white">
+                                    <span>📅 {getWeekdayName(schedule.weekday)}</span>
+                                  </h3>
                                 </div>
 
+
                                 <div className="flex items-center gap-2 text-[11px]">
-                                  <div className={`flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center ${isFriday ? 'bg-amber-100 text-amber-700' : isConflict ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-800'}`}>
-                                    <Clock className="h-3 w-3" /> {formatTime(schedule.start_time)}
+                                  <div className="flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center bg-blue-100 text-blue-800">
+                                    <Clock className="h-3 w-3 text-blue-600" /> {formatTime(schedule.start_time)}
                                   </div>
                                   <span className="text-gray-400 font-bold">—</span>
-                                  <div className={`flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center ${isConflict ? 'bg-red-200 text-red-800' : 'bg-red-100 text-red-800'}`}>
-                                    <Clock className="h-3 w-3" /> {formatTime(schedule.end_time)}
+                                  <div className="flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center bg-purple-100 text-purple-800">
+                                    <Clock className="h-3 w-3 text-purple-600" /> {formatTime(schedule.end_time)}
                                   </div>
                                 </div>
 
                                 <div className="flex items-center gap-1 text-green-700">
                                   {schedule.location ? (
-                                    <span className={`flex items-center gap-1 text-[12px] ${isFriday ? 'text-amber-700' : ''}`}>
-                                      <MapPin className={`h-3 w-3 ${isFriday ? 'text-amber-600' : 'text-green-600'}`} /> {schedule.location}
+                                    <span className="flex items-center gap-1 text-[12px]">
+                                      <MapPin className="h-3 w-3 text-green-600" /> {schedule.location}
                                     </span>
                                   ) : (
-                                    <span className={`text-[11px] italic ${isFriday ? 'text-amber-600' : 'text-green-500'}`}>موقع الحلقة الافتراضي</span>
+                                    <span className="text-[11px] italic text-green-500">موقع الحلقة الافتراضي</span>
                                   )}
                                 </div>
 
@@ -796,7 +786,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => handleEditSchedule(schedule)}
-                                      className={`flex-1 rounded-md h-7 ${isFriday ? 'bg-amber-200 hover:bg-amber-300 text-amber-900' : 'bg-green-200 hover:bg-green-300 text-green-900'}`}
+                                      className="flex-1 rounded-md h-7 bg-green-200 hover:bg-green-300 text-green-900"
                                       title="تعديل الموعد"
                                     >
                                       <Pencil className="h-3.5 w-3.5 mx-auto" />
@@ -824,13 +814,11 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                         )}
                         {groupedSchedules.map(group => {
                           const dayName = getWeekdayName(group.weekday);
-                          const isFridayGroup = group.weekday === 5;
                           return (
                             <div key={group.weekday} className="border border-green-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                              <div className={`px-4 py-2 flex items-center justify-between ${isFridayGroup ? 'bg-amber-100/70 border-b border-amber-300' : 'bg-green-100/70 border-b border-green-300'}`}>
-                                <h3 className={`font-bold flex items-center gap-2 text-sm ${isFridayGroup ? 'text-amber-700' : 'text-green-800'}`}>
+                                <div className="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-green-400 to-green-600 rounded-xl shadow-md border border-green-300">
+                                <h3 className="font-bold flex items-center gap-2 text-sm text-white">
                                   <span>📅 {dayName}</span>
-                                  <span className="text-xs font-normal text-gray-500">({group.items.length})</span>
                                 </h3>
                               </div>
                               <div className="divide-y divide-green-100">
@@ -839,19 +827,23 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                   return (
                                     <div key={item.id} className={`p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-[13px] ${isConflict ? 'bg-red-50/70' : 'hover:bg-green-50'} transition-colors`}>
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${isConflict ? 'bg-red-100 text-red-700' : isFridayGroup ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
-                                          <Clock className="h-3 w-3" /> {formatTime(item.start_time)} <span className="mx-1 text-gray-400">—</span> {formatTime(item.end_time)}
+                                        <div className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 shadow-sm">
+                                          <Clock className="h-3 w-3 text-blue-600" /> <span className="font-bold">الحضور:</span> {formatTime(item.start_time)}
+                                        </div>
+                                        <span className="mx-1 text-gray-400">—</span>
+                                        <div className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 shadow-sm">
+                                          <Clock className="h-3 w-3 text-purple-600" /> <span className="font-bold">الانصراف:</span> {formatTime(item.end_time)}
                                         </div>
                                         {item.location ? (
-                                          <span className={`flex items-center gap-1 text-[11px] md:text-xs ${isFridayGroup ? 'text-amber-700' : 'text-green-700'}`}>
-                                            <MapPin className={`h-3 w-3 ${isFridayGroup ? 'text-amber-600' : 'text-green-600'}`} /> {item.location}
+                                          <span className="flex items-center gap-1 text-[11px] md:text-xs text-green-700">
+                                            <MapPin className="h-3 w-3 text-green-600" /> {item.location}
                                           </span>
                                         ) : (
-                                          <span className={`text-[11px] italic ${isFridayGroup ? 'text-amber-600' : 'text-green-500'}`}>موقع افتراضي</span>
+                                          <span className="text-[11px] italic text-green-500">موقع افتراضي</span>
                                         )}
                                         {isConflict && (
-                                          <span className="flex items-center gap-1 text-[11px] text-red-700 font-semibold bg-red-100 px-2 py-0.5 rounded-full">
-                                            <AlertTriangle className="h-3 w-3" /> تعارض
+                                          <span className="flex items-center gap-1 text-[11px] text-red-700 font-semibold bg-red-100 px-2 py-0.5 rounded-full border border-red-300 shadow-sm">
+                                            <AlertTriangle className="h-3 w-3" /> تعارض في المواعيد
                                           </span>
                                         )}
                                       </div>
@@ -924,8 +916,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                     text-sm px-4 py-2 rounded-full border transition-all duration-200
                     flex-1 text-center
                     ${addScheduleForm.weekday === day.value.toString()
-                        ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
-                        : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
+                      ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                      : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
                     }
                   `}
                 >
@@ -943,7 +935,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
               value={addScheduleForm.start_time}
               onChange={(e) => handleAddScheduleFormChange('start_time', e.target.value)}
               required
-              className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
+              className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 font-medium"
             />
           </FormRow>
 
@@ -954,7 +946,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
               value={addScheduleForm.end_time}
               onChange={(e) => handleAddScheduleFormChange('end_time', e.target.value)}
               required
-              className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+              className="bg-purple-50 border-purple-200 text-purple-900 rounded-md text-sm py-1 px-2 font-medium"
             />
           </FormRow>
 
@@ -1007,7 +999,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
               </button>
             ))}
           </div>
-          
+
           {/* الوقت */}
           <div className="grid grid-cols-2 gap-2 mt-2">
             <FormRow label="وقت البداية *">
@@ -1017,7 +1009,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 value={editScheduleForm.start_time}
                 onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
                 required
-                className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
+                className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 font-medium"
               />
             </FormRow>
             <FormRow label="وقت النهاية *">
@@ -1027,7 +1019,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 value={editScheduleForm.end_time}
                 onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
                 required
-                className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+                className="bg-purple-50 border-purple-200 text-purple-900 rounded-md text-sm py-1 px-2 font-medium"
               />
             </FormRow>
           </div>

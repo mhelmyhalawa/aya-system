@@ -234,9 +234,9 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* وضع الجدول */}
             {sortedData.length > 0 && viewMode === 'table' && (
                 <div className="border border-green-200 dark:border-green-700 rounded-2xl overflow-hidden shadow-md bg-white dark:bg-green-950/20">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
                         <Table className="direction-rtl w-full border-collapse">
-                            <TableHeader className="bg-gradient-to-b from-green-800 via-green-600 to-green-500 dark:from-green-900 dark:via-green-800 dark:to-green-700">
+                            <TableHeader className="bg-gradient-to-b from-green-800 via-green-600 to-green-500 dark:from-green-900 dark:via-green-800 dark:to-green-700 sticky top-0 z-10">
                                 <TableRow>
                                     {columns.map((column) => {
                                         const alignClass =
@@ -305,7 +305,7 @@ export function GenericTable<T extends { id: string }>(props: {
 
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full p-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full p-2 overflow-y-auto max-h-[calc(100vh-200px)]">
                     {(() => {
                         const CardItem = ({ item }: { item: T }) => {
                             const [expanded, setExpanded] = useState(false);
@@ -340,7 +340,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                     {/* الرأس */}
                                     <div className="px-3 py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
                                                     dark:from-green-800 dark:via-green-700 dark:to-green-600 
-                                                    text-white rounded-t-lg shadow-md flex items-center justify-between sticky top-0 z-10">
+                                                    text-white rounded-t-lg shadow-md flex items-center justify-between">
                                         <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1">
                                             {titleColumn.render ? titleColumn.render(item) : titleValue}
                                         </h3>

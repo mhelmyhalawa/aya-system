@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,8 @@ import {
   CalendarClock,
   FileText,
   Search,
-  Plus
+  Plus,
+  Check
 } from "lucide-react";
 import { getStudyCirclesByTeacherId, getAllStudyCircles } from "@/lib/study-circle-service";
 import { getSessionsByCircleId, createSession, updateSession, deleteSession } from "@/lib/circle-session-service";
@@ -185,7 +187,18 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
       setLoading(true);
       try {
         const sessions = await getSessionsByCircleId(selectedCircle);
-        setCircleSessions(sessions);
+        
+        // فلترة الجلسات لعرض الجلسات المستقبلية فقط من تاريخ اليوم
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // تعيين الوقت إلى بداية اليوم
+        
+        const futureSessions = sessions.filter(session => {
+          const sessionDate = new Date(session.session_date);
+          sessionDate.setHours(0, 0, 0, 0); // تعيين الوقت إلى بداية اليوم للمقارنة بشكل صحيح
+          return sessionDate >= today; // تضمين الجلسات من اليوم فصاعداً
+        });
+        
+        setCircleSessions(futureSessions);
       } catch (error) {
         console.error("خطأ في جلب جلسات الحلقة:", error);
         toast({
@@ -398,15 +411,15 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
             {/* زخرفة إسلامية خفيفة في الخلفية */}
             <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('/patterns/arabic-pattern.svg')] bg-repeat"></div>
 
-            <h1 className="relative text-xl md:text-2xl font-bold flex items-center gap-2">
+            <h3 className="relative text-xl md:text-2xl font-bold flex items-center gap-2">
               <span className="text-2xl">🕌</span>
               {isAdminOrSuperadmin
-                ? "تسجيل الجلسات وإدارة الحلقات"
-                : "تسجيل الجلسات"}
-            </h1>
+                ? "تسجيل الجلسات المستقبلية وإدارة الحلقات"
+                : "تسجيل الجلسات المستقبلية"}
+            </h3>
 
             <p className="relative text-green-100 mt-1 text-xs md:text-sm">
-              نظام إدارة جلسات الحلقات القرآنية
+              نظام إدارة جلسات الحلقات القرآنية المستقبلية من تاريخ اليوم
             </p>
           </div>
           <div className="p-4 md:p-6 lg:p-8">
@@ -535,8 +548,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                     <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-white" />
                       {selectedCircle
-                        ? `جلسات حلقة : ${getCircleName(selectedCircle)}`
-                        : "جلسات الحلقة : "}  | 👨‍🏫
+                        ? `الجلسات المستقبلية لحلقة : ${getCircleName(selectedCircle)}`
+                        : "الجلسات المستقبلية للحلقة : "}  | 👨‍🏫
                       <span className="text-xs sm:text-[10px] text-gray-700">{getCircleTeacher(selectedCircle)}</span>
                     </CardTitle>
 
@@ -564,8 +577,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                   <div className="bg-green-100 rounded-lg border border-green-200 p-4 mx-2 mb-2">
                     <Badge variant="outline" className="text-green-800 border-green-400">
                       {circleSessions.length > 0
-                        ? `عدد الجلسات: ${circleSessions.length}`
-                        : "لا توجد جلسات"}
+                        ? `عدد الجلسات المستقبلية: ${circleSessions.length}`
+                        : "لا توجد جلسات مستقبلية"}
                     </Badge>
                   </div>
 
@@ -660,7 +673,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                             ),
                           },
                         ]}
-                        emptyMessage="لا توجد جلسات"
+                        emptyMessage="لا توجد جلسات مستقبلية"
                         className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
                         getRowClassName={(_, index) =>
                           `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
@@ -669,13 +682,13 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                     </div>
                   ) : selectedCircle ? (
                     <div className="text-center py-6 text-green-600">
-                      لا توجد جلسات مسجلة لهذه الحلقة.
+                      لا توجد جلسات مستقبلية مسجلة لهذه الحلقة.
                       <br />
                       انقر على زر "تسجيل جلسة جديدة" في الأعلى لإضافة جلسة.
                     </div>
                   ) : (
                     <div className="text-center py-6 text-green-600">
-                      اختر حلقة لعرض الجلسات الخاصة بها.
+                      اختر حلقة لعرض الجلسات المستقبلية الخاصة بها.
                     </div>
                   )}
                 </div>
@@ -689,155 +702,90 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
       </div>
 
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent
-          dir="rtl"
-          className="max-w-md w-full rounded-2xl overflow-hidden shadow-xl border border-green-200"
-        >
-          {/* Panel واحد لكل العناصر */}
-          <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <FormDialog
+        title={isEditMode ? "تعديل جلسة" : "تسجيل جلسة جديدة"}
+        description={isEditMode ? "قم بتعديل بيانات الجلسة أدناه" : "قم بإدخال بيانات الجلسة الجديدة"}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSave={handleSaveSession}
+        saveButtonText="حفظ"
+        cancelButtonText="إلغاء"
+        mode={isEditMode ? "edit" : "add"}
+        isLoading={loading}
+        maxWidth="550px"
+      >
+        {/* التاريخ */}
+        <FormRow label="تاريخ الجلسة *">
+          <Input
+            id="session_date"
+            name="session_date"
+            type="date"
+            value={formData.session_date}
+            onChange={handleFormChange}
+            className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
+            required
+          />
+        </FormRow>
 
-            {/* Header */}
-            <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-4 text-center">
-              <h3 className="flex items-center justify-center gap-2 text-white text-xl font-extrabold rounded-2xl shadow-md py-2 px-4 transition-transform hover:scale-105">
-                {isEditMode ? <><Edit className="h-5 w-5" /> تعديل جلسة</> : <><Plus className="h-5 w-5" /> تسجيل جلسة جديدة</>}
-              </h3>
-              <p className="text-green-100 text-sm mt-2">
-                {isEditMode
-                  ? "قم بتعديل بيانات الجلسة أدناه"
-                  : "قم بإدخال بيانات الجلسة الجديدة"}
-              </p>
-            </div>
+        {/* وقت البدء والانتهاء */}
+        <div className="grid grid-cols-2 gap-4">
+          <FormRow label="وقت البدء *">
+            <Input
+              id="start_time"
+              name="start_time"
+              type="time"
+              value={formData.start_time}
+              onChange={handleFormChange}
+              className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
+            />
+          </FormRow>
+          <FormRow label="وقت الانتهاء *">
+            <Input
+              id="end_time"
+              name="end_time"
+              type="time"
+              value={formData.end_time}
+              onChange={handleFormChange}
+              className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
+            />
+          </FormRow>
+        </div>
 
-            {/* Body داخل نفس Panel */}
-            <div className="p-5 space-y-4 bg-green-50">
+        {/* اختيار المعلم */}
+        {isAdminOrSuperadmin && (
+          <FormRow label="المعلم">
+            <Select
+              value={formData.teacher_id}
+              onValueChange={(value) =>
+                setFormData({ ...formData, teacher_id: value })
+              }
+            >
+              <SelectTrigger className="w-full bg-green-50 border-green-300 text-green-900 rounded-md shadow-inner">
+                <SelectValue placeholder="اختر المعلم" />
+              </SelectTrigger>
+              <SelectContent>
+                {teachers.map((teacher) => (
+                  <SelectItem key={teacher.id} value={teacher.id}>
+                    {teacher.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormRow>
+        )}
 
-              {/* التاريخ */}
-              <div className="grid gap-2">
-                <Label htmlFor="session_date" className="text-right text-green-800 font-semibold">تاريخ الجلسة *</Label>
-                <Input
-                  id="session_date"
-                  name="session_date"
-                  type="date"
-                  value={formData.session_date}
-                  onChange={handleFormChange}
-                  className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-                  required
-                />
-              </div>
-
-              {/* وقت البدء والانتهاء */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="start_time" className="text-right text-green-800 font-semibold">وقت البدء *</Label>
-                  <Input
-                    id="start_time"
-                    name="start_time"
-                    type="time"
-                    value={formData.start_time}
-                    onChange={handleFormChange}
-                    className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="end_time" className="text-right text-green-800 font-semibold">وقت الانتهاء *</Label>
-                  <Input
-                    id="end_time"
-                    name="end_time"
-                    type="time"
-                    value={formData.end_time}
-                    onChange={handleFormChange}
-                    className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-                  />
-                </div>
-              </div>
-
-              {/* اختيار المعلم */}
-              {isAdminOrSuperadmin && (
-                <div className="grid gap-2">
-                  <Label htmlFor="teacher_id" className="text-right text-green-800 font-semibold">المعلم</Label>
-                  <Select
-                    value={formData.teacher_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, teacher_id: value })
-                    }
-                  >
-                    <SelectTrigger className="w-full bg-green-50 border-green-300 text-green-900 rounded-md shadow-inner">
-                      <SelectValue placeholder="اختر المعلم" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* الملاحظات */}
-              <div className="grid gap-2">
-                <Label htmlFor="notes" className="text-right text-green-800 font-semibold">ملاحظات</Label>
-                <Textarea
-                  id="notes"
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleFormChange}
-                  className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-                  rows={3}
-                />
-              </div>
-
-            </div>
-
-            {/* Footer */}
-            <DialogFooter className="gap-3 flex justify-end p-4 border-t border-green-200 bg-green-50">
-              <Button
-                onClick={() => setIsDialogOpen(false)}
-                variant="outline"
-                className="border-green-300 text-green-700 hover:bg-green-100 text-sm px-4 py-2 rounded-lg shadow-sm"
-              >
-                إلغاء
-              </Button>
-              <Button
-                onClick={handleSaveSession}
-                disabled={loading}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-lg px-5 py-2 text-sm transition-transform shadow-md flex items-center gap-2 hover:scale-105"
-              >
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    جارٍ الحفظ...
-                  </span>
-                ) : (
-                  "حفظ"
-                )}
-              </Button>
-            </DialogFooter>
-
-          </div>
-        </DialogContent>
-      </Dialog>
+        {/* الملاحظات */}
+        <FormRow label="ملاحظات">
+          <Textarea
+            id="notes"
+            name="notes"
+            value={formData.notes}
+            onChange={handleFormChange}
+            className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
+            rows={3}
+          />
+        </FormRow>
+      </FormDialog>
 
       {/* مربع حوار تأكيد الحذف */}
       <DeleteConfirmationDialog

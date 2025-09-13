@@ -860,7 +860,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
       <Dialog open={openScheduleDialog} onOpenChange={setOpenScheduleDialog}>
         <DialogContent
           dir="rtl"
-          className="sm:max-w-[900px] w-full h-[57vh] flex flex-col bg-gradient-to-r from-blue-50 to-green-50 rounded-xl
+          className="sm:max-w-[900px] w-full max-h-[85vh] h-auto flex flex-col bg-gradient-to-r from-blue-50 to-green-50 rounded-xl
            shadow-lg
            border border-gray-100 p-0 overflow-hidden"
         >
