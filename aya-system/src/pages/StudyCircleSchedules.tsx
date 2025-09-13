@@ -23,7 +23,7 @@ import { StudyCircle } from "@/types/study-circle";
 import { StudyCircleSchedule, StudyCircleScheduleCreate, StudyCircleScheduleUpdate, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
 import { getAllStudyCircles, getStudyCircleById, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
-import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle, AlertTriangle, X } from "lucide-react";
+import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle, AlertTriangle, X, ChevronRight } from "lucide-react";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { GenericTable } from "@/components/ui/generic-table";
 
@@ -431,33 +431,26 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
   return (
     // جعل العرض يملأ الشاشة في الموبايل بإزالة قيود container
-    <div className="w-full mx-auto py-3 sm:py-6 px-0 sm:px-4" dir="rtl">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
 
-      <Card className="border border-green-300 shadow-lg sm:shadow-xl rounded-none md:rounded-2xl overflow-hidden">
+      <Card>
         {/* الهيدر */}
-        <CardHeader className="pb-2 sm:pb-4 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b-2 border-green-300/70 rounded-none md:rounded-t-2xl shadow-lg px-2 sm:px-4 sticky top-0 z-30">
-          <div className="flex justify-between items-center gap-2 sm:gap-3 w-full">
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-base sm:text-xl md:text-2xl font-extrabold text-white flex items-center gap-1 sm:gap-2 drop-shadow-md">
-                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
-                <span className="line-clamp-1">جدولة الحلقات الدراسية</span>
+              <CardTitle className="text-base sm:text-xl md:text-2xl font-extrabold text-white flex items-center justify-between gap-2 drop-shadow-md">
+
+                <div className="flex items-center gap-1 sm:gap-2 justify-end">
+                  <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
+                  <span className="line-clamp-1">جدولة الحلقات الدراسية </span>
+                </div>
               </CardTitle>
-              <CardDescription className="text-[11px] sm:text-sm md:text-sm text-green-100 mt-0.5 font-medium drop-shadow">
-                عرض وتعديل جدولة الحلقات ومواعيدها
+              <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
+                إدارة مواعيد وجدولة الحلقات الدراسية .
               </CardDescription>
             </div>
 
-            {/* زر العودة */}
-            <Button
-              variant="outline"
-              className="flex items-center gap-1 rounded-lg sm:rounded-2xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md sm:shadow-lg hover:scale-105 transition-all duration-300 px-2 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-sm md:text-base border border-green-200"
-              onClick={() => onNavigate('/study-circles')}
-              title="العودة إلى الحلقات"
-            >
-              <ChevronLeft className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
-              <span className="sr-only sm:not-sr-only sm:inline">العودة</span>
-            </Button>
           </div>
         </CardHeader>
 
@@ -622,6 +615,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 </div>
               </div>
             </div>
+
             {/* جانب الجدولة - ثلثين الصفحة */}
             <div className="md:col-span-2">
               <div className="bg-green-50 border border-green-200 rounded-none md:rounded-xl shadow-sm overflow-hidden">
@@ -641,14 +635,14 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   </div>
 
                   <div className="flex items-center gap-1">
-                    {canEditSchedules && (
+                    {canEditSchedules && selectedCircle && (
                       <Button
-                        onClick={handleAddSchedule}
-                        size="sm"
-                        className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none"
-                        title="إضافة موعد"
+                      onClick={handleAddSchedule}
+                      size="sm"
+                      className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none"
+                      title="إضافة موعد"
                       >
-                        <Plus className="h-2.5 w-2.5" />
+                      <Plus className="h-2.5 w-2.5" />
                       </Button>
                     )}
 
@@ -816,7 +810,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                           const dayName = getWeekdayName(group.weekday);
                           return (
                             <div key={group.weekday} className="border border-green-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                                <div className="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-green-400 to-green-600 rounded-xl shadow-md border border-green-300">
+                              <div className="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-green-400 to-green-600 rounded-xl shadow-md border border-green-300">
                                 <h3 className="font-bold flex items-center gap-2 text-sm text-white">
                                   <span>📅 {dayName}</span>
                                 </h3>

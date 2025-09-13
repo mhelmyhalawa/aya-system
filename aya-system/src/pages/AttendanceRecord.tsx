@@ -199,7 +199,23 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
       setLoading(true);
       try {
         const sessions = await getSessionsByCircleId(selectedCircle);
-        setCircleSessions(sessions);
+        
+        // تصفية الجلسات ليتم عرض فقط جلسات اليوم والمستقبلية
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // تعيين الوقت إلى بداية اليوم
+        
+        const filteredSessions = sessions.filter(session => {
+          const sessionDate = new Date(session.session_date);
+          sessionDate.setHours(0, 0, 0, 0); // تعيين الوقت إلى بداية اليوم للمقارنة العادلة
+          return sessionDate >= today;
+        });
+        
+        // ترتيب الجلسات حسب التاريخ (الأقرب أولاً)
+        const sortedSessions = filteredSessions.sort((a, b) => 
+          new Date(a.session_date).getTime() - new Date(b.session_date).getTime()
+        );
+        
+        setCircleSessions(sortedSessions);
         setSelectedSession(null); // إعادة تعيين الجلسة المختارة
       } catch (error) {
         console.error("خطأ في جلب جلسات الحلقة:", error);
@@ -438,10 +454,11 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
   return (
 
-    <div className="container mx-auto py-6" dir="rtl">
-      <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
+
+      <Card>
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div className="flex flex-col">
               <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
@@ -562,7 +579,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                       <div className="flex items-center gap-2">
                         <CalendarCheck className="h-5 w-5 text-green-700" />
                         {selectedCircle ?
-                          `الجلسات المتاحة لحلقة: ${getCircleName(selectedCircle)}` :
+                          `جلسات اليوم والمستقبل لحلقة: ${getCircleName(selectedCircle)}` :
                           'اختر الحلقة لعرض الجلسات'
                         }
                       </div>
@@ -582,7 +599,13 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                   ) : loading ? (
                     <div className="text-center text-xs text-gray-500 mt-4">جارٍ تحميل الجلسات...</div>
                   ) : circleSessions.length === 0 ? (
-                    <div className="text-center text-xs text-gray-500 mt-4">لا توجد جلسات لهذه الحلقة</div>
+                    <div className="text-center text-xs text-gray-500 mt-4">
+                      <div className="flex flex-col items-center justify-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <AlertCircle className="h-6 w-6 text-yellow-500 mb-2" />
+                        <p className="font-medium text-yellow-700 mb-1">لا توجد جلسات مستقبلية لهذه الحلقة</p>
+                        <p className="text-gray-600">تظهر فقط جلسات اليوم والتواريخ المستقبلية</p>
+                      </div>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-2">
                       {circleSessions.map((session) => {
@@ -607,6 +630,25 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                               <div className="flex items-center gap-2 font-medium group-hover:scale-105 transition-transform duration-200">
                                 <CalendarCheck className={`h-4 w-4 text-green-700 ${isSelected ? "animate-bounce" : ""}`} />
                                 {formatDateDisplay(session.session_date)}
+                                
+                                {/* إشارة إلى جلسة اليوم */}
+                                {(() => {
+                                  const sessionDate = new Date(session.session_date);
+                                  const today = new Date();
+                                  
+                                  // تنسيق التواريخ للمقارنة
+                                  sessionDate.setHours(0, 0, 0, 0);
+                                  today.setHours(0, 0, 0, 0);
+                                  
+                                  if (sessionDate.getTime() === today.getTime()) {
+                                    return (
+                                      <Badge className="mr-1 bg-green-500 hover:bg-green-600 text-white text-xs px-1.5 py-0.5 rounded animate-pulse">
+                                        اليوم
+                                      </Badge>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
 
                               {/* التوقيت مع ألوان مختلفة */}

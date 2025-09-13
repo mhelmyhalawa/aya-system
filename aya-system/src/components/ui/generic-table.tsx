@@ -40,6 +40,13 @@ export function GenericTable<T extends { id: string }>(props: {
     onAddNew?: () => void;
     onRefresh?: () => void;
     title?: string;
+    cardGridColumns?: {
+        sm?: number; // عدد الأعمدة في الشاشات الصغيرة
+        md?: number; // عدد الأعمدة في الشاشات المتوسطة
+        lg?: number; // عدد الأعمدة في الشاشات الكبيرة
+        xl?: number; // عدد الأعمدة في الشاشات الكبيرة جدًا
+    };
+    cardWidth?: string; // عرض البطاقة المخصص (مثل: "300px", "100%", إلخ)
 }) {
     const {
         data,
@@ -58,6 +65,8 @@ export function GenericTable<T extends { id: string }>(props: {
         onAddNew,
         onRefresh,
         title = '',
+        cardGridColumns = { sm: 1, md: 2, lg: 3, xl: 4 },
+        cardWidth,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -305,7 +314,13 @@ export function GenericTable<T extends { id: string }>(props: {
 
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full p-2 overflow-y-auto max-h-[calc(100vh-200px)]">
+                <div 
+                    className={`grid gap-4 w-full p-2 overflow-y-auto max-h-[calc(100vh-200px)]
+                        grid-cols-1 
+                        ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
+                        ${cardGridColumns.lg ? `lg:grid-cols-${cardGridColumns.lg}` : 'lg:grid-cols-3'} 
+                        ${cardGridColumns.xl ? `xl:grid-cols-${cardGridColumns.xl}` : 'xl:grid-cols-4'}`}
+                >
                     {(() => {
                         const CardItem = ({ item }: { item: T }) => {
                             const [expanded, setExpanded] = useState(false);
@@ -333,9 +348,11 @@ export function GenericTable<T extends { id: string }>(props: {
                                         }
                                     }}
                                     className={cn(
-                                        'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm transition-all duration-200 overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 w-full h-full',
+                                        'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm transition-all duration-200 overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 h-full',
+                                        cardWidth ? '' : 'w-full',
                                         highlightOnHover && 'hover:shadow-md hover:border-green-400/60 dark:hover:border-green-600/60'
                                     )}
+                                    style={cardWidth ? { width: cardWidth } : undefined}
                                 >
                                     {/* الرأس */}
                                     <div className="px-3 py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 

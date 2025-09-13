@@ -134,8 +134,15 @@ export const updateSession = async (session: CircleSessionUpdate): Promise<{ suc
     
     // إعداد البيانات للتحديث (حذف المفاتيح الرئيسية)
     const updateData = { ...session };
+    
+    // إذا كان هناك تاريخ جديد، نقوم بتحديث حقل session_date
+    if (updateData.session_date_new) {
+      updateData.session_date = updateData.session_date_new;
+      delete updateData.session_date_new;
+    }
+    
+    // حذف المفاتيح الأساسية من كائن التحديث
     delete (updateData as any).study_circle_id;
-    delete (updateData as any).session_date;
     
     const { data, error } = await supabase
       .from(CIRCLE_SESSIONS_TABLE)

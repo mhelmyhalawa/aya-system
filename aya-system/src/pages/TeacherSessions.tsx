@@ -3,7 +3,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import {
@@ -48,534 +47,667 @@ import {
   CalendarRange,
   AlarmClock,
   CalendarClock,
+  BookOpen,
+  Plus,
   FileText,
   Search,
-  Plus,
   Check
 } from "lucide-react";
 import { getStudyCirclesByTeacherId, getAllStudyCircles } from "@/lib/study-circle-service";
 import { getSessionsByCircleId, createSession, updateSession, deleteSession } from "@/lib/circle-session-service";
 import { getteachers } from "@/lib/profile-service";
-import { StudyCircle } from "@/types/study-circle";
-import { CircleSession, formatTimeDisplay, formatDateDisplay, formatShortDate } from "@/types/circle-session";
-import { Profile } from "@/types/profile";
-import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { Badge } from "@/components/ui/badge";
-import { GenericTable } from "@/components/ui/generic-table";
+import { format, isAfter, parseISO, startOfToday, addDays } from "date-fns";
+import { arSA } from "date-fns/locale";
+import { GenericTable, Column } from "@/components/ui/generic-table";
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
+import { CircleSession } from "@/types/circle-session";
 
-interface TeacherSessionsProps {
-  onNavigate: (path: string) => void;
-  currentUser: Profile | null;
-}
+type TeacherSessionsProps = {
+  onNavigate: (page: string) => void;
+  currentUser: any;
+};
+
+// تنسيق عرض التاريخ 
+const formatDateDisplay = (dateString: string) => {
+  const date = parseISO(dateString);
+  return format(date, "EEEE d MMMM yyyy", { locale: arSA });
+};
+
+// تنسيق عرض التاريخ المختصر
+const formatShortDate = (dateString: string) => {
+  const date = parseISO(dateString);
+  return format(date, "d MMM yyyy", { locale: arSA });
+};
+
+// تنسيق عرض الوقت مع ص/م
+const formatTimeDisplay = (timeString: string | null | undefined) => {
+  if (!timeString) return "-";
+
+  // استخراج الساعة والدقيقة
+  const [hours, minutes] = timeString.substring(0, 5).split(':').map(Number);
+
+  // تحديد ص/م
+  const period = hours >= 12 ? "م" : "ص";
+
+  // تحويل إلى نظام 12 ساعة
+  const hours12 = hours % 12 || 12;
+
+  // إرجاع الصيغة النهائية
+  return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
 
 export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProps) {
-  const { toast } = useToast();
-  const [teacherCircles, setTeacherCircles] = useState<StudyCircle[]>([]);
-  const [allCircles, setAllCircles] = useState<StudyCircle[]>([]);
-  const [selectedCircle, setSelectedCircle] = useState<string>("");
-  const [circleSessions, setCircleSessions] = useState<CircleSession[]>([]);
-  const [teachers, setTeachers] = useState<Profile[]>([]);
+  // تعريف المتغيرات وحالة المكون
   const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState<string>("");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [sessionToDelete, setSessionToDelete] = useState<CircleSession | null>(null);
-  const [formData, setFormData] = useState<{
-    study_circle_id: string;
-    session_date: string;
-    start_time: string;
-    end_time: string;
-    notes: string;
-    teacher_id: string; // معرف المعلم البديل
-  }>({
-    study_circle_id: "",
-    session_date: new Date().toISOString().split('T')[0], // التاريخ الحالي بتنسيق YYYY-MM-DD
+  const [circles, setCircles] = useState<any[]>([]);
+  const [selectedCircle, setSelectedCircle] = useState<string | null>(null);
+  const [circleSessions, setCircleSessions] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const { toast } = useToast();
+
+  // بحث الحلقات
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // دور المستخدم الحالي
+  const userRole = currentUser?.role;
+
+  // تصفية الحلقات حسب البحث
+  const filteredCircles = circles.filter((circle) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    const circleName = (circle?.name || "").toLowerCase();
+    const teacherName = (circle?.teacher?.full_name || "").toLowerCase();
+    return circleName.includes(term) || teacherName.includes(term);
+  });
+
+  // حالة نموذج إضافة/تعديل الجلسة
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    session_date: "",
     start_time: "",
     end_time: "",
     notes: "",
-    teacher_id: "",
   });
 
-  // للتحقق ما إذا كان المستخدم مدير أو مشرف
-  const isAdminOrSuperadmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
+  // حالة نافذة التأكيد للحذف
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<CircleSession | null>(null);
 
-  // جلب حلقات المعلم عند تحميل الصفحة
+  // Temporary cast to allow controlled usage until DeleteConfirmationDialogProps includes open/onOpenChange
+  const DeleteConfirmationDialogAny = DeleteConfirmationDialog as any;
+
+  // جلب بيانات الحلقات عند تحميل المكون
   useEffect(() => {
-    const loadData = async () => {
-      if (!currentUser) {
-        toast({
-          title: "تنبيه",
-          description: "يرجى تسجيل الدخول أولاً",
-          variant: "destructive",
-        });
-        onNavigate('/login');
-        return;
-      }
-
-      // عرض معلومات المستخدم للتشخيص
-      console.log("TeacherSessions - Current User:", currentUser);
-      console.log("TeacherSessions - User Role:", currentUser.role);
-      console.log("TeacherSessions - isAdminOrSuperadmin:", isAdminOrSuperadmin);
-
-      // التأكد من أن المستخدم لديه الصلاحيات المطلوبة
-      if (currentUser.role !== 'admin' && currentUser.role !== 'superadmin' && currentUser.role !== 'teacher') {
-        console.error("Invalid role for this page:", currentUser.role);
-        toast({
-          title: "تنبيه",
-          description: `ليس لديك صلاحية للوصول إلى هذه الصفحة. الدور الحالي: ${currentUser.role}`,
-          variant: "destructive",
-        });
-        setTimeout(() => onNavigate('/'), 2000);
-        return;
-      }
-
+    async function loadData() {
       setLoading(true);
       try {
-        // جلب المعلمين المتاحين للاختيار كبديل (للمشرفين والمديرين فقط)
-        if (isAdminOrSuperadmin) {
-          const teachersList = await getteachers();
-          setTeachers(teachersList);
+        let circlesData;
 
-          // جلب جميع الحلقات للمشرفين والمديرين
-          const circles = await getAllStudyCircles();
-          setAllCircles(circles);
-
-          // اختيار أول حلقة افتراضياً إذا وجدت
-          if (circles.length > 0) {
-            setSelectedCircle(circles[0].id);
-          }
-        } else if (currentUser.role === 'teacher') {
-          // جلب حلقات المعلم فقط
-          console.log("Fetching circles for teacher:", currentUser.id);
-          const circles = await getStudyCirclesByTeacherId(currentUser.id);
-          setTeacherCircles(circles);
-
-          // اختيار أول حلقة افتراضياً إذا وجدت
-          if (circles.length > 0) {
-            setSelectedCircle(circles[0].id);
-          }
+        // اذا كان المستخدم معلم، يتم جلب الحلقات الخاصة به فقط
+        if (currentUser && currentUser.role === "teacher") {
+          circlesData = await getStudyCirclesByTeacherId(currentUser.id);
         } else {
-          console.error("Invalid role for this page:", currentUser.role);
-          toast({
-            title: "تنبيه",
-            description: `ليس لديك صلاحية للوصول إلى هذه الصفحة. الدور الحالي: ${currentUser.role}`,
-            variant: "destructive",
-          });
-          setTimeout(() => onNavigate('/'), 2000);
+          // وإلا يتم جلب جميع الحلقات (للمشرفين والمدراء)
+          circlesData = await getAllStudyCircles();
+        }
+
+        setCircles(circlesData);
+
+        // جلب قائمة المعلمين
+        const teachersData = await getteachers();
+        setTeachers(teachersData);
+
+        // إذا كان المستخدم معلم، يتم اختيار أول حلقة تلقائيًا
+        if (currentUser && currentUser.role === "teacher" && circlesData.length > 0) {
+          setSelectedCircle(circlesData[0].id);
         }
       } catch (error) {
-        console.error("خطأ في جلب البيانات:", error);
+        console.error("Error loading initial data:", error);
         toast({
-          title: "خطأ",
-          description: "حدث خطأ أثناء جلب البيانات",
+          title: "خطأ في تحميل البيانات",
+          description: "حدث خطأ أثناء تحميل بيانات الحلقات",
           variant: "destructive",
         });
       } finally {
         setLoading(false);
       }
-    };
+    }
 
     loadData();
-  }, [currentUser, onNavigate, toast, isAdminOrSuperadmin]);
+  }, [currentUser, toast]);
 
-  // جلب جلسات الحلقة المختارة
+  // جلب جلسات الحلقة عند اختيار حلقة
   useEffect(() => {
-    const loadCircleSessions = async () => {
-      if (!selectedCircle) return;
+    async function loadCircleSessions() {
+      if (!selectedCircle) {
+        setCircleSessions([]);
+        return;
+      }
 
       setLoading(true);
       try {
-        const sessions = await getSessionsByCircleId(selectedCircle);
-        
-        // فلترة الجلسات لعرض الجلسات المستقبلية فقط من تاريخ اليوم
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // تعيين الوقت إلى بداية اليوم
-        
-        const futureSessions = sessions.filter(session => {
-          const sessionDate = new Date(session.session_date);
-          sessionDate.setHours(0, 0, 0, 0); // تعيين الوقت إلى بداية اليوم للمقارنة بشكل صحيح
-          return sessionDate >= today; // تضمين الجلسات من اليوم فصاعداً
+        // جلب جميع الجلسات للحلقة المختارة
+        const sessionsData = await getSessionsByCircleId(selectedCircle);
+
+        // فلترة الجلسات لإظهار الجلسات المستقبلية فقط (من تاريخ اليوم)
+        const today = startOfToday();
+        const futureSessions = sessionsData.filter((session: any) => {
+          const sessionDate = parseISO(session.session_date);
+          return isAfter(sessionDate, today) || format(sessionDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
         });
-        
-        setCircleSessions(futureSessions);
+
+        // ترتيب الجلسات حسب التاريخ تصاعديًا
+        const sortedSessions = futureSessions.sort((a: any, b: any) => {
+          return parseISO(a.session_date).getTime() - parseISO(b.session_date).getTime();
+        });
+
+        setCircleSessions(sortedSessions);
       } catch (error) {
-        console.error("خطأ في جلب جلسات الحلقة:", error);
+        console.error("Error loading circle sessions:", error);
         toast({
-          title: "خطأ",
-          description: "حدث خطأ أثناء جلب بيانات الجلسات",
+          title: "خطأ في تحميل البيانات",
+          description: "حدث خطأ أثناء تحميل جلسات الحلقة",
           variant: "destructive",
         });
       } finally {
         setLoading(false);
       }
-    };
+    }
 
     loadCircleSessions();
   }, [selectedCircle, toast]);
-
-  // تصفية الحلقات بناءً على مصطلح البحث
-  const filteredCircles = () => {
-    const circles = isAdminOrSuperadmin ? allCircles : teacherCircles;
-    if (!searchTerm.trim()) return circles;
-
-    return circles.filter(circle =>
-      circle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (circle.teacher?.full_name && circle.teacher.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  };
 
   // تغيير الحلقة المختارة
   const handleCircleChange = (circleId: string) => {
     setSelectedCircle(circleId);
   };
 
-  // إعداد النموذج لإضافة جلسة جديدة
+  // التعامل مع إضافة جلسة جديدة
   const handleAddSession = () => {
+    // تهيئة نموذج بتاريخ اليوم
+    const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
     setFormData({
-      study_circle_id: selectedCircle,
-      session_date: new Date().toISOString().split('T')[0],
-      start_time: "",
-      end_time: "",
+      session_date: tomorrow,
+      start_time: "08:00",
+      end_time: "09:00",
       notes: "",
-      teacher_id: currentUser?.id || "",
     });
-    setIsEditMode(false);
-    setIsDialogOpen(true);
+    setIsAddDialogOpen(true);
   };
 
-  // إعداد النموذج لتعديل جلسة موجودة
+  // حفظ الجلسة الجديدة
+  const handleSaveNewSession = async () => {
+    if (!selectedCircle) return;
+
+    try {
+      // تأكد من صحة البيانات
+      if (!formData.session_date || !formData.start_time || !formData.end_time) {
+        toast({
+          title: "بيانات غير مكتملة",
+          description: "يرجى ملء جميع الحقول المطلوبة",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // إنشاء كائن الجلسة الجديدة
+      const newSession = {
+        study_circle_id: selectedCircle,
+        session_date: formData.session_date,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        notes: formData.notes,
+        teacher_id: currentUser.role === "teacher" ? currentUser.id : null,
+      };
+
+      // حفظ الجلسة الجديدة
+      await createSession(newSession);
+
+      // تحديث قائمة الجلسات
+      const sessionsData = await getSessionsByCircleId(selectedCircle);
+      const today = startOfToday();
+      const futureSessions = sessionsData.filter((session: any) => {
+        const sessionDate = parseISO(session.session_date);
+        return isAfter(sessionDate, today) || format(sessionDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+      });
+
+      // ترتيب الجلسات حسب التاريخ تصاعديًا
+      const sortedSessions = futureSessions.sort((a: any, b: any) => {
+        return parseISO(a.session_date).getTime() - parseISO(b.session_date).getTime();
+      });
+
+      setCircleSessions(sortedSessions);
+
+      // إغلاق النافذة وعرض رسالة نجاح
+      setIsAddDialogOpen(false);
+      toast({
+        title: "تمت العملية بنجاح",
+        description: "تم إضافة الجلسة الجديدة بنجاح",
+      });
+    } catch (error) {
+      console.error("Error adding session:", error);
+      toast({
+        title: "خطأ في الحفظ",
+        description: "حدث خطأ أثناء حفظ الجلسة الجديدة",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // التعامل مع تعديل جلسة
   const handleEditSession = (session: CircleSession) => {
     setFormData({
-      study_circle_id: session.study_circle_id,
       session_date: session.session_date,
       start_time: session.start_time || "",
       end_time: session.end_time || "",
       notes: session.notes || "",
-      teacher_id: session.teacher_id || currentUser?.id || "",
     });
-    setIsEditMode(true);
-    setIsDialogOpen(true);
+    setSessionToDelete(session); // استخدام نفس المتغير لتخزين الجلسة المراد تعديلها
+    setIsEditDialogOpen(true);
   };
 
-  // تغيير قيم النموذج
-  const handleFormChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // حفظ تعديلات الجلسة
+  const handleSaveEditedSession = async () => {
+    if (!selectedCircle || !sessionToDelete) return;
 
-  // حفظ الجلسة (إضافة أو تعديل)
-  const handleSaveSession = async () => {
-    // التحقق من البيانات المطلوبة
-    if (!formData.study_circle_id || !formData.session_date) {
-      toast({
-        title: "خطأ",
-        description: "يجب تحديد الحلقة وتاريخ الجلسة",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
     try {
-      let result;
-
-      if (isEditMode) {
-        // تحديث جلسة موجودة
-        result = await updateSession({
-          study_circle_id: formData.study_circle_id,
-          session_date: formData.session_date,
-          start_time: formData.start_time || undefined,
-          end_time: formData.end_time || undefined,
-          notes: formData.notes || undefined,
-          teacher_id: formData.teacher_id || undefined,
-        });
-      } else {
-        // إنشاء جلسة جديدة
-        result = await createSession({
-          study_circle_id: formData.study_circle_id,
-          session_date: formData.session_date,
-          start_time: formData.start_time || undefined,
-          end_time: formData.end_time || undefined,
-          notes: formData.notes || undefined,
-          teacher_id: formData.teacher_id || currentUser?.id,
-        });
-      }
-
-      if (result.success) {
+      // تأكد من صحة البيانات
+      if (!formData.session_date || !formData.start_time || !formData.end_time) {
         toast({
-          title: "تم بنجاح",
-          description: isEditMode ? "تم تحديث الجلسة بنجاح" : "تم إضافة الجلسة بنجاح",
-        });
-        setIsDialogOpen(false);
-
-        // إعادة تحميل الجلسات
-        const sessions = await getSessionsByCircleId(selectedCircle);
-        setCircleSessions(sessions);
-      } else {
-        toast({
-          title: "خطأ",
-          description: result.error || "حدث خطأ أثناء حفظ الجلسة",
+          title: "بيانات غير مكتملة",
+          description: "يرجى ملء جميع الحقول المطلوبة",
           variant: "destructive",
         });
+        return;
       }
-    } catch (error) {
-      console.error("خطأ في حفظ الجلسة:", error);
+
+      // إنشاء كائن الجلسة المعدلة
+      const updatedSession = {
+        study_circle_id: selectedCircle,
+        session_date: sessionToDelete.session_date, // استخدام التاريخ الأصلي كمعرف
+        session_date_new: formData.session_date, // التاريخ الجديد
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        notes: formData.notes,
+        teacher_id: sessionToDelete.teacher_id || currentUser.id,
+      };
+
+      // حفظ التعديلات
+      await updateSession(updatedSession);
+
+      // تحديث قائمة الجلسات
+      const sessionsData = await getSessionsByCircleId(selectedCircle);
+      const today = startOfToday();
+      const futureSessions = sessionsData.filter((session: any) => {
+        const sessionDate = parseISO(session.session_date);
+        return isAfter(sessionDate, today) || format(sessionDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
+      });
+
+      // ترتيب الجلسات حسب التاريخ تصاعديًا
+      const sortedSessions = futureSessions.sort((a: any, b: any) => {
+        return parseISO(a.session_date).getTime() - parseISO(b.session_date).getTime();
+      });
+
+      setCircleSessions(sortedSessions);
+
+      // إغلاق النافذة وعرض رسالة نجاح
+      setIsEditDialogOpen(false);
+      setSessionToDelete(null);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع أثناء حفظ الجلسة",
+        title: "تمت العملية بنجاح",
+        description: "تم تعديل الجلسة بنجاح",
+      });
+    } catch (error) {
+      console.error("Error updating session:", error);
+      toast({
+        title: "خطأ في الحفظ",
+        description: "حدث خطأ أثناء حفظ التعديلات",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
-  // حذف جلسة - الخطوة الأولى: فتح مربع حوار التأكيد
+  // التعامل مع حذف جلسة
   const handleDeleteSession = (session: CircleSession) => {
     setSessionToDelete(session);
     setIsDeleteDialogOpen(true);
   };
 
-  // حذف جلسة - الخطوة الثانية: تنفيذ الحذف بعد التأكيد
+  // تنفيذ حذف الجلسة
   const confirmDeleteSession = async () => {
-    if (!sessionToDelete) return;
+    if (!selectedCircle || !sessionToDelete) return;
 
-    setLoading(true);
     try {
-      const result = await deleteSession(sessionToDelete.study_circle_id, sessionToDelete.session_date);
+      // حذف الجلسة
+      await deleteSession(selectedCircle, sessionToDelete.session_date);
 
-      if (result.success) {
-        toast({
-          title: "تم بنجاح",
-          description: "تم حذف الجلسة بنجاح",
-        });
-
-        // إعادة تحميل الجلسات
-        const sessions = await getSessionsByCircleId(selectedCircle);
-        setCircleSessions(sessions);
-      } else {
-        toast({
-          title: "خطأ",
-          description: result.error || "حدث خطأ أثناء حذف الجلسة",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("خطأ في حذف الجلسة:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع أثناء حذف الجلسة",
-        variant: "destructive",
+      // تحديث قائمة الجلسات
+      const sessionsData = await getSessionsByCircleId(selectedCircle);
+      const today = startOfToday();
+      const futureSessions = sessionsData.filter((session: any) => {
+        const sessionDate = parseISO(session.session_date);
+        return isAfter(sessionDate, today) || format(sessionDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd');
       });
-    } finally {
-      setLoading(false);
+
+      // ترتيب الجلسات حسب التاريخ تصاعديًا
+      const sortedSessions = futureSessions.sort((a: any, b: any) => {
+        return parseISO(a.session_date).getTime() - parseISO(b.session_date).getTime();
+      });
+
+      setCircleSessions(sortedSessions);
+
+      // إغلاق النافذة وعرض رسالة نجاح
       setIsDeleteDialogOpen(false);
       setSessionToDelete(null);
+      toast({
+        title: "تمت العملية بنجاح",
+        description: "تم حذف الجلسة بنجاح",
+      });
+    } catch (error) {
+      console.error("Error deleting session:", error);
+      toast({
+        title: "خطأ في الحذف",
+        description: "حدث خطأ أثناء حذف الجلسة",
+        variant: "destructive",
+      });
     }
   };
 
-  // العثور على اسم الحلقة من معرفها
-  const getCircleName = (circleId: string): string => {
-    const circlesList = isAdminOrSuperadmin ? allCircles : teacherCircles;
-    const circle = circlesList.find((c) => c.id === circleId);
-    return circle ? circle.name : "حلقة غير معروفة";
+  // الحصول على اسم الحلقة
+  const getCircleName = (circleId: string) => {
+    if (!circleId) return "";
+    const circle = circles.find((c) => c.id === circleId);
+    return circle ? circle.name : "";
   };
 
-  // العثور على معلم الحلقة
-  const getCircleTeacher = (circleId: string): string => {
-    const circlesList = isAdminOrSuperadmin ? allCircles : teacherCircles;
-    const circle = circlesList.find((c) => c.id === circleId);
-    return " " + circle?.teacher?.full_name || "لا يوجد معلم محدد";
-  };
+  // الحصول على اسم المعلم
+  const getCircleTeacher = (circleId: string) => {
+    if (!circleId) return "";
+    const circle = circles.find((c) => c.id === circleId);
+    if (!circle || !circle.teacher_id) return "";
 
-  // العثور على اسم المعلم من معرفه
-  const getTeacherName = (teacherId?: string): string => {
+    const teacherId = circle.teacher_id;
     if (!teacherId) return "";
     const teacher = teachers.find((t) => t.id === teacherId);
     return teacher ? teacher.full_name : "";
   };
 
   return (
-    <>
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
 
-      <div className="bg-gradient-to-br min-h-screen p-4 sm:p-6 md:p-8" dir="rtl">
-        <div className="container mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-green-200">
-          {/* الهيدر */}
-          <div className="bg-green-700 py-4 px-4 text-white rounded-t-2xl shadow-md relative overflow-hidden mt-6">
-            {/* زخرفة إسلامية خفيفة في الخلفية */}
-            <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[url('/patterns/arabic-pattern.svg')] bg-repeat"></div>
-
-            <h3 className="relative text-xl md:text-2xl font-bold flex items-center gap-2">
-              <span className="text-2xl">🕌</span>
-              {isAdminOrSuperadmin
-                ? "تسجيل الجلسات المستقبلية وإدارة الحلقات"
-                : "تسجيل الجلسات المستقبلية"}
-            </h3>
-
-            <p className="relative text-green-100 mt-1 text-xs md:text-sm">
-              نظام إدارة جلسات الحلقات القرآنية المستقبلية من تاريخ اليوم
-            </p>
+      <Card>
+        {/* الهيدر */}
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            {/* العنوان والوصف */}
+            <div className="flex flex-col">
+              <CardTitle className="text-base sm:text-xl md:text-2xl font-extrabold text-white flex items-center gap-1 sm:gap-2 drop-shadow-md">
+                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
+                <span className="truncate">جلسات المعلمين</span>
+              </CardTitle>
+              <CardDescription className="text-green-100 text-xs sm:text-sm mt-0.5 sm:mt-1">
+                إدارة جلسات المعلمين والحلقات المستقبلية
+              </CardDescription>
+            </div>
           </div>
-          <div className="p-4 md:p-6 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        </CardHeader>
 
-              <div className="lg:col-span-1">
-                {/* Panel واحد */}
-                <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
-
-                  {/* Header */}
-                  <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-4">
-                    <h2 className="text-xl font-semibold text-white mb-0 flex items-center gap-2">
-                      📖 قائمة الحلقات
-                    </h2>
-                  </div>
-
-                  {/* Body */}
-                  <div className="p-4 space-y-4">
-
-                    {/* مربع البحث */}
-                    <div className="relative">
-                      <Input
-                        type="text"
-                        placeholder="ابحث عن حلقة أو معلم..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pr-10 pl-4 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm"
-                      />
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <svg
-                          className="w-5 h-5 text-green-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                          />
-                        </svg>
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* ثلث الصفحة الأول - اختيار الحلقة */}
+            <div className="md:col-span-1">
+              <div className="bg-white border border-green-200 rounded-xl shadow-md overflow-hidden">
+                {/* هيدر اختيار الحلقة */}
+                {/* قائمة الحلقات */}
+                {/* قائمة الجوال */}
+                <div className="md:hidden">
+                  <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
+                    {/* الهيدر */}
+                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
+                      <div className="flex items-center gap-1">
+                        <BookOpen className="h-3.5 w-3.5 text-white" />
+                        <h2 className="text-[12px] font-semibold text-white">قائمة الحلقات</h2>
                       </div>
-                      {searchTerm && (
-                        <div className="mt-2 text-sm text-green-700 flex items-center justify-between">
-                          <span>نتائج البحث: {filteredCircles().length} حلقة</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-xs py-0 h-6 border-green-300 text-green-700 hover:bg-green-50"
-                            onClick={() => setSearchTerm("")}
-                          >
-                            مسح البحث
-                          </Button>
+                      {selectedCircle && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-white/80">المعلم:</span>
+                          <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
+                            {getCircleTeacher(selectedCircle)?.split(" ")[0] || 'غير محدد'}
+                          </Badge>
                         </div>
                       )}
                     </div>
 
-                    {/* قائمة الحلقات */}
-                    <ul className="divide-y divide-green-200 border border-green-300 rounded-xl overflow-hidden shadow-inner max-h-96 overflow-y-auto">
-                      {filteredCircles().length > 0 ? (
-                        filteredCircles().map((circle) => (
-                          <li
-                            key={circle.id}
-                            className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2 shadow-sm ${selectedCircle === circle.id
-                              ? 'bg-green-700 text-white ring-1 ring-green-400 scale-105'
-                              : 'bg-green-50 hover:bg-green-100 text-green-800'
-                              }`}
-                            onClick={() => handleCircleChange(circle.id)}
-                          >
-                            <div className="flex items-center justify-between text-sm font-medium gap-2">
-                              {/* اسم الحلقة والمعلم */}
-                              <div className="flex items-center gap-2 truncate">
-                                <span className="text-green-500 text-lg">📖</span>
-                                <span className="truncate font-medium">{circle.name}</span>
-                                {circle.teacher && (
-                                  <span
-                                    className={`flex items-center gap-1 text-xs truncate ${selectedCircle === circle.id ? 'text-white' : 'text-green-700'
-                                      }`}
-                                  >
-                                    👨‍🏫 {circle.teacher.full_name}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </li>
-                        ))
+                    {/* البحث */}
+                    {userRole !== 'teacher' && (
+                      <div className="px-2 pt-2">
+                        <div className="relative">
+                          <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
+                          <Input
+                            placeholder="بحث..."
+                            className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* العناصر */}
+                    <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 scrollbar-thin scrollbar-thumb-green-400 scrollbar-track-transparent">
+                      {loading ? (
+                        <div className="w-full py-6 text-center flex flex-col items-center">
+                          <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
+                          <span className="text-green-700 text-[12px] font-medium">جاري التحميل...</span>
+                        </div>
+                      ) : filteredCircles.length === 0 ? (
+                        <div className="w-full py-6 text-center text-green-600 text-[12px]">لا توجد نتائج</div>
                       ) : (
-                        <li className="p-4 text-center text-gray-500 bg-gray-50">
-                          <div className="flex flex-col items-center justify-center gap-2 py-8">
-                            <svg
-                              className="w-12 h-12 text-gray-300"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                              />
-                            </svg>
-                            <p className="text-sm">
-                              {searchTerm
-                                ? `لم يتم العثور على حلقات تطابق "${searchTerm}"`
-                                : "لا توجد حلقات متاحة"}
-                            </p>
-                          </div>
-                        </li>
-                      )}
-                    </ul>
-
-                  </div>
-                </div>
-              </div>
-
-
-              <div className="md:col-span-2 bg-green-50 border border-green-200 rounded-xl shadow-sm overflow-hidden">
-
-                {/* Header */}
-                <div className="bg-gradient-to-r from-green-100 via-green-200 to-green-700 p-4">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-white" />
-                      {selectedCircle
-                        ? `الجلسات المستقبلية لحلقة : ${getCircleName(selectedCircle)}`
-                        : "الجلسات المستقبلية للحلقة : "}  | 👨‍🏫
-                      <span className="text-xs sm:text-[10px] text-gray-700">{getCircleTeacher(selectedCircle)}</span>
-                    </CardTitle>
-
-
-                    {/* زر تسجيل جلسة جديدة */}
-                    <div className="flex justify-start sm:justify-center">
-                      {selectedCircle && (
-                        <Button
-                          onClick={handleAddSession}
-                          size="sm"
-                          className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-2xl px-3 py-1 shadow-sm text-xs sm:text-sm transition-transform hover:scale-105"
-                        >
-                          <Calendar className="h-4 w-4" />
-                          تسجيل جلسة جديدة
-                        </Button>
+                        <div className="flex flex-col gap-1">
+                          {filteredCircles.map(circle => {
+                            const active = selectedCircle === circle.id;
+                            return (
+                              <button
+                                key={circle.id}
+                                onClick={() => handleCircleChange(circle.id)}
+                                className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
+                        ${active
+                                    ? 'bg-gradient-to-r from-green-600 to-green-700 border-green-300 text-white shadow-md'
+                                    : 'bg-white border-green-200 text-green-700 hover:bg-green-50 hover:border-green-400 hover:shadow-sm'}
+                      `}
+                              >
+                                <span className="font-medium truncate">{circle.name}</span>
+                                <div className="flex items-center gap-1.5">
+                                  {circle.teacher && (
+                                    <span className={`text-[10px] ${active ? 'text-green-100' : 'text-green-500'}`}>
+                                      {circle.teacher.full_name.split(" ")[0]}
+                                    </span>
+                                  )}
+                                  {active && (
+                                    <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">
+                                      ✓
+                                    </span>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
-                {/* عداد الجلسات */}
 
-                <div className="p-4">
+                {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
+                <div className="hidden md:block w-full">
+                  {/* Body */}
+                  <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden">
+                    {/* الهيدر */}
+                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
+                      <div className="flex items-center gap-1.5">
+                        <BookOpen className="h-3.5 w-3.5 text-white" />
+                        <h2 className="text-[12px] font-semibold text-white">قائمة الحلقات</h2>
+                      </div>
+                      {selectedCircle && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-white/80">المعلم:</span>
+                          <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
+                            {getCircleTeacher(selectedCircle)?.split(" ")[0] || 'غير محدد'}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
 
-                  {/* الصندوق لعدد الجلسات */}
-                  <div className="bg-green-100 rounded-lg border border-green-200 p-4 mx-2 mb-2">
-                    <Badge variant="outline" className="text-green-800 border-green-400">
+                    {/* مربع البحث */}
+                    {userRole !== 'teacher' && (
+                      <div className="p-2 border-b border-green-100">
+                        <div className="relative">
+                          <Search className="absolute right-2.5 top-[9px] h-3.5 w-3.5 text-green-500" />
+                          <Input
+                            placeholder="بحث عن حلقة..."
+                            className="pr-8 h-8 text-xs border border-green-200 rounded-md focus:border-green-400 focus:ring-1 focus:ring-green-200 shadow-sm"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* عرض الحلقات */}
+                    {loading ? (
+                      <div className="flex flex-col items-center justify-center p-4 gap-1.5">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                        <span className="text-xs text-green-600">جاري تحميل الحلقات...</span>
+                      </div>
+                    ) : filteredCircles.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center p-4 text-center gap-1.5 bg-green-50/50 m-2 rounded-lg border border-green-200">
+                        <BookOpen className="h-8 w-8 text-green-200" />
+                        <h3 className="text-sm font-semibold text-green-800">لا توجد حلقات</h3>
+                        <p className="text-xs text-green-600">
+                          لم يتم العثور على حلقات تطابق معايير البحث
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-[450px] overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-green-400/60 scrollbar-track-transparent">
+                        {filteredCircles.map(circle => {
+                          const active = selectedCircle === circle.id;
+                          return (
+                            <button
+                              key={circle.id}
+                              type="button"
+                              onClick={() => handleCircleChange(circle.id)}
+                              className={`
+                        group w-full text-right relative rounded-lg px-3 py-2.5 transition-all duration-200
+                        border flex flex-col gap-1
+                        ${active
+                                  ? 'bg-gradient-to-l from-green-700 via-green-600 to-green-500 text-white border-green-500 shadow-sm shadow-green-300/30'
+                                  : 'bg-white hover:bg-green-50 text-green-800 border-green-200 hover:border-green-400'}
+                        `}
+                            >
+                              {/* شريط جانبي للحالة */}
+                              <span
+                                className={`
+                          absolute right-0 top-0 h-full w-1 rounded-r-lg transition-all
+                          ${active ? 'bg-white/90' : 'bg-green-300/0 group-hover:bg-green-300/60'}
+                        `}
+                              />
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`
+                          inline-flex items-center justify-center h-7 w-7 rounded-md text-xs font-semibold
+                          ${active
+                                      ? 'bg-white/20 text-white ring-1 ring-white/40'
+                                      : 'bg-green-100 text-green-700 group-hover:bg-green-200'}
+                          `}
+                                >
+                                  <BookOpen className="h-3.5 w-3.5" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-bold truncate ${active ? 'text-white' : 'text-green-800'}`}>
+                                    {circle.name}
+                                  </p>
+                                  {circle.teacher && (
+                                    <p
+                                      className={`text-xs mt-0.5 truncate flex items-center gap-1
+                            ${active ? 'text-green-100' : 'text-green-600 group-hover:text-green-700'}
+                            `}
+                                    >
+                                      <UserCheck className="h-3 w-3" />
+                                      {circle.teacher.full_name}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  {active && (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-white/60 text-[9px] leading-none px-1.5 py-0.5 bg-white/20 text-white"
+                                    >
+                                      <Check className="h-2.5 w-2.5 mr-0.5" />
+                                      محدد
+                                    </Badge>
+                                  )}
+                                  {typeof circle?.students_count !== 'undefined' && (
+                                    <span
+                                      className={`
+                            inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium
+                            ${active
+                                          ? 'bg-white/30 text-white'
+                                          : 'bg-green-100 text-green-700 group-hover:bg-green-200'}
+                            `}
+                                      title="عدد الطلاب"
+                                    >
+                                      {circle.students_count}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* عرض الجلسات - ثلثي الصفحة */}
+            <div className="md:col-span-2">
+              <div className="bg-white border border-green-200 rounded-xl shadow-md overflow-hidden">
+                {/* هيدر الجلسات */}
+                <div className="bg-gradient-to-r from-green-100 via-green-200 to-green-300 px-3 py-2 sm:px-4 sm:py-3 border-b border-green-300">
+                  <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+                    <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-start">
+                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" />
+                      <h3 className="text-sm sm:text-base md:text-lg font-bold text-green-800 text-center sm:text-right">
+                        {selectedCircle ? (
+                          <span>الجلسات المستقبلية لحلقة: {getCircleName(selectedCircle)}</span>
+                        ) : (
+                          <span>الجلسات المستقبلية للحلقة</span>
+                        )}
+                      </h3>
+                    </div>
+                    {selectedCircle && (
+                      <Button
+                        onClick={handleAddSession}
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm rounded-lg shadow-sm flex items-center gap-1 mx-auto sm:mx-0"
+                        title="تسجيل جلسة جديدة"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span className="inline">تسجيل جلسة جديدة</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* عداد الجلسات والبيانات */}
+                <div className="p-3 sm:p-4">
+                  {/* عدد الجلسات */}
+                  <div className="bg-green-50 rounded-lg border border-green-200 p-2 sm:p-3 mb-3 sm:mb-4">
+                    <Badge variant="outline" className="text-green-800 border-green-400 text-xs sm:text-sm">
                       {circleSessions.length > 0
                         ? `عدد الجلسات المستقبلية: ${circleSessions.length}`
                         : "لا توجد جلسات مستقبلية"}
@@ -584,228 +716,282 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
                   {/* جدول الجلسات */}
                   {loading ? (
-                    <div className="text-center py-4 text-green-600">جاري التحميل...</div>
-                  ) : circleSessions.length > 0 ? (
-                    <div className="overflow-x-auto p-2">
-
-                      <GenericTable
-                        data={circleSessions.map((session, index) => ({
-                          ...session,
-                          id: `${session.study_circle_id}-${session.session_date}-${index}`
-                        }))}
-                        columns={[
-                          {
-                            key: 'session_date',
-                            header: '📅 التاريخ',
-                            align: 'right',
-                            render: (session) => (
-                              <div className="flex flex-col text-right">
-                                <span className="text-green-800 font-medium">{formatShortDate(session.session_date)}</span>
-                                <span className="text-xs text-green-600">{formatDateDisplay(session.session_date)}</span>
-                              </div>
-                            ),
-                          },
-                          {
-                            key: 'time',
-                            header: '⏰ الوقت',
-                            align: 'right',
-                            render: (session) => (
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-lg">
-                                  <Clock className="h-4 w-4" />
-                                  <span className="font-medium">{formatTimeDisplay(session.start_time)}</span>
-                                </div>
-                                <span className="text-gray-400 font-bold mx-1">—</span>
-                                <div className="flex items-center gap-1 bg-red-100 text-red-800 px-3 py-1 rounded-lg">
-                                  <Clock className="h-4 w-4" />
-                                  <span className="font-medium">{formatTimeDisplay(session.end_time)}</span>
-                                </div>
-                              </div>
-                            ),
-                          },
-                          {
-                            key: 'notes',
-                            header: '📝 ملاحظات',
-                            align: 'right',
-                            render: (session) => (
-                              <span className="text-green-800 max-w-[200px] block">{session.notes || '—'}</span>
-                            ),
-                          },
-                          {
-                            key: 'actions',
-                            header: '⚙️ إجراءات',
-                            align: 'center',
-                            render: (session) => (
-                              <div className="flex justify-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditSession({ 
-                                    study_circle_id: session.study_circle_id,
-                                    session_date: session.session_date,
-                                    start_time: session.start_time,
-                                    end_time: session.end_time,
-                                    notes: session.notes,
-                                    teacher_id: session.teacher_id
-                                  })}
-                                  className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 transition-colors"
-                                  title="تعديل الجلسة"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteSession({
-                                    study_circle_id: session.study_circle_id,
-                                    session_date: session.session_date,
-                                    start_time: session.start_time,
-                                    end_time: session.end_time,
-                                    notes: session.notes,
-                                    teacher_id: session.teacher_id
-                                  })}
-                                  className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 transition-colors"
-                                  title="حذف الجلسة"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ),
-                          },
-                        ]}
-                        emptyMessage="لا توجد جلسات مستقبلية"
-                        className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-                        getRowClassName={(_, index) =>
-                          `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
-                        }
-                      />
+                    <div className="text-center py-12 flex flex-col items-center justify-center">
+                      <div className="animate-spin h-8 w-8 border-3 border-green-500 border-t-transparent rounded-full mb-2"></div>
+                      <span className="text-green-700 font-medium">جاري التحميل...</span>
                     </div>
                   ) : selectedCircle ? (
-                    <div className="text-center py-6 text-green-600">
-                      لا توجد جلسات مستقبلية مسجلة لهذه الحلقة.
-                      <br />
-                      انقر على زر "تسجيل جلسة جديدة" في الأعلى لإضافة جلسة.
-                    </div>
+                    circleSessions.length > 0 ? (
+                      <div className="overflow-hidden">
+                        <GenericTable
+                          data={circleSessions.map((session, index) => ({
+                            ...session,
+                            id: `${session.study_circle_id}-${session.session_date}-${index}`
+                          }))}
+                          cardGridColumns={{ sm: 1, md: 1, lg: 2, xl: 3 }}
+                          cardWidth="100%"
+                          columns={[
+                            {
+                              key: 'session_date',
+                              header: '📅 التاريخ',
+                              align: 'right',
+                              render: (session) => (
+                                <div className="flex flex-col text-right">
+                                  <span className="text-xs text-white-600">{formatDateDisplay(session.session_date)}</span>
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'time',
+                              header: '⏰ الوقت',
+                              align: 'right',
+                              render: (session) => (
+                                <div className="flex flex-wrap items-center gap-1 max-w-full">
+                                  <div className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-lg text-xs whitespace-nowrap">
+                                    <Clock className="h-3 w-3" />
+                                    <span className="font-medium">{formatTimeDisplay(session.start_time)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-xs whitespace-nowrap">
+                                    <Clock className="h-3 w-3" />
+                                    <span className="font-medium">{formatTimeDisplay(session.end_time)}</span>
+                                  </div>
+                                </div>
+                              ),
+                            },
+                            {
+                              key: 'notes',
+                              header: '📝مذكرة',
+                              align: 'right',
+                              render: (session) => (
+                                <span className="text-green-800 text-xs max-w-[200px] block">{session.notes || '—'}</span>
+                              ),
+                            },
+                            {
+                              key: 'actions',
+                              header: '⚙️ إجراءات',
+                              align: 'center',
+                              render: (session) => (
+                                <div className="flex justify-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditSession({
+                                      study_circle_id: session.study_circle_id,
+                                      session_date: session.session_date,
+                                      start_time: session.start_time,
+                                      end_time: session.end_time,
+                                      notes: session.notes,
+                                      teacher_id: session.teacher_id
+                                    })}
+                                    className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 transition-colors"
+                                    title="تعديل الجلسة"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSession({
+                                      study_circle_id: session.study_circle_id,
+                                      session_date: session.session_date,
+                                      start_time: session.start_time,
+                                      end_time: session.end_time,
+                                      notes: session.notes,
+                                      teacher_id: session.teacher_id
+                                    })}
+                                    className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 transition-colors"
+                                    title="حذف الجلسة"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ),
+                            },
+                          ]}
+                          emptyMessage="لا توجد جلسات مستقبلية"
+                          className="overflow-hidden rounded-xl border border-green-300 shadow-md"
+                          getRowClassName={(_, index) =>
+                            `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
+                          }
+                        />
+                      </div>
+                    ) : (
+                      <div className="py-16 text-center">
+                        <div className="bg-green-50 rounded-2xl p-6 max-w-md mx-auto border border-green-200 shadow-inner">
+                          <Calendar className="w-12 h-12 text-green-300 mx-auto mb-3" />
+                          <h3 className="text-lg font-bold text-green-800 mb-2">لا توجد جلسات مستقبلية</h3>
+                          <p className="text-green-600 text-sm mb-4">
+                            لا توجد جلسات مستقبلية مسجلة لهذه الحلقة
+                          </p>
+                          <Button
+                            onClick={handleAddSession}
+                            className="bg-green-600 hover:bg-green-700 text-white rounded-xl"
+                          >
+                            <Plus className="h-4 w-4 mr-1" />
+                            تسجيل جلسة جديدة
+                          </Button>
+                        </div>
+                      </div>
+                    )
                   ) : (
-                    <div className="text-center py-6 text-green-600">
-                      اختر حلقة لعرض الجلسات المستقبلية الخاصة بها.
+                    <div className="py-16 text-center">
+                      <div className="bg-green-50 rounded-2xl p-6 max-w-md mx-auto border border-green-200 shadow-inner">
+                        <BookOpen className="w-12 h-12 text-green-300 mx-auto mb-3" />
+                        <h3 className="text-lg font-bold text-green-800 mb-2">اختر حلقة لعرض الجلسات</h3>
+                        <p className="text-green-600 text-sm">
+                          يرجى اختيار حلقة من القائمة على اليمين لعرض الجلسات المستقبلية الخاصة بها
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
-
               </div>
-
-
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-
+      {/* نافذة إضافة جلسة جديدة */}
+      {/* نافذة إضافة جلسة جديدة */}
       <FormDialog
-        title={isEditMode ? "تعديل جلسة" : "تسجيل جلسة جديدة"}
-        description={isEditMode ? "قم بتعديل بيانات الجلسة أدناه" : "قم بإدخال بيانات الجلسة الجديدة"}
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onSave={handleSaveSession}
-        saveButtonText="حفظ"
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        title="تسجيل جلسة جديدة"
+        description="أدخل بيانات الجلسة الجديدة"
+        onSave={handleSaveNewSession}
+        saveButtonText="حفظ الجلسة"
         cancelButtonText="إلغاء"
-        mode={isEditMode ? "edit" : "add"}
+        maxWidth="600px"
+        mode="add"
         isLoading={loading}
-        maxWidth="550px"
       >
-        {/* التاريخ */}
-        <FormRow label="تاريخ الجلسة *">
-          <Input
-            id="session_date"
-            name="session_date"
-            type="date"
-            value={formData.session_date}
-            onChange={handleFormChange}
-            className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-            required
-          />
+        <FormRow label="التاريخ">
+          <div className="flex flex-col gap-2">
+            <Input
+              id="session_date"
+              type="date"
+              value={formData.session_date}
+              onChange={(e) => setFormData({ ...formData, session_date: e.target.value })}
+              min={format(new Date(), "yyyy-MM-dd")}
+            />
+          </div>
         </FormRow>
 
-        {/* وقت البدء والانتهاء */}
-        <div className="grid grid-cols-2 gap-4">
-          <FormRow label="وقت البدء *">
-            <Input
-              id="start_time"
-              name="start_time"
-              type="time"
-              value={formData.start_time}
-              onChange={handleFormChange}
-              className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-            />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormRow label="وقت البدء">
+            <div className="flex flex-col gap-2">
+              <Input
+                id="start_time"
+                type="time"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+              />
+            </div>
           </FormRow>
-          <FormRow label="وقت الانتهاء *">
-            <Input
-              id="end_time"
-              name="end_time"
-              type="time"
-              value={formData.end_time}
-              onChange={handleFormChange}
-              className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-            />
+          <FormRow label="وقت الانتهاء">
+            <div className="flex flex-col gap-2">
+              <Input
+                id="end_time"
+                type="time"
+                value={formData.end_time}
+                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+              />
+            </div>
           </FormRow>
         </div>
 
-        {/* اختيار المعلم */}
-        {isAdminOrSuperadmin && (
-          <FormRow label="المعلم">
-            <Select
-              value={formData.teacher_id}
-              onValueChange={(value) =>
-                setFormData({ ...formData, teacher_id: value })
-              }
-            >
-              <SelectTrigger className="w-full bg-green-50 border-green-300 text-green-900 rounded-md shadow-inner">
-                <SelectValue placeholder="اختر المعلم" />
-              </SelectTrigger>
-              <SelectContent>
-                {teachers.map((teacher) => (
-                  <SelectItem key={teacher.id} value={teacher.id}>
-                    {teacher.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FormRow>
-        )}
-
-        {/* الملاحظات */}
         <FormRow label="ملاحظات">
-          <Textarea
-            id="notes"
-            name="notes"
-            value={formData.notes}
-            onChange={handleFormChange}
-            className="text-right bg-green-50 border-green-300 text-green-900 rounded-md py-2 px-3 shadow-inner focus:ring-2 focus:ring-green-400"
-            rows={3}
-          />
+          <div className="flex flex-col gap-2">
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="أي ملاحظات إضافية حول الجلسة..."
+              className="h-24"
+            />
+          </div>
         </FormRow>
       </FormDialog>
 
-      {/* مربع حوار تأكيد الحذف */}
-      <DeleteConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        onConfirm={confirmDeleteSession}
+      {/* نافذة تعديل الجلسة */}
+      <FormDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        title="تعديل بيانات الجلسة"
+        description="عدّل بيانات الجلسة المختارة"
+        onSave={handleSaveEditedSession}
+        saveButtonText="حفظ التعديلات"
+        cancelButtonText="إلغاء"
+        maxWidth="600px"
+        mode="edit"
         isLoading={loading}
+      >
+        <FormRow label="التاريخ">
+          <div className="flex flex-col gap-2">
+            <Input
+              id="edit_session_date"
+              type="date"
+              value={formData.session_date}
+              onChange={(e) => setFormData({ ...formData, session_date: e.target.value })}
+              min={format(new Date(), "yyyy-MM-dd")}
+            />
+          </div>
+        </FormRow>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormRow label="وقت البدء">
+            <div className="flex flex-col gap-2">
+              <Input
+                id="edit_start_time"
+                type="time"
+                value={formData.start_time}
+                onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+              />
+            </div>
+          </FormRow>
+          <FormRow label="وقت الانتهاء">
+            <div className="flex flex-col gap-2">
+              <Input
+                id="edit_end_time"
+                type="time"
+                value={formData.end_time}
+                onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+              />
+            </div>
+          </FormRow>
+        </div>
+
+        <FormRow label="ملاحظات">
+          <div className="flex flex-col gap-2">
+            <Textarea
+              id="edit_notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="أي ملاحظات إضافية حول الجلسة..."
+              className="h-24"
+            />
+          </div>
+        </FormRow>
+      </FormDialog>
+
+      {/* نافذة تأكيد الحذف */}
+      <DeleteConfirmationDialogAny
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
         title="تأكيد حذف الجلسة"
-        description="هل أنت متأكد من رغبتك في حذف هذه الجلسة؟"
-        itemDetails={sessionToDelete ? {
+        description="هل أنت متأكد من رغبتك في حذف هذه الجلسة؟ لا يمكن التراجع عن هذا الإجراء."
+        onConfirm={confirmDeleteSession}
+        detailsTitle="بيانات الجلسة المراد حذفها:"
+        details={sessionToDelete ? {
           "التاريخ": formatDateDisplay(sessionToDelete.session_date),
-          "الوقت": sessionToDelete.start_time ?
-            `${formatTimeDisplay(sessionToDelete.start_time)} - ${formatTimeDisplay(sessionToDelete.end_time || "")}` :
-            "-",
+          "الوقت": sessionToDelete.start_time && sessionToDelete.end_time
+            ? `${formatTimeDisplay(sessionToDelete.start_time)} - ${formatTimeDisplay(sessionToDelete.end_time || "")}`
+            : "-",
           "الملاحظات": sessionToDelete.notes || "-"
         } : null}
         deleteButtonText="نعم، قم بالحذف"
         cancelButtonText="إلغاء"
       />
-
-    </>
+    </div>
   );
 }

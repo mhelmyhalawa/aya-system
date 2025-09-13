@@ -19,6 +19,7 @@ export interface CircleSessionCreate extends Omit<CircleSession, 'created_at'> {
 export interface CircleSessionUpdate extends Partial<Omit<CircleSession, 'study_circle_id' | 'session_date' | 'created_at'>> {
   study_circle_id: string;
   session_date: string;
+  session_date_new?: string; // التاريخ الجديد في حالة تغييره
 }
 
 // دالة مساعدة لتنسيق الوقت
