@@ -166,7 +166,7 @@ export function DatabaseManagement({ onNavigate }: DatabaseManagementProps) {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+  <div className="w-full max-w-[1600px] mx-auto px-4 py-6">
       <Card className="w-full">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">

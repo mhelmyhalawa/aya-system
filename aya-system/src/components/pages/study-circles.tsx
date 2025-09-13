@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+// (تمت إزالة استيراد عناصر الجدول المباشر بعد استخدام GenericTable)
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import {
@@ -41,7 +41,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
 import { StudyCircleSchedule, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
 import { TeacherSessions } from "@/pages/TeacherSessions";
-import { GenericTable } from "../ui/generic-table";
+import { GenericTable, Column } from "../ui/generic-table";
 
 interface StudyCirclesProps {
   onNavigate: (path: string) => void;
@@ -510,7 +510,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
   // عرض الواجهة
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
       <Card className="bg-white dark:bg-gray-900 rounded-3xl shadow-lg border border-green-300 dark:border-green-700 overflow-hidden transition-all duration-300 hover:shadow-2xl">
         {/* الهيدر */}
@@ -536,21 +536,23 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                   className="flex items-center gap-2 rounded-3xl border-2 border-green-600 text-green-900 
                     hover:bg-green-100 hover:text-green-800 hover:scale-105 
                     dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
-                    shadow-lg transition-all duration-200 px-4 py-1.5 font-semibold"
+                    shadow-lg transition-all duration-200 px-3 md:px-4 py-1.5 font-semibold"
                   onClick={() => onNavigate('/study-circle-schedules')}
+                title="الانتقال إلى صفحة جدولة الحلقات"
                 >
                   <Calendar className="h-4 w-4" />
-                  <span className="text-sm">{'جدولة الحلقات'}</span>
+                  <span className="hidden md:inline text-sm">{'جدولة الحلقات'}</span>
                 </Button>
               )}
 
               {(userRole === 'superadmin' || userRole === 'admin') && (
                 <Button
                   onClick={handleAddCircle}
-                  className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
+                  className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-3 md:px-4 py-1.5 font-semibold"
+                title="إضافة حلقة جديدة"
                 >
                   <Plus className="h-4 w-4" />
-                  <span className="text-sm">{studyCirclesLabels.addCircle}</span>
+                  <span className="hidden md:inline text-sm">{studyCirclesLabels.addCircle}</span>
                 </Button>
               )}
             </div>
@@ -581,130 +583,121 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             </div>
           </div>
 
-          {/* الجدول */}
-          <div className="border border-green-200 dark:border-green-700 rounded-2xl overflow-hidden shadow-md">
-            <Table className="direction-rtl w-full border-collapse">
-              <TableHeader className="bg-green-800 dark:bg-green-900">
-                <TableRow>
-                  <TableHead className="text-right font-bold text-white py-3 px-4 border-r border-green-700">
-                    <div className="flex items-center gap-2">
-
-                      <span>📚{studyCirclesLabels.name}</span>
-                    </div>
-                  </TableHead>
-                  <TableHead className="text-right font-bold text-white py-3 px-4 border-r border-green-700">👨‍🏫 {studyCirclesLabels.teacher}</TableHead>
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">👥 {studyCirclesLabels.maxStudents}</TableHead>
-                  <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🗓️ {studyCirclesLabels.schedule}</TableHead>
-                  {(userRole === 'superadmin' || userRole === 'admin') && (
-                    <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">⚙️ الإجراءات</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {filteredCircles.length > 0 ? (
-                  filteredCircles.map((circle) => (
-                    <TableRow
-                      key={circle.id}
-                      className="odd:bg-green-50 even:bg-white dark:odd:bg-green-800 dark:even:bg-green-900 hover:bg-green-100 dark:hover:bg-green-700 transition-colors duration-200 border-b border-green-200 dark:border-green-700"
+          {/* جدول الحلقات باستخدام المكون العام */}
+          {(() => {
+            const columns: Column<StudyCircle>[] = [
+              {
+                key: 'name',
+                header: `� ${studyCirclesLabels.name}`,
+                important: true,
+                render: (c) => <span className="font-medium">{c.name}</span>
+              },
+              {
+                key: 'teacher',
+                header: `👨‍🏫 ${studyCirclesLabels.teacher}`,
+                render: (c) => (
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-green-700 dark:text-green-300" />
+                    <span>{c.teacher?.full_name || 'غير محدد'}</span>
+                  </div>
+                )
+              },
+              {
+                key: 'max_students',
+                header: `👥 ${studyCirclesLabels.maxStudents}`,
+                align: 'center',
+                render: (c) => c.max_students ? (
+                  <div className="flex items-center justify-center gap-1">
+                    <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
+                    <span>{c.max_students}</span>
+                  </div>
+                ) : <span className="text-green-500/60">-</span>
+              },
+              ...((userRole === 'superadmin' || userRole === 'admin') ? [{
+                key: 'actions',
+                header: '⚙️ الإجراءات',
+                align: 'center' as const,
+                render: (c: StudyCircle) => (
+                  <div className="flex items-center justify-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleOpenScheduleDialog(c)}
+                      className="h-8 w-8 text-green-600 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-700 dark:hover:text-green-200 rounded-full"
+                      title="جدولة الحلقة"
                     >
-                      {/* اسم الحلقة */}
-                      <TableCell className="text-right font-medium text-green-900 dark:text-green-200 py-3 px-4 border-r border-green-200 dark:border-green-700">
-                        <div className="flex items-center gap-2">
-                          <span>📚 {circle.name}</span>
-                        </div>
-                      </TableCell>
-
-                      {/* المعلم */}
-                      <TableCell className="text-right py-3 px-4 border-r border-green-200 dark:border-green-700">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-green-700 dark:text-green-300" />
-                          <span className="text-green-900 dark:text-green-200">{circle.teacher?.full_name || "غير محدد"}</span>
-                        </div>
-                      </TableCell>
-
-                      {/* الحد الأقصى للطلاب */}
-                      <TableCell className="text-center py-3 px-4 border-r border-green-200 dark:border-green-700">
-                        {circle.max_students ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
-                            <span className="text-green-900 dark:text-green-200">{circle.max_students}</span>
-                          </div>
-                        ) : (
-                          <span className="text-green-600 dark:text-green-400">-</span>
-                        )}
-                      </TableCell>
-
-                      {/* أزرار الجدولة */}
-                      <TableCell className="text-center py-3 px-4 border-r border-green-200 dark:border-green-700">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenScheduleDialog(circle)}
-                          className="h-8 w-8 text-green-600 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-700 dark:hover:text-green-200 rounded-full transition-colors"
-                          title="جدولة الحلقة"
-                        >
-                          <Calendar size={16} />
-                        </Button>
-                      </TableCell>
-
-                      {/* أزرار الإجراءات */}
-                      {(userRole === 'superadmin' || userRole === 'admin') && (
-                        <TableCell className="text-center py-3 px-4 border-r border-green-200 dark:border-green-700">
-                          <div className="flex items-center justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditCircle(circle)}
-                              className="h-8 w-8 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-800 dark:hover:text-green-200 rounded-full transition-colors"
-                              title={studyCirclesLabels.editTooltip}
-                            >
-                              <Pencil size={16} />
-                            </Button>
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteCircle(circle)}
-                              className="h-8 w-8 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-800 hover:text-red-500 dark:hover:text-red-400 rounded-full transition-colors"
-                              title={studyCirclesLabels.deleteTooltip}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={(userRole === 'superadmin' || userRole === 'admin') ? 6 : 5}
-                      className="text-center py-10"
+                      <Calendar size={16} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEditCircle(c)}
+                      className="h-8 w-8 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-800 dark:hover:text-green-200 rounded-full"
+                      title={studyCirclesLabels.editTooltip}
                     >
-                      <div className="flex flex-col items-center justify-center">
-                        <BookOpen className="h-8 w-8 text-green-300 mb-2" />
-                        <p className="text-green-600 dark:text-green-400">
-                          {searchTerm ? "لا توجد نتائج مطابقة للبحث" : studyCirclesLabels.noCircles}
-                        </p>
-                        {!searchTerm && (userRole === 'superadmin' || userRole === 'admin') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleAddCircle}
-                            className="mt-4 flex items-center gap-2 border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700 transition-colors rounded-xl px-4 py-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                            <span>{studyCirclesLabels.addCirclePrompt}</span>
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      <Pencil size={16} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteCircle(c)}
+                      className="h-8 w-8 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-800 hover:text-red-500 dark:hover:text-red-400 rounded-full"
+                      title={studyCirclesLabels.deleteTooltip}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                )
+              }] : [])
+            ];
+
+            return (
+              <GenericTable
+                data={filteredCircles}
+                columns={columns}
+                title="الحلقات"
+                emptyMessage={searchTerm ? 'لا توجد نتائج مطابقة للبحث' : studyCirclesLabels.noCircles}
+                onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddCircle : undefined}
+                onRefresh={loadCircles}
+                cardMaxFieldsCollapsed={4}
+                cardPrimaryActions={(c) => (
+                  (userRole === 'superadmin' || userRole === 'admin') ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditCircle(c)}
+                        className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700"
+                      >
+                        <Pencil className="h-3 w-3 ml-1" />
+                        <span className="hidden sm:inline">تعديل</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteCircle(c)}
+                        className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/30"
+                      >
+                        <Trash2 className="h-3 w-3 ml-1" />
+                        <span className="hidden sm:inline">حذف</span>
+                      </Button>
+                    </>
+                  ) : null
                 )}
-              </TableBody>
-            </Table>
-          </div>
+                cardActions={(c) => (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenScheduleDialog(c)}
+                    className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700"
+                  >
+                    <Calendar className="h-3 w-3 ml-1" />
+                    <span className="hidden sm:inline">الجدولة</span>
+                  </Button>
+                )}
+              />
+            );
+          })()}
         </CardContent>
       </Card>
 

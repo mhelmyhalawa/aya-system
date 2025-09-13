@@ -43,7 +43,7 @@ export function formatTime(time: string): string {
     // تحويل من تنسيق "HH:MM:SS" إلى تنسيق "HH:MM AM/PM" بالعربية
     const [hours, minutes] = time.split(':');
     const h = parseInt(hours, 10);
-    const period = h >= 12 ? 'مساءً' : 'صباحاً';
+    const period = h >= 12 ? 'م' : 'ص';
     const hour = h > 12 ? h - 12 : h === 0 ? 12 : h;
     return `${hour}:${minutes} ${period}`;
   } catch (e) {

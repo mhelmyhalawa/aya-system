@@ -230,7 +230,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-background text-foreground flex flex-col" dir="rtl">
+  <div className="min-h-screen bg-background text-foreground flex flex-col" dir="rtl">
           {/* الهيدر ثابت في جميع الشاشات */}
           <Header 
             currentPath={currentPath}
@@ -241,22 +241,33 @@ const App = () => {
             onSidebarToggle={toggleSidebar}  // استخدام وظيفة تبديل القائمة الجانبية
           />
           
-          <div className="flex flex-1 relative pt-16">
-            {/* القائمة الجانبية ثابتة في جميع الشاشات إذا كان المستخدم مسجل دخول */}
-            {userRole && (
-              <Sidebar                 
-                onNavigate={handleNavigate} 
-                onLogout={handleLogout}
-                isOpen={sidebarOpen}  // استخدام حالة القائمة الجانبية
-                setIsOpen={setSidebarOpen}  // تمرير وظيفة تغيير الحالة
-                userRole={userRole} 
-              />
-            )}
-            
+          <div className="flex flex-1 pt-16 relative">
             {/* المحتوى الرئيسي */}
-            <main className={`flex-1 ${userRole ? (sidebarOpen ? "mr-64" : "mr-16") : ""}`}>
-              {renderPage()}
+            {/* تباعد المحتوى عن الشريط الجانبي:
+                - في الشاشات الكبيرة: 64 عند الفتح، 16 عند الإغلاق (لأن هناك شريط مصغر بعرض 16)
+                - في الموبايل: بدون هامش لأن الشريط Overlay */}
+            <main
+              className={`flex-1 transition-all duration-300 ease-in-out ${
+                userRole ? (sidebarOpen ? 'md:mr-64' : 'md:mr-16') : ''
+              } min-h-[calc(100vh-64px-196px)] md:min-h-[calc(100vh-64px-160px)] pb-4 px-2 sm:px-4 overflow-x-hidden`}
+            >
+              <div className="max-w-full mx-auto">
+                {renderPage()}
+              </div>
             </main>
+
+            {/* القائمة الجانبية في جميع الشاشات إذا كان المستخدم مسجل دخول */}
+            {userRole && (
+              <div className="fixed top-16 right-0 h-[calc(100vh-64px)]">
+                <Sidebar                 
+                  onNavigate={handleNavigate} 
+                  onLogout={handleLogout}
+                  isOpen={sidebarOpen}  // استخدام حالة القائمة الجانبية
+                  setIsOpen={setSidebarOpen}  // تمرير وظيفة تغيير الحالة
+                  userRole={userRole} 
+                />
+              </div>
+            )}
           </div>
           
           {/* الفوتر ثابت في جميع الشاشات */}

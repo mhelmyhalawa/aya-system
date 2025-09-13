@@ -782,7 +782,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   // التحقق من الصلاحيات
   if (userRole !== 'superadmin' && userRole !== 'admin' && userRole !== 'teacher') {
     return (
-      <div className="container mx-auto p-8 text-center">
+  <div className="w-full max-w-[1600px] mx-auto p-8 text-center">
         <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">{guardiansLabels.accessDenied}</h2>
         <p className="text-muted-foreground mb-6">{guardiansLabels.accessDeniedMessage}</p>
@@ -794,7 +794,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   }
 
   return (
-    <div className="container mx-auto py-6" dir="rtl">
+  <div className="w-full max-w-[1600px] mx-auto py-6" dir="rtl">
       <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
         <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">

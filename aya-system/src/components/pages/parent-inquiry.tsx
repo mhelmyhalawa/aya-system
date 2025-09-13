@@ -446,7 +446,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-islamic-light to-muted p-4">
-            <div className="container mx-auto max-w-4xl">
+            <div className="w-full max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-8">
                     <div className="mx-auto mb-4 p-3 bg-gradient-to-br from-islamic-green to-accent rounded-full w-fit">

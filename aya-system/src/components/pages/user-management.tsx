@@ -984,7 +984,7 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
   // Check permissions
   if (userRole !== 'superadmin' && userRole !== 'admin' && userRole !== 'teacher') {
     return (
-      <div className="container mx-auto p-8 text-center">
+  <div className="w-full max-w-[1600px] mx-auto p-8 text-center">
         <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">{userManagementLabels.accessDenied}</h2>
         <p className="mb-4">{userManagementLabels.accessDeniedMessage}</p>
@@ -1033,7 +1033,7 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
   // Render page
   return (
 
-    <div className="container mx-auto py-6" dir="rtl">
+  <div className="w-full max-w-[1600px] mx-auto py-6" dir="rtl">
 
       <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
         {/* الهيدر */}

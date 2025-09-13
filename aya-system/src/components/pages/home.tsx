@@ -207,7 +207,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+  <div className="w-full max-w-[1600px] mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
 {/* بانر صور متغيرة - لمسة إسلامية معاصرة */}
 <div className="mb-12 flex justify-center font-arabic">

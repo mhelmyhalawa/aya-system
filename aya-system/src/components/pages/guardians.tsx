@@ -309,7 +309,7 @@ export function Guardians({ onNavigate, userRole }: GuardiansProps) {
   // التحقق من الصلاحيات
   if (userRole !== 'superadmin' && userRole !== 'admin' && userRole !== 'teacher') {
     return (
-      <div className="container mx-auto p-8 text-center">
+  <div className="w-full max-w-[1600px] mx-auto p-8 text-center">
         <AlertTriangle className="h-16 w-16 mx-auto text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">{guardiansLabels.accessDenied}</h2>
         <p className="mb-4">{guardiansLabels.accessDeniedMessage}</p>
@@ -320,7 +320,7 @@ export function Guardians({ onNavigate, userRole }: GuardiansProps) {
 
   // عرض الصفحة
   return (
-    <div className="container mx-auto p-4">
+  <div className="w-full max-w-[1600px] mx-auto p-4">
       <Card className="border-islamic-green/20 shadow-lg">
         <CardHeader className="pb-4">
           <CardTitle className="text-2xl font-bold text-islamic-green">{guardiansLabels.title}</CardTitle>

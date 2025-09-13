@@ -132,16 +132,30 @@ export function Header({ currentPath, onNavigate, userRole, currentUser, onLogou
                 </Button>
               )}
 
-              {/* زر القائمة المنسدلة للشاشات الصغيرة */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onSidebarToggle}
-                className="text-green-100 hover:bg-green-800/50 rounded-xl transition-all duration-300 h-8 w-8 sm:h-9 sm:w-9 sm:hidden"
-                title="القائمة"
-              >
-                <Menu className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
+                    {/* زر القائمة الجانبية (محمول فقط) - تصميم محسن */}
+                    {userRole && (
+                    <div className="md:hidden">
+                      <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onSidebarToggle}
+                      className="group relative h-9 w-9 sm:h-10 sm:w-10 rounded-2xl 
+                        bg-gradient-to-br from-green-700/30 via-green-800/40 to-green-900/40 
+                        border border-green-600/40 
+                        hover:from-green-600/40 hover:via-green-700/50 hover:to-green-800/60 
+                        hover:border-green-500/60
+                        text-green-100 hover:text-white 
+                        shadow-inner shadow-green-900/40 hover:shadow-green-800/60 
+                        transition-all duration-300"
+                      title="القائمة الجانبية"
+                      aria-label="فتح وإغلاق القائمة الجانبية"
+                      >
+                      <span className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-green-500/25 group-hover:ring-green-300/50 transition-all duration-300" />
+                      <Menu className="h-5 w-5 sm:h-6 sm:w-6 drop-shadow-[0_0_4px_rgba(34,197,94,0.35)] group-active:scale-90 transition-transform duration-200" />
+                      <span className="absolute -top-1 -left-1 h-2 w-2 rounded-full bg-emerald-400/70 animate-pulse shadow shadow-emerald-600/40" />
+                      </Button>
+                    </div>
+                    )}
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ interface DashboardPageProps {
 
 export function Dashboard({ userRole, userId }: DashboardPageProps) {
   return (
-    <div className="container mx-auto py-6">
+  <div className="w-full max-w-[1600px] mx-auto py-6">
       <h1 className="text-3xl font-bold text-islamic-green mb-6 text-center">
         لوحة المعلومات
       </h1>

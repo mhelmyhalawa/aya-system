@@ -22,7 +22,7 @@ import { StudyCircle } from "@/types/study-circle";
 import { StudyCircleSchedule, StudyCircleScheduleCreate, StudyCircleScheduleUpdate, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
 import { getAllStudyCircles, getStudyCircleById, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
-import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle } from "lucide-react";
+import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle, AlertTriangle, X } from "lucide-react";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { GenericTable } from "@/components/ui/generic-table";
 
@@ -391,61 +391,176 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     setCircleSchedules([]);
   };
 
+  // === Helpers for grouping & conflict detection ===
+  const parseTimeToMinutes = (time: string) => {
+    const [h, m] = time.split(":");
+    return parseInt(h) * 60 + parseInt(m);
+  };
+
+  const conflictIds: Set<string> = (() => {
+    const set = new Set<string>();
+    const byDay: Record<number, StudyCircleSchedule[]> = {};
+    circleSchedules.forEach(s => { (byDay[s.weekday] ||= []).push(s); });
+    Object.values(byDay).forEach(list => {
+      list.forEach(a => {
+        const aStart = parseTimeToMinutes(a.start_time.substring(0, 5));
+        const aEnd = parseTimeToMinutes(a.end_time.substring(0, 5));
+        list.forEach(b => {
+          if (a.id === b.id) return;
+          const bStart = parseTimeToMinutes(b.start_time.substring(0, 5));
+          const bEnd = parseTimeToMinutes(b.end_time.substring(0, 5));
+          if (aStart < bEnd && aEnd > bStart) {
+            set.add(a.id); set.add(b.id);
+          }
+        });
+      });
+    });
+    return set;
+  })();
+
+  const groupedSchedules = (() => {
+    const groups: Record<number, StudyCircleSchedule[]> = {};
+    circleSchedules.forEach(s => { (groups[s.weekday] ||= []).push(s); });
+    Object.values(groups).forEach(list => list.sort((a, b) => a.start_time.localeCompare(b.start_time)));
+    return weekdayOptions
+      .map(o => parseInt(o.value, 10))
+      .filter(day => groups[day]?.length)
+      .map(day => ({ weekday: day, items: groups[day] }));
+  })();
+
   return (
-    <div className="container mx-auto py-6" dir="rtl">
+    // جعل العرض يملأ الشاشة في الموبايل بإزالة قيود container
+    <div className="w-full mx-auto py-3 sm:py-6 px-0 sm:px-4" dir="rtl">
 
-      <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
+      <Card className="border border-green-300 shadow-lg sm:shadow-xl rounded-none md:rounded-2xl overflow-hidden">
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-
+        <CardHeader className="pb-2 sm:pb-4 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b-2 border-green-300/70 rounded-none md:rounded-t-2xl shadow-lg px-2 sm:px-4 sticky top-0 z-30">
+          <div className="flex justify-between items-center gap-2 sm:gap-3 w-full">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-yellow-300" />
-                إدارة جدولة الحلقات الدراسية
+              <CardTitle className="text-base sm:text-xl md:text-2xl font-extrabold text-white flex items-center gap-1 sm:gap-2 drop-shadow-md">
+                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
+                <span className="line-clamp-1">جدولة الحلقات الدراسية</span>
               </CardTitle>
-              <CardDescription className="text-xs md:text-sm text-green-100 mt-1">
-                عرض وتعديل جدولة الحلقات الدراسية ومواعيدها
+              <CardDescription className="text-[11px] sm:text-sm md:text-sm text-green-100 mt-0.5 font-medium drop-shadow">
+                عرض وتعديل جدولة الحلقات ومواعيدها
               </CardDescription>
             </div>
 
             {/* زر العودة */}
             <Button
               variant="outline"
-              className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
+              className="flex items-center gap-1 rounded-lg sm:rounded-2xl bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-md sm:shadow-lg hover:scale-105 transition-all duration-300 px-2 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-sm md:text-base border border-green-200"
               onClick={() => onNavigate('/study-circles')}
+              title="العودة إلى الحلقات"
             >
-              <ChevronLeft className="h-4 w-4" />
-              العودة إلى الحلقات
+              <ChevronLeft className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+              <span className="sr-only sm:not-sr-only sm:inline">العودة</span>
             </Button>
-
           </div>
         </CardHeader>
 
+        <CardContent className="space-y-3 sm:space-y-6 px-2 sm:px-4 pt-3 pb-4">
+          <div className="grid md:grid-cols-3 gap-2 sm:gap-6">
+            {/* قائمة الجوال */}
+            <div className="md:hidden">
+              <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
+                {/* الهيدر */}
+                <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
+                  <div className="flex items-center gap-1">
+                    <BookOpen className="h-3.5 w-3.5 text-white" />
+                    <h2 className="text-[12px] font-semibold text-white">قائمة الحلقات</h2>
+                  </div>
+                  {selectedCircle && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-white/80">المعلم:</span>
+                      <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
+                        {selectedCircle.teacher?.full_name?.split(" ")[0] || 'غير محدد'}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
 
-        <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* جانب الحلقات - ثلث الصفحة */}
-            <div className="md:col-span-1">
+                {/* البحث */}
+                {userRole !== 'teacher' && (
+                  <div className="px-2 pt-2">
+                    <div className="relative">
+                      <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
+                      <Input
+                        placeholder="بحث..."
+                        className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* العناصر */}
+                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 scrollbar-thin scrollbar-thumb-green-400 scrollbar-track-transparent">
+                  {loading ? (
+                    <div className="w-full py-6 text-center flex flex-col items-center">
+                      <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
+                      <span className="text-green-700 text-[12px] font-medium">جاري التحميل...</span>
+                    </div>
+                  ) : filteredCircles.length === 0 ? (
+                    <div className="w-full py-6 text-center text-green-600 text-[12px]">لا توجد نتائج</div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {filteredCircles.map(circle => {
+                        const active = selectedCircle?.id === circle.id;
+                        return (
+                          <button
+                            key={circle.id}
+                            onClick={() => handleSelectCircle(circle)}
+                            className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
+                        ${active
+                                ? 'bg-gradient-to-r from-green-600 to-green-700 border-green-300 text-white shadow-md'
+                                : 'bg-white border-green-200 text-green-700 hover:bg-green-50 hover:border-green-400 hover:shadow-sm'}
+                      `}
+                          >
+                            <span className="font-medium truncate">{circle.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              {circle.teacher && (
+                                <span className={`text-[10px] ${active ? 'text-green-100' : 'text-green-500'}`}>
+                                  {circle.teacher.full_name.split(" ")[0]}
+                                </span>
+                              )}
+                              {active && (
+                                <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
+            <div className="md:col-span-1 hidden md:block">
               <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-4">
-                  <h2 className="text-xl font-semibold text-white mb-0 flex items-center gap-2">
+                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3">
+                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2">
                     <BookOpen className="h-5 w-5" />
                     الحلقات الدراسية
                   </h2>
                 </div>
 
                 {/* Body */}
-                <div className="p-4 space-y-4">
+                <div className="p-4 space-y-4 md:space-y-5">
                   {/* مربع البحث */}
                   <div className="relative">
                     {userRole !== 'teacher' && (
-                      <div className="relative mt-2">
+                      <div className="relative mt-1">
                         <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
                         <Input
                           placeholder="بحث عن حلقة..."
-                          className="pr-10 pl-4 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm"
+                          className="pr-10 pl-3 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm text-sm"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -470,19 +585,19 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                       {filteredCircles.map((circle) => (
                         <div
                           key={circle.id}
-                          className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2 shadow-sm ${selectedCircle?.id === circle.id
-                            ? 'bg-green-700 text-white ring-1 ring-green-400 scale-105'
+                          className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2.5 shadow-sm text-sm ${selectedCircle?.id === circle.id
+                            ? 'bg-green-700 text-white ring-1 ring-green-400'
                             : 'bg-green-50 hover:bg-green-100 text-green-800'
                             }`}
                           onClick={() => handleSelectCircle(circle)}
                         >
-                          <div className="flex items-center justify-between text-sm font-medium gap-1">
+                          <div className="flex items-center justify-between font-medium gap-1">
                             {/* اسم الحلقة مع أيقونة كتاب صغيرة */}
                             <div className="flex items-center gap-1 truncate">
                               <span className="text-green-500">📖</span>
                               <span className="truncate">{circle.name}</span>
                               {circle.teacher && (
-                                <span className={`flex items-center gap-1 text-xs truncate ${selectedCircle?.id === circle.id ? 'text-white' : 'text-green-700'
+                                <span className={`flex items-center gap-1 text-[11px] truncate ${selectedCircle?.id === circle.id ? 'text-white' : 'text-green-700'
                                   }`}>
                                   👨‍🏫 {circle.teacher.full_name}
                                 </span>
@@ -504,65 +619,103 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                     </div>
                   )}
                 </div>
-
-
-
-
-
               </div>
             </div>
-
             {/* جانب الجدولة - ثلثين الصفحة */}
             <div className="md:col-span-2">
-              <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm overflow-hidden">
-                <CardHeader className="pb-4 bg-gradient-to-r from-green-100 via-green-200 to-green-700 p-4">
-                  <div className="flex justify-between  items-center">
-                    <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5 text-green-700" />
-                        {selectedCircle ? `جدولة حلقة: ${selectedCircle.name}` : 'جدولة الحلقات'} | 👨‍🏫
-                      </div>
+              <div className="bg-green-50 border border-green-200 rounded-none md:rounded-xl shadow-sm overflow-hidden">
 
-                      {selectedCircle?.teacher && (
-                        <CardDescription className="text-gray-700 text-xs sm:text-[10px]">
-                          المعلم: {selectedCircle.teacher.full_name}
-                        </CardDescription>
-                      )}
-                    </CardTitle>
-
-                    {selectedCircle && (
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-3 rounded-3xl border-2 border-green-600 text-green-900 
-                                hover:bg-green-100 hover:text-green-800 hover:scale-105 
-                                dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
-                                shadow-lg transition-all duration-200 px-5 py-2 font-semibold"
-                          onClick={handleClearSelection}
-                        >
-                          إلغاء التحديد
-                        </Button>
-
-                        {canEditSchedules && (
-                          <Button
-                            onClick={handleAddSchedule}
-                            size="sm"
-                            className="flex items-center gap-3 rounded-3xl bg-green-600 hover:bg-green-700 
-                            dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-5 py-2 font-semibold"
-                          >
-                            <Plus className="h-4 w-4" />
-                            إضافة موعد
-                          </Button>
-                        )}
-                      </div>
+                {/* هيدر ديناميكي حسب الشاشة */}
+                {/** هيدر الموبايل **/}
+                <div className="flex items-center justify-between md:hidden px-2 py-1 bg-gradient-to-r from-green-600 via-green-500 to-green-600 rounded-t-lg">
+                  <div className="flex items-center gap-1 truncate">
+                    {selectedCircle?.teacher && (
+                      <>
+                        <BookOpen className="h-3 w-3 text-white" />
+                        <span className="text-[9px] text-white truncate">
+                          <span className="truncate">{selectedCircle.name}</span> 👨‍🏫 {selectedCircle.teacher.full_name.split(" ")[0]}
+                        </span>
+                      </>
                     )}
                   </div>
-                </CardHeader>
 
-                <CardContent className="p-4">
+                  <div className="flex items-center gap-1">
+                    {canEditSchedules && (
+                      <Button
+                        onClick={handleAddSchedule}
+                        size="sm"
+                        className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none"
+                        title="إضافة موعد"
+                      >
+                        <Plus className="h-2.5 w-2.5" />
+                      </Button>
+                    )}
+
+                    {selectedCircle && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClearSelection}
+                        className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none border border-green-200"
+                        title="إلغاء التحديد"
+                      >
+                        <X className="h-2.5 w-2.5" />
+                      </Button>
+
+                    )}
+                  </div>
+                </div>
+
+
+                {/** هيدر الديسكتوب **/}
+                <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-green-100 via-green-200 to-green-700 px-4 py-4 rounded-t-xl">
+                  <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-green-700" />
+                      {selectedCircle ? `جدولة حلقة: ${selectedCircle.name}` : 'جدولة الحلقات'} | 👨‍🏫
+                    </div>
+
+                    {selectedCircle?.teacher && (
+                      <CardDescription className="text-gray-700 text-xs sm:text-[10px]">
+                        المعلم: {selectedCircle.teacher.full_name}
+                      </CardDescription>
+                    )}
+                  </CardTitle>
+
+                  {selectedCircle && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-3 rounded-3xl border-2 border-green-600 text-green-900 
+          hover:bg-green-100 hover:text-green-800 hover:scale-105 
+          dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
+          shadow-lg transition-all duration-200 px-5 py-2 font-semibold"
+                        onClick={handleClearSelection}
+                      >
+                        إلغاء التحديد
+                      </Button>
+
+                      {canEditSchedules && (
+                        <Button
+                          onClick={handleAddSchedule}
+                          size="sm"
+                          className="flex items-center gap-3 rounded-3xl bg-green-600 hover:bg-green-700 
+            dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-5 py-2 font-semibold"
+                        >
+                          <Plus className="h-4 w-4" />
+                          إضافة موعد
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+
+                {/* محتوى الجدولة */}
+                <CardContent className="px-3 sm:px-4 pt-4 pb-5">
                   {!selectedCircle ? (
-                    <div className="flex flex-col items-center justify-center p-12 text-center gap-3">
+                    <div className="flex flex-col items-center justify-center p-10 sm:p-12 text-center gap-3 text-sm sm:text-base">
                       <Calendar className="h-16 w-16 text-green-200" />
                       <h3 className="text-xl font-semibold text-green-800">اختر حلقة للبدء</h3>
                       <p className="text-green-600 max-w-md">
@@ -571,112 +724,174 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-2 p-3 bg-green-100 rounded-lg border border-green-200">
+
+                      {/* ملخص المواعيد */}
+                      <div className="flex items-center gap-2 p-2.5 sm:p-3 bg-green-100 rounded-none md:rounded-lg border border-green-200 text-xs sm:text-sm">
+                        <span className="text-sm text-green-700">إجمالي المواعيد</span>
                         <Badge variant="outline" className="text-green-800 border-green-400">
                           {circleSchedules.length} موعد
                         </Badge>
-                        <span className="text-sm text-green-700">إجمالي المواعيد</span>
                       </div>
-                      <GenericTable
-                        data={circleSchedules}
-                        columns={[
-                          {
-                            key: 'weekday',
-                            header: '📅 اليوم',
-                            align: 'right' as const,
-                            render: (schedule: StudyCircleSchedule) => (
-                              <span className="font-medium text-green-900 dark:text-green-200 text-sm">
-                                {getWeekdayName(schedule.weekday)}
-                              </span>
-                            ),
-                          },
-                          {
-                            key: 'time',
-                            header: '🕒 الوقت',
-                            align: 'right' as const,
-                            render: (schedule: StudyCircleSchedule) => (
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1 bg-green-100 text-green-800 px-3 py-1 rounded-lg">
-                                  <Clock className="h-4 w-4" />
-                                  <span className="font-medium">{formatTime(schedule.start_time)}</span>
-                                </div>
-                                <span className="text-gray-400 font-bold mx-1">—</span>
-                                <div className="flex items-center gap-1 bg-red-100 text-red-800 px-3 py-1 rounded-lg">
-                                  <Clock className="h-4 w-4" />
-                                  <span className="font-medium">{formatTime(schedule.end_time)}</span>
-                                </div>
-                              </div>
-                            ),
-                          },
-                          {
-                            key: 'location',
-                            header: '📍 الموقع',
-                            align: 'right' as const,
-                            render: (schedule: StudyCircleSchedule) =>
-                              schedule.location ? (
-                                <div className="flex items-center gap-2 text-green-800">
-                                  <MapPin className="h-4 w-4 text-green-600" />
-                                  {schedule.location}
-                                </div>
-                              ) : (
-                                <span className="text-green-700/60 italic text-sm">موقع الحلقة الافتراضي</span>
-                              ),
-                          },
-                          {
-                            key: 'created_at',
-                            header: '📅 تاريخ الإضافة',
-                            align: 'center' as const,
-                            render: (schedule: StudyCircleSchedule) =>
-                              schedule.created_at
-                                ? new Date(schedule.created_at).toLocaleDateString('ar-EG', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                })
-                                : '-',
-                          },
-                          ...(canEditSchedules ? [{
-                            key: 'actions',
-                            header: '⚙️ الإجراءات',
-                            align: 'center' as const,
-                            render: (schedule: StudyCircleSchedule) => (
-                              <div className="flex justify-center gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditSchedule(schedule)}
-                                  className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 transition-colors"
-                                  title="تعديل الموعد"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDeleteSchedule(schedule)}
-                                  className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 transition-colors"
-                                  title="حذف الموعد"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ),
-                          }] : []),
-                        ]}
-                        emptyMessage="لا توجد مواعيد"
-                        className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-                        getRowClassName={(_, index) =>
-                          `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
-                        }
-                      />
 
+                      {/* عرض الموبايل */}
+                      <div className="md:hidden space-y-2.5 px-2" role="list" aria-label="قائمة المواعيد">
+                        {circleSchedules.length === 0 && (
+                          <div className="text-center text-[13px] text-green-600 py-5">لا توجد مواعيد</div>
+                        )}
 
+                        {[...circleSchedules]
+                          .sort((a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time))
+                          .map(schedule => {
+                            const isFriday = schedule.weekday === 5;
+                            const isConflict = conflictIds.has(schedule.id);
+
+                            return (
+                              <div
+                                key={schedule.id}
+                                role="listitem"
+                                className={`rounded-lg border shadow-sm p-2.5 flex flex-col gap-2 text-[12px] relative transition-colors
+                                ${isFriday
+                                    ? 'border-amber-400 bg-amber-50/80 ring-1 ring-amber-300'
+                                    : isConflict
+                                      ? 'border-red-300 bg-red-50'
+                                      : 'border-green-300 bg-white'}`}
+                                aria-label={`موعد يوم ${getWeekdayName(schedule.weekday)}`}
+                              >
+                                {isConflict && (
+                                  <div className="absolute -top-2 -left-2 bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 shadow">
+                                    <AlertTriangle className="h-3 w-3" /> تعارض
+                                  </div>
+                                )}
+
+                                <div className="flex items-center justify-between">
+                                  <span className={`font-bold flex items-center gap-1 ${isFriday ? 'text-amber-700' : 'text-green-800'}`}>
+                                    📅 {getWeekdayName(schedule.weekday)}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 text-[11px]">
+                                  <div className={`flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center ${isFriday ? 'bg-amber-100 text-amber-700' : isConflict ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-800'}`}>
+                                    <Clock className="h-3 w-3" /> {formatTime(schedule.start_time)}
+                                  </div>
+                                  <span className="text-gray-400 font-bold">—</span>
+                                  <div className={`flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center ${isConflict ? 'bg-red-200 text-red-800' : 'bg-red-100 text-red-800'}`}>
+                                    <Clock className="h-3 w-3" /> {formatTime(schedule.end_time)}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 text-green-700">
+                                  {schedule.location ? (
+                                    <span className={`flex items-center gap-1 text-[12px] ${isFriday ? 'text-amber-700' : ''}`}>
+                                      <MapPin className={`h-3 w-3 ${isFriday ? 'text-amber-600' : 'text-green-600'}`} /> {schedule.location}
+                                    </span>
+                                  ) : (
+                                    <span className={`text-[11px] italic ${isFriday ? 'text-amber-600' : 'text-green-500'}`}>موقع الحلقة الافتراضي</span>
+                                  )}
+                                </div>
+
+                                {canEditSchedules && (
+                                  <div className="flex gap-2 pt-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditSchedule(schedule)}
+                                      className={`flex-1 rounded-md h-7 ${isFriday ? 'bg-amber-200 hover:bg-amber-300 text-amber-900' : 'bg-green-200 hover:bg-green-300 text-green-900'}`}
+                                      title="تعديل الموعد"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5 mx-auto" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteSchedule(schedule)}
+                                      className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-md h-7"
+                                      title="حذف الموعد"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 mx-auto" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      {/* عرض الديسكتوب */}
+                      <div className="hidden md:flex flex-col gap-5" aria-label="المواعيد المجمعة">
+                        {groupedSchedules.length === 0 && (
+                          <div className="text-center text-sm text-green-600 py-8 border rounded-xl bg-white">لا توجد مواعيد</div>
+                        )}
+                        {groupedSchedules.map(group => {
+                          const dayName = getWeekdayName(group.weekday);
+                          const isFridayGroup = group.weekday === 5;
+                          return (
+                            <div key={group.weekday} className="border border-green-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                              <div className={`px-4 py-2 flex items-center justify-between ${isFridayGroup ? 'bg-amber-100/70 border-b border-amber-300' : 'bg-green-100/70 border-b border-green-300'}`}>
+                                <h3 className={`font-bold flex items-center gap-2 text-sm ${isFridayGroup ? 'text-amber-700' : 'text-green-800'}`}>
+                                  <span>📅 {dayName}</span>
+                                  <span className="text-xs font-normal text-gray-500">({group.items.length})</span>
+                                </h3>
+                              </div>
+                              <div className="divide-y divide-green-100">
+                                {group.items.map(item => {
+                                  const isConflict = conflictIds.has(item.id);
+                                  return (
+                                    <div key={item.id} className={`p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-[13px] ${isConflict ? 'bg-red-50/70' : 'hover:bg-green-50'} transition-colors`}>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <div className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium ${isConflict ? 'bg-red-100 text-red-700' : isFridayGroup ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'}`}>
+                                          <Clock className="h-3 w-3" /> {formatTime(item.start_time)} <span className="mx-1 text-gray-400">—</span> {formatTime(item.end_time)}
+                                        </div>
+                                        {item.location ? (
+                                          <span className={`flex items-center gap-1 text-[11px] md:text-xs ${isFridayGroup ? 'text-amber-700' : 'text-green-700'}`}>
+                                            <MapPin className={`h-3 w-3 ${isFridayGroup ? 'text-amber-600' : 'text-green-600'}`} /> {item.location}
+                                          </span>
+                                        ) : (
+                                          <span className={`text-[11px] italic ${isFridayGroup ? 'text-amber-600' : 'text-green-500'}`}>موقع افتراضي</span>
+                                        )}
+                                        {isConflict && (
+                                          <span className="flex items-center gap-1 text-[11px] text-red-700 font-semibold bg-red-100 px-2 py-0.5 rounded-full">
+                                            <AlertTriangle className="h-3 w-3" /> تعارض
+                                          </span>
+                                        )}
+                                      </div>
+                                      {canEditSchedules && (
+                                        <div className="flex items-center gap-2 mt-1 md:mt-0">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleEditSchedule(item)}
+                                            className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 h-8"
+                                            title="تعديل الموعد"
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleDeleteSchedule(item)}
+                                            className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 h-8"
+                                            title="حذف الموعد"
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
 
                     </div>
                   )}
                 </CardContent>
               </div>
             </div>
+
+
           </div>
         </CardContent>
       </Card>
@@ -795,89 +1010,87 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           </div>
         </DialogContent>
       </Dialog>
-
       {/* Edit Schedule Dialog */}
       <Dialog open={openEditScheduleDialog} onOpenChange={setOpenEditScheduleDialog}>
         <DialogContent
-          className="sm:max-w-[480px] w-full rounded-xl p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
+          className="sm:max-w-[480px] w-[95%] max-h-[90vh] overflow-y-auto rounded-xl p-2 sm:p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
           dir="rtl"
         >
           {/* Frame container */}
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+          <div className="bg-white rounded-lg shadow-sm p-2 sm:p-4 space-y-2 sm:space-y-4">
             {/* Header */}
-            <DialogHeader className="pb-2">
-              <DialogTitle className="text-lg font-bold text-center">
-                <h3 className="flex items-center justify-center gap-2 
+            <DialogHeader className="pb-1 sm:pb-2">
+              <DialogTitle className="text-base sm:text-lg font-bold text-center">
+                <h3 className="flex items-center justify-center gap-1 sm:gap-2 
                         bg-gradient-to-r from-orange-400 via-orange-300 to-yellow-400 
-                        text-white text-xl font-extrabold 
-                        py-3 px-5 rounded-2xl shadow-md 
-                        transition-transform duration-200 hover:scale-105">
-                  <Pencil className="h-5 w-5 text-white" />
+                        text-white text-sm sm:text-xl font-bold sm:font-extrabold 
+                        py-2 px-3 sm:py-3 sm:px-5 rounded-xl sm:rounded-2xl shadow-md">
+                  <Pencil className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                   تعديل موعد
                 </h3>
               </DialogTitle>
 
-              <DialogDescription className="text-gray-600 text-center text-sm mt-1">
+              <DialogDescription className="text-gray-600 text-center text-xs sm:text-sm mt-1">
                 قم بتعديل بيانات الموعد
               </DialogDescription>
             </DialogHeader>
 
-
-
-
             {/* Body */}
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-4">
               {/* اليوم */}
-              <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-
+              <div className="border border-gray-200 rounded-md shadow-sm p-2 sm:p-3 bg-white">
                 {/* اليوم كأزرار عصرية */}
-                <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-                  <Label className="text-right text-gray-800 text-sm mb-2">اليوم *</Label>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {weekdayOptions.map(day => (
-                      <button
-                        key={day.value}
-                        type="button"
-                        onClick={() => handleEditScheduleFormChange('weekday', day.value.toString())}
-                        className={`
-                    text-sm px-4 py-2 rounded-full border transition-all duration-200
-                    flex-1 text-center
-                    ${editScheduleForm.weekday === day.value.toString()
-                            ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
-                            : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
-                          }
-                    `}
-                      >
-                        {day.label}
-                      </button>
-                    ))}
+                <Label className="text-right text-gray-800 text-xs sm:text-sm mb-1 sm:mb-2 block">اليوم *</Label>
+                <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
+                  {weekdayOptions.map(day => (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => handleEditScheduleFormChange('weekday', day.value.toString())}
+                      className={`
+                      text-[10px] sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border transition-all duration-200
+                      flex-1 text-center
+                      ${editScheduleForm.weekday === day.value.toString()
+                          ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                          : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
+                        }
+                      `}
+                    >
+                      {day.label}
+                    </button>
+                  ))}
+                </div>
+                
+                {/* الوقت */}
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div>
+                    <Label htmlFor="edit-schedule-start-time" className="text-right text-gray-800 text-xs sm:text-sm block">وقت البداية *</Label>
+                    <Input
+                      id="edit-schedule-start-time"
+                      type="time"
+                      value={editScheduleForm.start_time}
+                      onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
+                      required
+                      className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-xs sm:text-sm py-1 px-2 h-8 sm:h-auto"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-schedule-end-time" className="text-right text-gray-800 text-xs sm:text-sm block">وقت النهاية *</Label>
+                    <Input
+                      id="edit-schedule-end-time"
+                      type="time"
+                      value={editScheduleForm.end_time}
+                      onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
+                      required
+                      className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-xs sm:text-sm py-1 px-2 h-8 sm:h-auto"
+                    />
                   </div>
                 </div>
-                {/* الوقت */}
-                <Label htmlFor="edit-schedule-start-time" className="text-right text-gray-800 text-sm mt-2">وقت البداية *</Label>
-                <Input
-                  id="edit-schedule-start-time"
-                  type="time"
-                  value={editScheduleForm.start_time}
-                  onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
-                  required
-                  className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
-                />
-
-                <Label htmlFor="edit-schedule-end-time" className="text-right text-gray-800 text-sm mt-2">وقت النهاية *</Label>
-                <Input
-                  id="edit-schedule-end-time"
-                  type="time"
-                  value={editScheduleForm.end_time}
-                  onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
-                  required
-                  className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
-                />
 
                 {/* الموقع */}
-                <Label htmlFor="edit-schedule-location" className="text-right text-gray-800 text-sm mt-2">الموقع (اختياري)</Label>
-                <div className="flex items-center text-xs text-gray-500 mb-1">
-                  <Info className="h-3 w-3 ml-1" />
+                <Label htmlFor="edit-schedule-location" className="text-right text-gray-800 text-xs sm:text-sm mt-2 block">الموقع (اختياري)</Label>
+                <div className="flex items-center text-[9px] sm:text-xs text-gray-500 mb-1">
+                  <Info className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />
                   اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
                 </div>
                 <Input
@@ -885,26 +1098,26 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   value={editScheduleForm.location}
                   onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
                   placeholder="أدخل موقع الموعد (اختياري)"
-                  className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
+                  className="bg-gray-50 border-gray-300 rounded-md text-xs sm:text-sm py-1 px-2 h-8 sm:h-auto"
                 />
               </div>
             </div>
 
             {/* Footer */}
-            <DialogFooter className="gap-3 flex justify-end mt-4" dir="rtl">
+            <DialogFooter className="gap-2 sm:gap-3 flex justify-end mt-2 sm:mt-4" dir="rtl">
               <Button
                 variant="outline"
                 onClick={() => setOpenEditScheduleDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-sm px-3 py-1"
+                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1 h-8 sm:h-auto"
               >
                 إلغاء
               </Button>
               <Button
                 onClick={handleSaveScheduleEdit}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 text-sm transition-colors"
+                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm transition-colors h-8 sm:h-auto"
                 disabled={!editScheduleForm.start_time || !editScheduleForm.end_time || savingScheduleEdit}
               >
-                {savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+                {savingScheduleEdit ? "جارٍ..." : "حفظ"}
               </Button>
             </DialogFooter>
           </div>
