@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogOverlay } from "@/components/ui/dialog";
+import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -402,6 +403,21 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     setEditScheduleForm(prev => ({ ...prev, [field]: value }));
   };
 
+  // دالة محسّنة للحصول على اسم اليوم من الرقم
+  const getWeekdayNameFixed = (weekday: number | string): string => {
+    const weekdayMap = {
+      '0': 'الأحد',
+      '1': 'الإثنين',
+      '2': 'الثلاثاء',
+      '3': 'الأربعاء',
+      '4': 'الخميس',
+      '5': 'الجمعة',
+      '6': 'السبت'
+    };
+    const weekdayStr = String(weekday);
+    return weekdayMap[weekdayStr] || `غير معروف (${weekdayStr})`;
+  };
+
   // حفظ الحلقة
   const handleSaveCircle = async () => {
     // التحقق من البيانات
@@ -508,11 +524,70 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     );
   }
 
+  // تعريف أعمدة جدول الجدولة
+  const tableColumns: Column<StudyCircleSchedule>[] = [
+    {
+      key: 'weekday',
+      header: 'اليوم',
+      render: (schedule) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-green-700 dark:text-green-300" />
+          <span>{getWeekdayNameFixed(schedule.weekday)}</span>
+        </div>
+      )
+    },
+    {
+      key: 'time',
+      header: 'الوقت',
+      render: (schedule) => (
+        <div className="flex items-center gap-2">
+          <Clock className="h-4 w-4 text-blue-700 dark:text-blue-300" />
+          <span dir="ltr">{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</span>
+        </div>
+      )
+    },
+    {
+      key: 'location',
+      header: 'الموقع',
+      render: (schedule) => (
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-orange-700 dark:text-orange-300" />
+          <span>{schedule.location || 'الموقع الافتراضي'}</span>
+        </div>
+      )
+    },
+    ...(userRole === 'superadmin' || userRole === 'admin' ? [{
+      key: 'actions',
+      header: 'الإجراءات',
+      align: 'center' as const,
+      render: (schedule) => (
+        <div className="flex items-center justify-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleEditSchedule(schedule)}
+            className="h-7 w-7 text-blue-600 hover:bg-blue-50 hover:text-blue-700 rounded-full"
+          >
+            <Pencil size={14} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleDeleteSchedule(schedule)}
+            className="h-7 w-7 text-red-500 hover:bg-red-50 hover:text-red-600 rounded-full"
+          >
+            <Trash2 size={14} />
+          </Button>
+        </div>
+      )
+    }] : [])
+  ];
+
   // عرض الواجهة
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-4 py-4 sm:py-6">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
 
-      <Card className="bg-white dark:bg-gray-900 rounded-3xl shadow-lg border border-green-300 dark:border-green-700 overflow-hidden transition-all duration-300 hover:shadow-2xl">
+      <Card>
         {/* الهيدر */}
         <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
@@ -538,7 +613,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                     dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
                     shadow-lg transition-all duration-200 px-3 md:px-4 py-1.5 font-semibold"
                   onClick={() => onNavigate('/study-circle-schedules')}
-                title="الانتقال إلى صفحة جدولة الحلقات"
+                  title="الانتقال إلى صفحة جدولة الحلقات"
                 >
                   <Calendar className="h-4 w-4" />
                   <span className="hidden md:inline text-sm">{'جدولة الحلقات'}</span>
@@ -549,7 +624,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 <Button
                   onClick={handleAddCircle}
                   className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-3 md:px-4 py-1.5 font-semibold"
-                title="إضافة حلقة جديدة"
+                  title="إضافة حلقة جديدة"
                 >
                   <Plus className="h-4 w-4" />
                   <span className="hidden md:inline text-sm">{studyCirclesLabels.addCircle}</span>
@@ -562,7 +637,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
 
         {/* المحتوى */}
-        <CardContent className="p-6 space-y-6">
+        <CardContent>
           {error && (
             <Alert variant="destructive" className="mb-4 rounded-lg shadow-sm">
               <AlertCircle className="h-4 w-4 ml-2" />
@@ -607,7 +682,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 header: `👥 ${studyCirclesLabels.maxStudents}`,
                 align: 'center',
                 render: (c) => c.max_students ? (
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex gap-1">
                     <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
                     <span>{c.max_students}</span>
                   </div>
@@ -615,10 +690,10 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               },
               ...((userRole === 'superadmin' || userRole === 'admin') ? [{
                 key: 'actions',
-                header: '⚙️ الإجراءات',
+                header: '⚙️ الإجراء',
                 align: 'center' as const,
                 render: (c: StudyCircle) => (
-                  <div className="flex items-center justify-center gap-2">
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -703,111 +778,68 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
 
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent
-          dir="rtl"
-          className="sm:max-w-[600px] w-full rounded-xl p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-        >
-          {/* Frame container */}
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <FormDialog
+        title={dialogTitle}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSave={handleSaveCircle}
+        saveButtonText={dialogMode === "add"
+          ? studyCirclesLabels.addForm.submit
+          : studyCirclesLabels.editForm.submit}
+        cancelButtonText={studyCirclesLabels.cancel}
+        mode={dialogMode}
+      >
+        <div className="grid gap-4 py-2">
+          {/* اسم الحلقة */}
+          <FormRow label={`${studyCirclesLabels.name} *`}>
+            <Input
+              id="name"
+              value={circleName}
+              onChange={(e) => setCircleName(e.target.value)}
+              placeholder="أدخل اسم الحلقة"
+              className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 text-right"
+            />
+          </FormRow>
 
-            {/* Header */}
-            <DialogHeader className="flex justify-center items-center pb-2 text-right">
-              <DialogTitle className="text-xl flex items-center gap-2">
-                <h3 className="bg-gradient-to-r from-orange-400 via-orange-300 to-yellow-400 
-                        text-white text-xl font-extrabold py-3 px-5 rounded-2xl shadow-md 
-                        transition-transform duration-200 hover:scale-105 flex items-center gap-2 text-right">
-                  {dialogTitle}
-                  <BookOpen className="h-5 w-5 text-white" />
-                </h3>
-              </DialogTitle>
-            </DialogHeader>
+          {/* المعلم */}
+          <FormRow label={`${studyCirclesLabels.teacher} *`}>
+            <Select value={teacherId} onValueChange={setTeacherId}>
+              <SelectTrigger className="bg-green-50 border-green-200 text-green-900 rounded-md text-sm py-1 px-2 text-right">
+                <SelectValue placeholder={studyCirclesLabels.selectTeacher} />
+              </SelectTrigger>
+              <SelectContent>
+                {teachers.length > 0 ? (
+                  teachers.map((teacher) => (
+                    <SelectItem key={teacher.id} value={teacher.id}>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span>{teacher.full_name}</span>
+                      </div>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="" disabled>
+                    {studyCirclesLabels.noTeachers}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </FormRow>
 
-            {/* Body */}
-            <div className="grid gap-4 py-4">
-
-              {/* اسم الحلقة */}
-              <div className="grid gap-2">
-                <Label htmlFor="name" className="text-right text-gray-800 text-sm">
-                  {studyCirclesLabels.name} <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={circleName}
-                  onChange={(e) => setCircleName(e.target.value)}
-                  placeholder="أدخل اسم الحلقة"
-                  className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 text-right"
-                />
-              </div>
-
-              {/* المعلم */}
-              <div className="grid gap-2">
-                <Label htmlFor="teacher" className="text-right text-gray-800 text-sm">
-                  {studyCirclesLabels.teacher} <span className="text-red-500">*</span>
-                </Label>
-                <Select value={teacherId} onValueChange={setTeacherId}>
-                  <SelectTrigger className="bg-green-50 border-green-200 text-green-900 rounded-md text-sm py-1 px-2 text-right">
-                    <SelectValue placeholder={studyCirclesLabels.selectTeacher} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teachers.length > 0 ? (
-                      teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            <span>{teacher.full_name}</span>
-                          </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="" disabled>
-                        {studyCirclesLabels.noTeachers}
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* الحد الأقصى للطلاب */}
-              <div className="grid gap-2">
-                <Label htmlFor="max_students" className="text-right text-gray-800 text-sm">
-                  {studyCirclesLabels.maxStudents}
-                </Label>
-                <Input
-                  id="max_students"
-                  type="number"
-                  value={maxStudents}
-                  onChange={(e) => setMaxStudents(e.target.value)}
-                  placeholder={studyCirclesLabels.enterNumber}
-                  min="1"
-                  className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2 text-right"
-                />
-              </div>
-
-            </div>
-
-            {/* Footer */}
-            <DialogFooter dir="rtl" className="flex justify-end gap-2 mt-4">
-              <Button
-                onClick={handleSaveCircle}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 text-sm transition-colors"
-              >
-                {dialogMode === "add"
-                  ? studyCirclesLabels.addForm.submit
-                  : studyCirclesLabels.editForm.submit}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-sm px-3 py-1"
-              >
-                {studyCirclesLabels.cancel}
-              </Button>
-            </DialogFooter>
-
-          </div>
-        </DialogContent>
-      </Dialog>
+          {/* الحد الأقصى للطلاب */}
+          <FormRow label={studyCirclesLabels.maxStudents}>
+            <Input
+              id="max_students"
+              type="number"
+              value={maxStudents}
+              onChange={(e) => setMaxStudents(e.target.value)}
+              placeholder={studyCirclesLabels.enterNumber}
+              min="1"
+              className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2 text-right"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
 
 
       <DeleteConfirmationDialog
@@ -825,456 +857,242 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         cancelButtonText={studyCirclesLabels.cancel}
       />
 
-
-
-
       <Dialog open={openScheduleDialog} onOpenChange={setOpenScheduleDialog}>
-        <DialogContent dir="rtl" className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto p-4 bg-gradient-to-r from-blue-50 to-green-50 rounded-xl shadow-lg border border-gray-100">
+        <DialogContent
+          dir="rtl"
+          className="sm:max-w-[900px] w-full h-[57vh] flex flex-col bg-gradient-to-r from-blue-50 to-green-50 rounded-xl
+           shadow-lg
+           border border-gray-100 p-0 overflow-hidden"
+        >
+          {/* الهيدر مع الأزرار على اليسار */}
+          <DialogTitle
+            className="relative flex items-center justify-center bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-t-xl shadow-md"
+          >
+            {/* العنوان في النص */}
+            <h2 className="text-sm sm:text-lg font-extrabold tracking-wide drop-shadow-md text-center flex-1">
+              جدولة حلقة {selectedCircleForSchedule?.name || ""}
+            </h2>
 
-          {/* رأس الديالوج */}
-          <DialogHeader className="flex flex-col items-center border-b border-islamic-green/20 pb-4">
-            <DialogTitle className="text-xl text-islamic-green flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              {selectedCircleForSchedule
-                ? `جدولة حلقة: ${selectedCircleForSchedule.name}`
-                : 'جدولة الحلقة'}
-              {selectedCircleForSchedule?.teacher && ` | المعلم: ${selectedCircleForSchedule.teacher.full_name}`}
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">
-              إدارة مواعيد وأيام انعقاد الحلقة الدراسية
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* القسم الرئيسي */}
-          <div className="space-y-4 mt-4">
-
-            {/* ملخص المواعيد والإجراءات */}
-            <div className="flex justify-between items-center p-4 bg-white/50 rounded-lg shadow-sm">
-              <div className="flex items-center gap-4">
-                <Badge variant="outline" className="text-islamic-green border-islamic-green/40">
-                  {circleSchedules.length} موعد
-                </Badge>
-                <span className="text-sm text-muted-foreground">إجمالي المواعيد</span>
-                {selectedCircleForSchedule && (
-                  <Badge variant="secondary" className="text-xs">
-                    الحلقة: {selectedCircleForSchedule.name}
-                  </Badge>
-                )}
-              </div>
-
-              {/* زر إضافة موعد جديد للمسؤولين */}
-              {(userRole === 'superadmin' || userRole === 'admin') && (
+            {/* الأزرار على اليسار */}
+            <div className="absolute left-3 sm:left-4 flex gap-2">
+              {(userRole === "superadmin" || userRole === "admin") && (
                 <Button
+                  title="إضافة موعد جديد للحلقة"
                   onClick={handleAddSchedule}
-                  className="bg-islamic-green hover:bg-islamic-green/90 text-white flex items-center gap-2"
-                  size="sm"
+                  className="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-lg shadow-md border border-white/30 transition-all duration-200 h-6 sm:h-8"
                 >
-                  <Plus className="h-4 w-4" />
-                  إضافة موعد جديد
+                  <Plus className="h-2.5 w-2.5 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline ml-1">إضافة موعد</span>
                 </Button>
+
               )}
             </div>
+          </DialogTitle>
 
-            {/* حالة التحميل أو لا توجد مواعيد */}
+
+
+          {/* المحتوى الرئيسي مع سكرول داخلي */}
+          <div className="flex-1 overflow-y-auto -mx-0.5 px-3 sm:px-4 py-0 sm:py-1" dir="rtl">
             {loadingSchedules ? (
-              <div className="text-center p-8">
+              <div className="text-center p-6 sm:p-8">
                 <div className="flex flex-col items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green mb-4"></div>
-                  <span className="text-muted-foreground">جاري تحميل جدولة الحلقة...</span>
+                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-islamic-green mb-2 sm:mb-4"></div>
+                  <span className="text-xs sm:text-sm text-muted-foreground">
+                    جاري تحميل جدولة الحلقة...
+                  </span>
                 </div>
               </div>
             ) : circleSchedules.length === 0 ? (
-              <div className="text-center p-8 bg-white/30 rounded-lg shadow-sm">
-                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-medium text-lg mb-2">لا توجد مواعيد محددة</h3>
-                <p className="text-muted-foreground mb-4">لم يتم تسجيل أي مواعيد لهذه الحلقة بعد</p>
-                {(userRole === 'superadmin' || userRole === 'admin') && (
-                  <Button onClick={handleAddSchedule} className="bg-islamic-green hover:bg-islamic-green/90 text-white">
-                    <Plus className="h-4 w-4 ml-2" />
+              <div className="text-center p-4 sm:p-8 bg-white/30 rounded-lg shadow-sm">
+                <Calendar className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-2 sm:mb-4" />
+                <h3 className="font-medium text-sm sm:text-lg mb-1 sm:mb-2">
+                  لا توجد مواعيد محددة
+                </h3>
+                <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-4">
+                  لم يتم تسجيل أي مواعيد لهذه الحلقة بعد
+                </p>
+                {(userRole === "superadmin" || userRole === "admin") && (
+                  <Button
+                    onClick={handleAddSchedule}
+                    className="bg-islamic-green hover:bg-islamic-green/90 text-white text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2"
+                  >
+                    <Plus className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
                     إضافة أول موعد
                   </Button>
                 )}
-                {userRole === 'teacher' && (
-                  <p className="text-muted-foreground text-sm">لا يمكن للمعلمين إضافة مواعيد. يرجى التواصل مع الإدارة.</p>
+                {userRole === "teacher" && (
+                  <p className="text-muted-foreground text-[9px] sm:text-sm mt-2">
+                    لا يمكن للمعلمين إضافة مواعيد. يرجى التواصل مع الإدارة.
+                  </p>
                 )}
               </div>
             ) : (
-
               <GenericTable
                 data={circleSchedules}
-                columns={[
-                  {
-                    key: 'weekday',
-                    header: 'اليوم 📅',
-                    align: 'right',
-                    render: (schedule) => (
-                      <span className="font-medium text-gray-700 dark:text-gray-200 text-sm">
-                        {getWeekdayName(schedule.weekday)}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: 'time',
-                    header: 'الوقت 🕒',
-                    align: 'right',
-                    render: (schedule) => (
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md">
-                          <Clock className="h-4 w-4" />
-                          {formatTime(schedule.start_time)}
-                        </div>
-                        <span className="text-gray-400 font-bold">—</span>
-                        <div className="flex items-center gap-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-300 px-2 py-1 rounded-md">
-                          <Clock className="h-4 w-4" />
-                          {formatTime(schedule.end_time)}
-                        </div>
-                      </div>
-                    ),
-                  },
-                  {
-                    key: 'location',
-                    header: 'الموقع 📍',
-                    align: 'right',
-                    render: (schedule) =>
-                      schedule.location ? (
-                        <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                          <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400" />
-                          {schedule.location}
-                        </div>
-                      ) : (
-                        <span className="text-green-700/60 dark:text-green-400 italic text-sm">
-                          موقع الحلقة الافتراضي
-                        </span>
-                      ),
-                  },
-                  {
-                    key: 'created_at',
-                    header: 'تاريخ الإضافة 📅',
-                    align: 'center',
-                    render: (schedule) =>
-                      schedule.created_at
-                        ? new Date(schedule.created_at).toLocaleDateString('ar-EG', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })
-                        : '-',
-                  },
-                  {
-                    key: 'actions',
-                    header: 'الإجراءات ⚙️',
-                    align: 'center',
-                    render: (schedule) => (
-                      <div className="flex justify-center gap-2 items-center">
-                        {(userRole === 'superadmin' || userRole === 'admin') && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditSchedule(schedule)}
-                              className="bg-green-200 dark:bg-green-800 hover:bg-green-300 dark:hover:bg-green-700 text-green-900 dark:text-green-200 rounded-md p-2 transition-colors"
-                              title="تعديل الموعد"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteSchedule(schedule)}
-                              className="bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800 text-red-700 dark:text-red-200 rounded-md p-2 transition-colors"
-                              title="حذف الموعد"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                        {userRole === 'teacher' && (
-                          <span className="text-gray-500 dark:text-gray-400 text-xs py-2">
-                            غير مسموح بالتعديل
-                          </span>
-                        )}
-                      </div>
-                    ),
-                  },
-                ]}
-                emptyMessage="لا توجد مواعيد"
-                className="overflow-hidden rounded-lg text-xs border border-green-300 dark:border-green-700 shadow-sm"
-                getRowClassName={(_, index) =>
-                  `${index % 2 === 0 ? 'bg-white' : 'bg-green-50/70'} hover:bg-green-100/60 cursor-pointer transition-colors`
-                }
+                columns={tableColumns}
+                className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
+                defaultView="table"
               />
-
-
             )}
           </div>
-
-          {/* فوتر الديالوج */}
-          <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t flex justify-end gap-2" dir="rtl">
-            <Button
-              variant="outline"
-              onClick={() => setOpenScheduleDialog(false)}
-              className="border-islamic-green text-islamic-green hover:bg-islamic-green/10"
-            >
-              إغلاق
-            </Button>
-            {(userRole === 'superadmin' || userRole === 'admin') && (
-              <Button
-                onClick={handleAddSchedule}
-                className="bg-islamic-green hover:bg-islamic-green/90 text-white"
-              >
-                <Plus className="h-4 w-4 ml-2" />
-                إضافة موعد
-              </Button>
-            )}
-          </DialogFooter>
-
         </DialogContent>
+
+
       </Dialog>
 
-
-      <Dialog open={openAddScheduleDialog} onOpenChange={setOpenAddScheduleDialog}>
-        <DialogContent
-          className="sm:max-w-[500px] w-full rounded-xl p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-          dir="rtl"
-        >
-          {/* إطار داخلي */}
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
-            {/* رأس الديالوج */}
-            <DialogHeader>
-              <DialogTitle className="text-center">
-                <h3 className="flex items-center justify-center gap-2 
-                          bg-gradient-to-r from-green-400 via-green-300 to-blue-400 
-                          text-white text-xl font-extrabold 
-                          py-3 px-5 rounded-2xl shadow-md 
-                          transition-transform duration-200 hover:scale-105">
-                  <Plus className="h-5 w-5 text-white" />
-                  إضافة موعد جديد
-                </h3>
-              </DialogTitle>
-              <DialogDescription className="text-gray-600 text-center text-sm mt-1">
-                قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* الجسم */}
-            <div className="space-y-4">
-              {/* اختيار اليوم كأزرار عصريه */}
-              <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-                <Label className="text-right text-gray-800 text-sm mb-2">اليوم *</Label>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {weekdayOptions.map(day => (
-                    <button
-                      key={day.value}
-                      type="button"
-                      onClick={() => handleAddScheduleFormChange('weekday', day.value.toString())}
-                      className={`
+      {/* إضافة موعد جديد */}
+      <FormDialog
+        title="إضافة موعد جديد"
+        description="قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة"
+        open={openAddScheduleDialog}
+        onOpenChange={setOpenAddScheduleDialog}
+        onSave={handleSaveNewSchedule}
+        isLoading={savingNewSchedule}
+        saveButtonText={savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
+        mode="add"
+      >
+        <div className="space-y-4">
+          {/* اليوم كأزرار عصرية */}
+          <FormRow label="اليوم *">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {weekdayOptions.map(day => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => handleAddScheduleFormChange('weekday', day.value.toString())}
+                  className={`
                     text-sm px-4 py-2 rounded-full border transition-all duration-200
                     flex-1 text-center
                     ${addScheduleForm.weekday === day.value.toString()
-                          ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
-                          : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
-                        }
+                      ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                      : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
+                    }
                   `}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* وقت البداية والنهاية */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="add-schedule-start-time" className="text-right text-gray-800 text-sm">وقت البداية *</Label>
-                  <Input
-                    id="add-schedule-start-time"
-                    type="time"
-                    value={addScheduleForm.start_time}
-                    onChange={(e) => handleAddScheduleFormChange('start_time', e.target.value)}
-                    required
-                    className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="add-schedule-end-time" className="text-right text-gray-800 text-sm">وقت النهاية *</Label>
-                  <Input
-                    id="add-schedule-end-time"
-                    type="time"
-                    value={addScheduleForm.end_time}
-                    onChange={(e) => handleAddScheduleFormChange('end_time', e.target.value)}
-                    required
-                    className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
-                  />
-                </div>
-              </div>
-
-              {/* الموقع */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="add-schedule-location" className="text-right text-gray-800 text-sm">الموقع (اختياري)</Label>
-                  <div className="flex items-center text-xs text-gray-500">
-                    <Info className="h-3 w-3 ml-1" />
-                    اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
-                  </div>
-                </div>
-                <Input
-                  id="add-schedule-location"
-                  value={addScheduleForm.location}
-                  onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
-                  placeholder="أدخل موقع الموعد (اختياري)"
-                  className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
-                />
-              </div>
+                >
+                  {day.label}
+                </button>
+              ))}
             </div>
+          </FormRow>
 
-            {/* الفوتر */}
-            <DialogFooter className="gap-3 flex justify-end mt-4" dir="rtl">
-              <Button
-                variant="outline"
-                onClick={() => setOpenAddScheduleDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-sm px-3 py-1"
-              >
-                إلغاء
-              </Button>
-              <Button
-                onClick={handleSaveNewSchedule}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 text-sm transition-colors"
-                disabled={!addScheduleForm.start_time || !addScheduleForm.end_time || savingNewSchedule}
-              >
-                {savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
-              </Button>
-            </DialogFooter>
+          {/* وقت البداية والنهاية */}
+          <div className="grid grid-cols-2 gap-4">
+            <FormRow label="وقت البداية *">
+              <Input
+                id="add-schedule-start-time"
+                type="time"
+                value={addScheduleForm.start_time}
+                onChange={(e) => handleAddScheduleFormChange('start_time', e.target.value)}
+                required
+                className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
+
+            <FormRow label="وقت النهاية *">
+              <Input
+                id="add-schedule-end-time"
+                type="time"
+                value={addScheduleForm.end_time}
+                onChange={(e) => handleAddScheduleFormChange('end_time', e.target.value)}
+                required
+                className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
           </div>
-        </DialogContent>
-      </Dialog>
 
-
-
-      <Dialog open={openEditScheduleDialog} onOpenChange={setOpenEditScheduleDialog}>
-        <DialogContent
-          className="sm:max-w-[500px] w-full rounded-xl p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-          dir="rtl"
-        >
-          {/* Frame container */}
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
-
-            {/* Header */}
-            <DialogHeader className="pb-2">
-              <DialogTitle className="text-xl flex items-center justify-center gap-2">
-                <h3 className="bg-gradient-to-r from-orange-400 via-orange-300 to-yellow-400 
-                          text-white text-xl font-extrabold py-3 px-5 rounded-2xl shadow-md 
-                          transition-transform duration-200 hover:scale-105 flex items-center gap-2">
-                  <Pencil className="h-5 w-5 text-white" />
-                  تعديل موعد
-                </h3>
-              </DialogTitle>
-              <DialogDescription className="text-center text-muted-foreground mt-1">
-                قم بتعديل بيانات الموعد
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* Body */}
-            <div className="space-y-4 py-4">
-
-              {/* اليوم كأزرار عصرية */}
-              <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-                <Label className="text-right text-gray-800 text-sm mb-2">اليوم <span className="text-red-500">*</span></Label>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {weekdayOptions.map(day => (
-                    <button
-                      key={day.value}
-                      type="button"
-                      onClick={() => handleEditScheduleFormChange('weekday', day.value.toString())}
-                      className={`
-                      text-sm px-4 py-2 rounded-full border transition-all duration-200
-                      flex-1 text-center
-                      ${editScheduleForm.weekday === day.value.toString()
-                          ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
-                          : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
-                        }
-                      `}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* وقت البداية والنهاية */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-schedule-start-time" className="text-right text-gray-800 text-sm">
-                    وقت البداية <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="edit-schedule-start-time"
-                    type="time"
-                    value={editScheduleForm.start_time}
-                    onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
-                    required
-                    className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="edit-schedule-end-time" className="text-right text-gray-800 text-sm">
-                    وقت النهاية <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="edit-schedule-end-time"
-                    type="time"
-                    value={editScheduleForm.end_time}
-                    onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
-                    required
-                    className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
-                  />
-                </div>
-              </div>
-
-              {/* الموقع (اختياري) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="edit-schedule-location" className="text-right text-gray-800 text-sm">
-                    الموقع (اختياري)
-                  </Label>
-                  <div className="flex items-center text-xs text-muted-foreground">
-                    <Info className="h-3 w-3 mr-1" />
-                    اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
-                  </div>
-                </div>
-                <Input
-                  id="edit-schedule-location"
-                  value={editScheduleForm.location}
-                  onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
-                  placeholder="أدخل موقع الموعد (اختياري)"
-                  className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
-                />
-              </div>
-
+          {/* الموقع */}
+          <FormRow label="الموقع (اختياري)">
+            <div className="flex items-center text-xs text-gray-500 mb-1">
+              <Info className="h-3 w-3 ml-1" />
+              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
             </div>
+            <Input
+              id="add-schedule-location"
+              value={addScheduleForm.location}
+              onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
+              placeholder="أدخل موقع الموعد (اختياري)"
+              className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
 
-            {/* Footer */}
-            <DialogFooter className="flex justify-end gap-2 mt-4" dir="rtl">
-              <Button
-                variant="outline"
-                onClick={() => setOpenEditScheduleDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-sm px-3 py-1"
-              >
-                إلغاء
-              </Button>
-              <Button
-                onClick={handleSaveScheduleEdit}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 text-sm transition-colors"
-                disabled={!editScheduleForm.start_time || !editScheduleForm.end_time || savingScheduleEdit}
-              >
-                {savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
-              </Button>
-            </DialogFooter>
+      {/* تعديل موعد */}
+      <FormDialog
+        title="تعديل موعد"
+        description="قم بتعديل بيانات الموعد"
+        open={openEditScheduleDialog}
+        onOpenChange={setOpenEditScheduleDialog}
+        onSave={handleSaveScheduleEdit}
+        isLoading={savingScheduleEdit}
+        saveButtonText={savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+        mode="edit"
+      >
+        <div className="space-y-4">
+          {/* اليوم كأزرار عصرية */}
+          <FormRow label="اليوم *">
+            <div className="flex flex-wrap gap-2 justify-center">
+              {weekdayOptions.map(day => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => handleEditScheduleFormChange('weekday', day.value.toString())}
+                  className={`
+                    text-sm px-4 py-2 rounded-full border transition-all duration-200
+                    flex-1 text-center
+                    ${editScheduleForm.weekday === day.value.toString()
+                      ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                      : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
+                    }
+                  `}
+                >
+                  {day.label}
+                </button>
+              ))}
+            </div>
+          </FormRow>
 
+          {/* وقت البداية والنهاية */}
+          <div className="grid grid-cols-2 gap-4">
+            <FormRow label="وقت البداية *">
+              <Input
+                id="edit-schedule-start-time"
+                type="time"
+                value={editScheduleForm.start_time}
+                onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
+                required
+                className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
+
+            <FormRow label="وقت النهاية *">
+              <Input
+                id="edit-schedule-end-time"
+                type="time"
+                value={editScheduleForm.end_time}
+                onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
+                required
+                className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* الموقع */}
+          <FormRow label="الموقع (اختياري)">
+            <div className="flex items-center text-xs text-gray-500 mb-1">
+              <Info className="h-3 w-3 ml-1" />
+              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+            </div>
+            <Input
+              id="edit-schedule-location"
+              value={editScheduleForm.location}
+              onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
+              placeholder="أدخل موقع الموعد (اختياري)"
+              className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
 
       {/* مربع حوار تأكيد حذف الجدولة */}
       <DeleteConfirmationDialog
@@ -1285,7 +1103,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         title="تأكيد حذف الموعد"
         description="هل أنت متأكد من رغبتك في حذف هذا الموعد من جدول الحلقة؟"
         itemDetails={scheduleToDelete ? {
-          "اليوم": getWeekdayName(+scheduleToDelete.weekday),
+          "اليوم": getWeekdayNameFixed(scheduleToDelete.weekday),
           "الوقت": `${scheduleToDelete.start_time} - ${scheduleToDelete.end_time}`,
           "المكان": scheduleToDelete.location || "-"
         } : null}

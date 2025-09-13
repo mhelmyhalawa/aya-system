@@ -33,8 +33,19 @@ export const weekdayOptions = [
 
 // تحويل رقم اليوم إلى اسم
 export function getWeekdayName(weekday: number): string {
-  const day = weekdayOptions.find(d => d.value === weekday.toString());
-  return day ? day.label : '';
+  // التأكد من تحويل weekday إلى نص بشكل صريح
+  const weekdayStr = weekday.toString();
+  const day = weekdayOptions.find(d => d.value === weekdayStr);
+  
+  // إذا لم يتم العثور على اليوم، نطبع خطأ للتشخيص
+  if (!day) {
+    console.warn(`لم يتم العثور على اليوم المقابل للقيمة: ${weekday} (النوع: ${typeof weekday})`);
+    // البحث بطريقة أخرى للمطابقة (تجاهل نوع البيانات)
+    const fallbackDay = weekdayOptions.find(d => parseInt(d.value) === parseInt(weekdayStr));
+    return fallbackDay ? fallbackDay.label : `يوم غير معروف (${weekday})`;
+  }
+  
+  return day.label;
 }
 
 // تنسيق الوقت للعرض

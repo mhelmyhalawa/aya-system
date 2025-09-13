@@ -657,11 +657,11 @@ export const studyCirclesLabels = {
   
   // الحقول
   name: "اسم الحلقة",
-  teacher: "المعلم المسؤول",
+  teacher: "المعلم",
   location: "المكان",
-  schedule: "الجدول الزمني",
-  maxStudents: "الحد الأقصى للطلاب",
-  
+  schedule: "الجدول",
+  maxStudents: "الحد",
+
   // الإجراءات
   addCircle: "إضافة حلقة جديدة",
   editCircle: "تعديل الحلقة",

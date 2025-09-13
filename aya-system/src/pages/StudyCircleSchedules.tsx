@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -899,230 +900,154 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
 
       {/* Add Schedule Dialog */}
-      <Dialog open={openAddScheduleDialog} onOpenChange={setOpenAddScheduleDialog}>
-        <DialogContent
-          className="sm:max-w-[480px] w-full rounded-xl p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-          dir="rtl"
-        >
-          {/* Frame container */}
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
-            {/* Header */}
-            <DialogHeader>
-              <DialogTitle className="text-center">
-                <h3 className="flex items-center justify-center gap-2 
-                        bg-gradient-to-r from-green-400 via-green-300 to-blue-400 
-                        text-white text-xl font-extrabold 
-                        py-3 px-5 rounded-2xl shadow-md 
-                        transition-transform duration-200 hover:scale-105">
-                  <Plus className="h-5 w-5 text-white" />
-                  إضافة موعد جديد
-                </h3>
-              </DialogTitle>
-
-              <DialogDescription className="text-gray-600 text-center text-sm mt-1">
-                قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة
-              </DialogDescription>
-            </DialogHeader>
-
-
-            {/* Body */}
-            <div className="space-y-4">
-              {/* اليوم */}
-              <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-                {/* اليوم كأزرار عصرية */}
-                <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-                  <Label className="text-right text-gray-800 text-sm mb-2">اليوم *</Label>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {weekdayOptions.map(day => (
-                      <button
-                        key={day.value}
-                        type="button"
-                        onClick={() => handleAddScheduleFormChange('weekday', day.value.toString())}
-                        className={`
+      <FormDialog
+        title="إضافة موعد جديد"
+        description="قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة"
+        open={openAddScheduleDialog}
+        onOpenChange={setOpenAddScheduleDialog}
+        onSave={handleSaveNewSchedule}
+        isLoading={savingNewSchedule}
+        saveButtonText={savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
+        mode="add"
+      >
+        <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
+          {/* اليوم كأزرار عصرية */}
+          <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
+            <Label className="text-right text-gray-800 text-sm mb-2">اليوم *</Label>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {weekdayOptions.map(day => (
+                <button
+                  key={day.value}
+                  type="button"
+                  onClick={() => handleAddScheduleFormChange('weekday', day.value.toString())}
+                  className={`
                     text-sm px-4 py-2 rounded-full border transition-all duration-200
                     flex-1 text-center
                     ${addScheduleForm.weekday === day.value.toString()
-                            ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
-                            : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
-                          }
-                    `}
-                      >
-                        {day.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* الوقت */}
-                <Label htmlFor="add-schedule-start-time" className="text-right text-gray-800 text-sm mt-2">وقت البداية *</Label>
-                <Input
-                  id="add-schedule-start-time"
-                  type="time"
-                  value={addScheduleForm.start_time}
-                  onChange={(e) => handleAddScheduleFormChange('start_time', e.target.value)}
-                  required
-                  className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
-                />
-
-                <Label htmlFor="add-schedule-end-time" className="text-right text-gray-800 text-sm mt-2">وقت النهاية *</Label>
-                <Input
-                  id="add-schedule-end-time"
-                  type="time"
-                  value={addScheduleForm.end_time}
-                  onChange={(e) => handleAddScheduleFormChange('end_time', e.target.value)}
-                  required
-                  className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
-                />
-
-                {/* الموقع */}
-                <Label htmlFor="add-schedule-location" className="text-right text-gray-800 text-sm mt-2">الموقع (اختياري)</Label>
-                <div className="flex items-center text-xs text-gray-500 mb-1">
-                  <Info className="h-3 w-3 ml-1" />
-                  اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
-                </div>
-                <Input
-                  id="add-schedule-location"
-                  value={addScheduleForm.location}
-                  onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
-                  placeholder="أدخل موقع الموعد (اختياري)"
-                  className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
-                />
-              </div>
+                        ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                        : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
+                    }
+                  `}
+                >
+                  {day.label}
+                </button>
+              ))}
             </div>
-
-            {/* Footer */}
-            <DialogFooter className="gap-3 flex justify-end mt-4" dir="rtl">
-              <Button
-                variant="outline"
-                onClick={() => setOpenAddScheduleDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-sm px-3 py-1"
-              >
-                إلغاء
-              </Button>
-              <Button
-                onClick={handleSaveNewSchedule}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 text-sm transition-colors"
-                disabled={!addScheduleForm.start_time || !addScheduleForm.end_time || savingNewSchedule}
-              >
-                {savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
-              </Button>
-            </DialogFooter>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          {/* الوقت */}
+          <FormRow label="وقت البداية *">
+            <Input
+              id="add-schedule-start-time"
+              type="time"
+              value={addScheduleForm.start_time}
+              onChange={(e) => handleAddScheduleFormChange('start_time', e.target.value)}
+              required
+              className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+
+          <FormRow label="وقت النهاية *">
+            <Input
+              id="add-schedule-end-time"
+              type="time"
+              value={addScheduleForm.end_time}
+              onChange={(e) => handleAddScheduleFormChange('end_time', e.target.value)}
+              required
+              className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+
+          {/* الموقع */}
+          <FormRow label="الموقع (اختياري)">
+            <div className="flex items-center text-xs text-gray-500 mb-1">
+              <Info className="h-3 w-3 ml-1" />
+              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+            </div>
+            <Input
+              id="add-schedule-location"
+              value={addScheduleForm.location}
+              onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
+              placeholder="أدخل موقع الموعد (اختياري)"
+              className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
       {/* Edit Schedule Dialog */}
-      <Dialog open={openEditScheduleDialog} onOpenChange={setOpenEditScheduleDialog}>
-        <DialogContent
-          className="sm:max-w-[480px] w-[95%] max-h-[90vh] overflow-y-auto rounded-xl p-2 sm:p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-          dir="rtl"
-        >
-          {/* Frame container */}
-          <div className="bg-white rounded-lg shadow-sm p-2 sm:p-4 space-y-2 sm:space-y-4">
-            {/* Header */}
-            <DialogHeader className="pb-1 sm:pb-2">
-              <DialogTitle className="text-base sm:text-lg font-bold text-center">
-                <h3 className="flex items-center justify-center gap-1 sm:gap-2 
-                        bg-gradient-to-r from-orange-400 via-orange-300 to-yellow-400 
-                        text-white text-sm sm:text-xl font-bold sm:font-extrabold 
-                        py-2 px-3 sm:py-3 sm:px-5 rounded-xl sm:rounded-2xl shadow-md">
-                  <Pencil className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                  تعديل موعد
-                </h3>
-              </DialogTitle>
-
-              <DialogDescription className="text-gray-600 text-center text-xs sm:text-sm mt-1">
-                قم بتعديل بيانات الموعد
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* Body */}
-            <div className="space-y-2 sm:space-y-4">
-              {/* اليوم */}
-              <div className="border border-gray-200 rounded-md shadow-sm p-2 sm:p-3 bg-white">
-                {/* اليوم كأزرار عصرية */}
-                <Label className="text-right text-gray-800 text-xs sm:text-sm mb-1 sm:mb-2 block">اليوم *</Label>
-                <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
-                  {weekdayOptions.map(day => (
-                    <button
-                      key={day.value}
-                      type="button"
-                      onClick={() => handleEditScheduleFormChange('weekday', day.value.toString())}
-                      className={`
-                      text-[10px] sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-full border transition-all duration-200
-                      flex-1 text-center
-                      ${editScheduleForm.weekday === day.value.toString()
-                          ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
-                          : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
-                        }
-                      `}
-                    >
-                      {day.label}
-                    </button>
-                  ))}
-                </div>
-                
-                {/* الوقت */}
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div>
-                    <Label htmlFor="edit-schedule-start-time" className="text-right text-gray-800 text-xs sm:text-sm block">وقت البداية *</Label>
-                    <Input
-                      id="edit-schedule-start-time"
-                      type="time"
-                      value={editScheduleForm.start_time}
-                      onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
-                      required
-                      className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-xs sm:text-sm py-1 px-2 h-8 sm:h-auto"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="edit-schedule-end-time" className="text-right text-gray-800 text-xs sm:text-sm block">وقت النهاية *</Label>
-                    <Input
-                      id="edit-schedule-end-time"
-                      type="time"
-                      value={editScheduleForm.end_time}
-                      onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
-                      required
-                      className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-xs sm:text-sm py-1 px-2 h-8 sm:h-auto"
-                    />
-                  </div>
-                </div>
-
-                {/* الموقع */}
-                <Label htmlFor="edit-schedule-location" className="text-right text-gray-800 text-xs sm:text-sm mt-2 block">الموقع (اختياري)</Label>
-                <div className="flex items-center text-[9px] sm:text-xs text-gray-500 mb-1">
-                  <Info className="h-2.5 w-2.5 sm:h-3 sm:w-3 ml-1" />
-                  اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
-                </div>
-                <Input
-                  id="edit-schedule-location"
-                  value={editScheduleForm.location}
-                  onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
-                  placeholder="أدخل موقع الموعد (اختياري)"
-                  className="bg-gray-50 border-gray-300 rounded-md text-xs sm:text-sm py-1 px-2 h-8 sm:h-auto"
-                />
-              </div>
-            </div>
-
-            {/* Footer */}
-            <DialogFooter className="gap-2 sm:gap-3 flex justify-end mt-2 sm:mt-4" dir="rtl">
-              <Button
-                variant="outline"
-                onClick={() => setOpenEditScheduleDialog(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1 h-8 sm:h-auto"
+      <FormDialog
+        title="تعديل موعد"
+        description="قم بتعديل بيانات الموعد"
+        open={openEditScheduleDialog}
+        onOpenChange={setOpenEditScheduleDialog}
+        onSave={handleSaveScheduleEdit}
+        isLoading={savingScheduleEdit}
+        saveButtonText={savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+        mode="edit"
+      >
+        <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
+          {/* اليوم كأزرار عصرية */}
+          <Label className="text-right text-gray-800 text-sm mb-2 block">اليوم *</Label>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {weekdayOptions.map(day => (
+              <button
+                key={day.value}
+                type="button"
+                onClick={() => handleEditScheduleFormChange('weekday', day.value.toString())}
+                className={`
+                  text-sm px-4 py-2 rounded-full border transition-all duration-200
+                  flex-1 text-center
+                  ${editScheduleForm.weekday === day.value.toString()
+                    ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                    : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
+                  }
+                `}
               >
-                إلغاء
-              </Button>
-              <Button
-                onClick={handleSaveScheduleEdit}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-2 sm:px-4 py-1 sm:py-2 text-xs sm:text-sm transition-colors h-8 sm:h-auto"
-                disabled={!editScheduleForm.start_time || !editScheduleForm.end_time || savingScheduleEdit}
-              >
-                {savingScheduleEdit ? "جارٍ..." : "حفظ"}
-              </Button>
-            </DialogFooter>
+                {day.label}
+              </button>
+            ))}
           </div>
-        </DialogContent>
-      </Dialog>
+          
+          {/* الوقت */}
+          <div className="grid grid-cols-2 gap-2 mt-2">
+            <FormRow label="وقت البداية *">
+              <Input
+                id="edit-schedule-start-time"
+                type="time"
+                value={editScheduleForm.start_time}
+                onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
+                required
+                className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
+            <FormRow label="وقت النهاية *">
+              <Input
+                id="edit-schedule-end-time"
+                type="time"
+                value={editScheduleForm.end_time}
+                onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
+                required
+                className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
+          </div>
+
+          {/* الموقع */}
+          <FormRow label="الموقع (اختياري)">
+            <div className="flex items-center text-xs text-gray-500 mb-1">
+              <Info className="h-3 w-3 ml-1" />
+              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+            </div>
+            <Input
+              id="edit-schedule-location"
+              value={editScheduleForm.location}
+              onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
+              placeholder="أدخل موقع الموعد (اختياري)"
+              className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
 
       {/* حوار تأكيد الحذف */}
 
