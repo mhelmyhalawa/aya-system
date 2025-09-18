@@ -990,11 +990,11 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   };
 
   return (
-    <div className="container mx-auto py-6" dir="rtl">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
 
-      <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
+      <Card>
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
@@ -1007,15 +1007,45 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               </CardDescription>
             </div>
 
-            {/* زر العودة */}
-            <Button
-              variant="outline"
-              className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
-              onClick={refreshData}
-            >
-              <RefreshCwIcon className="h-4 w-4" />
-              تحديث
-            </Button>
+            <div className="flex flex-wrap gap-2 items-center">
+              {/* زر التحديث */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 rounded-3xl 
+                          bg-green-600 hover:bg-green-700 
+                          dark:bg-green-700 dark:hover:bg-green-600 
+                          text-white shadow-lg hover:scale-105 
+                          transition-transform duration-200 
+                          px-4 py-1.5 font-semibold"
+                onClick={refreshData}
+                title='تحديث البيانات'
+              >
+                {/* أيقونة */}
+                <RefreshCwIcon className="h-4 w-4" />
+                {/* النص يظهر على الشاشات md وما فوق */}
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
+
+              {/* زر إضافة سجل */}
+              <Button
+                onClick={handleAddNewRecord}
+                variant="outline"
+                className="flex items-center gap-2 rounded-3xl 
+                          bg-green-600 hover:bg-green-700 
+                          dark:bg-green-700 dark:hover:bg-green-600 
+                          text-white shadow-lg hover:scale-105 
+                          transition-transform duration-200 
+                          px-4 py-1.5 font-semibold"
+                title='إضافة سجل جديد'
+              >
+                {/* أيقونة */}
+                <Plus className="w-4 h-4" />
+                {/* النص يظهر على الشاشات md وما فوق */}
+                <span className="hidden sm:inline">إضافة سجل جديد</span>
+              </Button>
+            </div>
+
+
           </div>
         </CardHeader>
         <CardContent>
@@ -1134,85 +1164,58 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 </Select>
               </div>
 
-              {/* أزرار تبديل العرض */}
-              {/* زر الإضافة على اليسار */}
-              <Button
-                onClick={handleAddNewRecord}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center gap-2 px-3 py-1.5 shadow-md hover:scale-105 transition-transform duration-200 text-sm font-semibold ring-1 ring-green-500/30 hover:ring-2 hover:ring-green-500/50 active:scale-95"
-              >
-                <Plus className="w-3 h-3" />
-                إضافة سجل جديد
-              </Button>
+
 
             </div>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 
+                bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
               {/* التابات */}
+
+
               <Tabs
                 value={activeTab}
                 onValueChange={setActiveTab}
                 className="w-full md:w-[420px] bg-green-50 rounded-xl shadow-inner p-1"
               >
-                <TabsList className="grid w-full grid-cols-2 rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-2 gap-1 rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
+                  {/* Tab جميع السجلات */}
                   <TabsTrigger
                     value="all-records"
                     className="
-                                flex items-center justify-center gap-2 text-sm font-medium
-                                rounded-lg
-                                text-green-800
-                                hover:bg-green-100 hover:text-green-900
-                                data-[state=active]:bg-islamic-green
-                                data-[state=active]:text-white
-                                transition-all duration-300
-                              "
-                  >
-                    📋 جميع السجلات
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="my-records"
-                    className="
-                              flex items-center justify-center gap-2 text-sm font-medium
-                              rounded-lg
-                              text-green-800
+                              flex items-center justify-center gap-2 text-center text-sm font-medium
+                              rounded-lg text-green-800
                               hover:bg-green-100 hover:text-green-900
                               data-[state=active]:bg-islamic-green
                               data-[state=active]:text-white
                               transition-all duration-300
                             "
+                    title='جميع السجلات'
                   >
-                    👤 سجلاتي
+                    📋 <span className="hidden sm:inline">جميع السجلات</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="my-records"
+                    className="
+                              flex items-center justify-center gap-2 text-center text-sm font-medium
+                              rounded-lg text-green-800
+                              hover:bg-green-100 hover:text-green-900
+                              data-[state=active]:bg-islamic-green
+                              data-[state=active]:text-white
+                              transition-all duration-300
+                            "
+                    title='سجلاتي فقط'
+                  >
+                    👤 <span className="hidden sm:inline">سجلاتي</span>
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-
-              {/* أزرار تبديل العرض */}
-              <div className="flex items-center gap-2 border rounded-lg p-1 bg-green-50 dark:bg-green-900 shadow-sm">
-                <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="flex items-center justify-center w-10 h-10 p-0 rounded-lg hover:bg-green-100 hover:scale-105 transition-transform duration-200"
-                  title="عرض جدول"
-                >
-                  <Table2 className="w-5 h-5 text-green-800" />
-                </Button>
-                <Button
-                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('cards')}
-                  className="flex items-center justify-center w-10 h-10 p-0 rounded-lg hover:bg-green-100 hover:scale-105 transition-transform duration-200"
-                  title="عرض بطاقات"
-                >
-                  <LayoutGrid className="w-5 h-5 text-green-800" />
-                </Button>
-              </div>
             </div>
-            {/* جدول السجلات أو البطاقات */}
             {isLoading ? (
               <div className="text-center py-10">جاري التحميل...</div>
             ) : filteredRecords.length === 0 ? (
               <h2 className="text-lg font-semibold text-green-800 rounded-2xl shadow-sm">لا توجد سجلات حفظ متطابقة مع معايير البحث</h2>
 
-            ) : viewMode === 'table' ? (
+            ) :
               <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
                 data={filteredRecords.map(record => ({
                   ...record,
@@ -1227,7 +1230,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       <div className="font-medium text-right">
                         {record.student?.full_name || 'غير معروف'}
                         {record.student?.guardian && (
-                          <div className="text-xs text-green-700 dark:text-green-300">
+                          <div className="text-xs text-red-800 dark:text-red-800">
                             ولي الأمر: {record.student.guardian.full_name || 'غير محدد'}
                           </div>
                         )}
@@ -1269,10 +1272,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     header: '🔖 نطاق الحفظ',
                     align: 'right' as const,
                     render: (record) => {
-                      // Create a compatible record with numeric id for formatMemorizationRange
-                      const compatibleRecord = { 
-                        ...record, 
-                        id: parseInt(record.id) 
+                      const compatibleRecord = {
+                        ...record,
+                        id: parseInt(record.id)
                       };
                       return formatMemorizationRange(compatibleRecord as MemorizationRecord);
                     },
@@ -1304,7 +1306,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleEditRecord({...record, id: parseInt(record.id)})}
+                          onClick={() => handleEditRecord({ ...record, id: parseInt(record.id) })}
                           className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
                           title="تعديل"
                         >
@@ -1329,108 +1331,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
                 }
               />
-
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredRecords.map((record) => (
-                  <Card
-                    key={record.id}
-                    className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl"
-                  >
-                    <CardHeader className={`p-4 ${getMemorizationTypeColor(record.type).replace('bg-', 'bg-opacity-10 bg-')} rounded-t-xl`}>
-                      <div className="flex justify-between items-center">
-                        <CardTitle className="text-lg font-bold line-clamp-1">
-                          {record.student?.full_name || 'غير معروف'}
-                        </CardTitle>
-                        <Badge className={`${getMemorizationTypeColor(record.type)} px-2 py-1 rounded-lg`}>
-                          {getMemorizationTypeName(record.type)}
-                        </Badge>
-                      </div>
-
-                      {record.student?.guardian && (
-                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                          ولي الأمر: {record.student.guardian.full_name || 'غير محدد'}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        <span className="inline-block bg-gray-200 dark:bg-gray-700 rounded-full p-1">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                          </svg>
-                        </span>
-                        <span>{new Date(record.date).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })}</span>
-                      </div>
-                    </CardHeader>
-
-                    <CardContent className="pt-4 space-y-4">
-                      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                        <h4 className="text-sm font-semibold mb-1 text-gray-600 dark:text-gray-300">نطاق الحفظ:</h4>
-                        <p className="text-lg font-medium">{formatMemorizationRange(record)}</p>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-blue-50 dark:bg-blue-900 rounded-lg p-2 text-center">
-                          <h4 className="text-sm font-semibold mb-1 text-gray-600 dark:text-gray-300">الدرجة:</h4>
-                          <p className="text-md font-medium">{formatScore(record.score)}</p>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900 rounded-lg p-2 text-center">
-                          <h4 className="text-sm font-semibold mb-1 text-gray-600 dark:text-gray-300">أخطاء التجويد:</h4>
-                          <p className="text-md font-medium">{formatTajweedErrors(record.tajweed_errors)}</p>
-                        </div>
-                      </div>
-
-                      {record.notes && (
-                        <div className="bg-yellow-50 dark:bg-yellow-900 p-3 rounded-lg">
-                          <h4 className="text-sm font-semibold mb-1 text-gray-700 dark:text-gray-300">ملاحظات:</h4>
-                          <p className="text-sm text-gray-700 dark:text-gray-300">{record.notes}</p>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-green-50 dark:bg-green-900 p-2 rounded-lg text-center">
-                          <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300">المُسجل بواسطة:</h4>
-                          <p className="text-sm font-medium">{record.recorder?.full_name || 'غير معروف'}</p>
-                        </div>
-                        <div className="bg-indigo-50 dark:bg-indigo-900 p-2 rounded-lg text-center">
-                          <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-300">الحلقة:</h4>
-                          <p className="text-sm font-medium">
-                            {record.student?.study_circle ?
-                              (record.student.study_circle.name || `حلقة ${record.student.study_circle.id}`) :
-                              'غير محدد'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex justify-center space-x-2 rtl:space-x-reverse pt-2 border-t mt-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-1 bg-blue-50 dark:bg-blue-900 hover:bg-blue-100 dark:hover:bg-blue-800"
-                          onClick={() => handleEditRecord(record)}
-                        >
-                          <Pencil className="h-4 w-4 text-blue-500" />
-                          <span>تعديل</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-1 bg-red-50 dark:bg-red-900 hover:bg-red-100 dark:hover:bg-red-800"
-                          onClick={() => handleDeleteRecord(record.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                          <span>حذف</span>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-            )}
+            }
           </>
         </CardContent>
       </Card>

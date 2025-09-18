@@ -192,36 +192,40 @@ export function GenericTable<T extends { id: string }>(props: {
                     )}
 
                     {/* زر عرض الجدول */}
-                    <Button
-                        onClick={() => setViewMode("table")}
-                        size="icon"
-                        className={cn(
-                            "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
-                            viewMode === "table"
-                                ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                                : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-700"
-                        )}
-                        title="عرض الجدول"
-                    >
-                        <List className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline font-medium">جدول</span>
-                    </Button>
+                    {/* إخفاء أزرار العرض على الموبايل */}
+                    <div className="hidden sm:flex items-center gap-1 sm:gap-3">
+                        {/* زر عرض الجدول */}
+                        <Button
+                            onClick={() => setViewMode("table")}
+                            size="icon"
+                            className={cn(
+                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
+                                viewMode === "table"
+                                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-700"
+                            )}
+                            title="عرض الجدول"
+                        >
+                            <List className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <span className="hidden sm:inline font-medium">جدول</span>
+                        </Button>
 
-                    {/* زر عرض البطاقات */}
-                    <Button
-                        onClick={() => setViewMode("card")}
-                        size="icon"
-                        className={cn(
-                            "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
-                            viewMode === "card"
-                                ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                                : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-700"
-                        )}
-                        title="عرض البطاقات"
-                    >
-                        <LayoutGrid className="h-4 w-4 sm:h-5 sm:w-5" />
-                        <span className="hidden sm:inline font-medium">بطاقات</span>
-                    </Button>
+                        {/* زر عرض البطاقات */}
+                        <Button
+                            onClick={() => setViewMode("card")}
+                            size="icon"
+                            className={cn(
+                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
+                                viewMode === "card"
+                                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-700"
+                            )}
+                            title="عرض البطاقات"
+                        >
+                            <LayoutGrid className="h-4 w-4 sm:h-5 sm:w-5" />
+                            <span className="hidden sm:inline font-medium">بطاقات</span>
+                        </Button>
+                    </div>
                 </div>
 
             </div>
@@ -377,8 +381,6 @@ export function GenericTable<T extends { id: string }>(props: {
                                         </h3>
                                     </div>
 
-
-
                                     {/* المحتوى */}
                                     <div className="w-full">
                                         {/* نسخة الجدول - تظهر من sm وفوق */}
@@ -396,27 +398,26 @@ export function GenericTable<T extends { id: string }>(props: {
                                                             <td className="w-[30%] border border-green-300 dark:border-green-700 px-2 py-1 font-medium text-green-700 dark:text-green-300 text-right">
                                                                 {column.header}
                                                             </td>
-<td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 
-               text-green-800 dark:text-green-100 text-right 
-               bg-green-50 dark:bg-green-900/50">
-    <div
-        className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
-                   bg-green-100 dark:bg-green-200/70  /* لون مختلف للحقل الداخلي */
-                   border border-blue-300
-                   rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
-    >
-        {value !== null && value !== undefined ? (
-            typeof value === "object" && React.isValidElement(value) ? (
-                value
-            ) : (
-                <span className="text-center">{getDisplayValue(value)}</span>
-            )
-        ) : (
-            <span className="text-green-400/60 italic text-center">-</span>
-        )}
-    </div>
-</td>
-
+                                                            <td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 
+                                                                            text-green-800 dark:text-green-100 text-right 
+                                                                            bg-green-50 dark:bg-green-900/50">
+                                                                <div
+                                                                    className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
+                                                                                bg-green-50 dark:bg-green-800/30  
+                                                                                border border-green-200 dark:border-green-700
+                                                                                rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
+                                                                >
+                                                                    {value !== null && value !== undefined ? (
+                                                                        typeof value === "object" && React.isValidElement(value) ? (
+                                                                            value
+                                                                        ) : (
+                                                                            <span className="text-center">{getDisplayValue(value)}</span>
+                                                                        )
+                                                                    ) : (
+                                                                        <span className="text-green-400/60 italic text-center">-</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })}
@@ -443,15 +444,15 @@ export function GenericTable<T extends { id: string }>(props: {
                                                         <div className="flex justify-center">
                                                             <div
                                                                 className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
-                                                                    bg-white dark:bg-green-900 
-                                                                    border border-green-300 dark:border-green-700 
+                                                                    bg-green-50 dark:bg-green-800/30  
+                                                                    border border-green-200 dark:border-green-700 
                                                                     rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
                                                             >
                                                                 {value !== null && value !== undefined ? (
                                                                     typeof value === "object" && React.isValidElement(value) ? (
                                                                         value
                                                                     ) : (
-                                                                        <span className="text-center">{getDisplayValue(value)}</span>
+                                                                        <span className="text-center font-medium text-green-800 dark:text-green-100">{getDisplayValue(value)}</span>
                                                                     )
                                                                 ) : (
                                                                     <span className="text-green-400/60 italic text-center">-</span>
@@ -459,17 +460,12 @@ export function GenericTable<T extends { id: string }>(props: {
                                                             </div>
                                                         </div>
                                                     </div>
-
                                                 );
                                             })}
                                         </div>
                                     </div>
-
-
-
-
-
                                     {/* زر إظهار المزيد إذا كان هناك المزيد من الحقول */}
+                                    
                                     {hasMore && (
                                         <Button
                                             variant="ghost"
@@ -481,7 +477,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 e.target.setAttribute('data-stop', 'true');
                                                 setExpanded(!expanded);
                                             }}
-                                            className="mt-1 mb-2 mx-auto text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-xs"
+                                            className="mt-1 mb-2 mx-auto text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs"
                                         >
                                             {expanded ? 'عرض أقل' : 'عرض المزيد'}
                                             {expanded ? (
@@ -491,6 +487,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                             )}
                                         </Button>
                                     )}
+                                    
                                 </div>
                             );
                         };
