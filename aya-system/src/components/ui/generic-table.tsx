@@ -116,6 +116,20 @@ export function GenericTable<T extends { id: string }>(props: {
         });
     }, [data, columns, sortDirection]);
 
+    function getDisplayValue(value: any): string {
+        if (value === null || value === undefined) return "-";
+        if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+            return String(value);
+        }
+        if (typeof value === "object") {
+            if ("label" in value) return String(value.label);
+            if ("name" in value) return String(value.name);
+            return "-";
+        }
+        return "-";
+    }
+
+
     return (
 
 
@@ -314,7 +328,7 @@ export function GenericTable<T extends { id: string }>(props: {
 
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (
-                <div 
+                <div
                     className={`grid gap-4 w-full p-2 overflow-y-auto max-h-[calc(100vh-200px)]
                         grid-cols-1 
                         ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
@@ -367,24 +381,90 @@ export function GenericTable<T extends { id: string }>(props: {
 
                                     {/* المحتوى */}
                                     <div className="w-full">
-                                        <table className="w-full border border-green-300 dark:border-green-700 text-[12px] sm:text-xs table-fixed">
+                                        {/* نسخة الجدول - تظهر من sm وفوق */}
+                                        <table className="hidden sm:table w-full border border-green-300 dark:border-green-700 text-[12px] sm:text-xs table-fixed">
                                             <tbody>
                                                 {visibleColumns.map((column) => {
-                                                    const value = column.render ? column.render(item) : (item as any)[column.key];
+                                                    const value = column.render
+                                                        ? column.render(item)
+                                                        : (item as any)[column.key];
                                                     return (
-                                                        <tr key={`${item.id}-${column.key}-row`} className="hover:bg-green-50 dark:hover:bg-green-900/25">
+                                                        <tr
+                                                            key={`${item.id}-${column.key}-row`}
+                                                            className="hover:bg-green-50 dark:hover:bg-green-900/25"
+                                                        >
                                                             <td className="w-[30%] border border-green-300 dark:border-green-700 px-2 py-1 font-medium text-green-700 dark:text-green-300 text-right">
                                                                 {column.header}
                                                             </td>
-                                                            <td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 text-green-800 dark:text-green-100 text-right">
-                                                                {value ? value : <span className="text-green-400/60 italic">-</span>}
-                                                            </td>
+<td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 
+               text-green-800 dark:text-green-100 text-right 
+               bg-green-50 dark:bg-green-900/50">
+    <div
+        className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
+                   bg-green-100 dark:bg-green-200/70  /* لون مختلف للحقل الداخلي */
+                   border border-blue-300
+                   rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
+    >
+        {value !== null && value !== undefined ? (
+            typeof value === "object" && React.isValidElement(value) ? (
+                value
+            ) : (
+                <span className="text-center">{getDisplayValue(value)}</span>
+            )
+        ) : (
+            <span className="text-green-400/60 italic text-center">-</span>
+        )}
+    </div>
+</td>
+
                                                         </tr>
                                                     );
                                                 })}
                                             </tbody>
                                         </table>
+
+                                        {/* نسخة الفورم - تظهر فقط على الموبايل (أصغر من sm) */}
+                                        <div className="sm:hidden space-y-4">
+                                            {visibleColumns.map((column) => {
+                                                const value = column.render
+                                                    ? column.render(item)
+                                                    : (item as any)[column.key];
+                                                return (
+                                                    <div
+                                                        key={`${item.id}-${column.key}-form`}
+                                                        className="p-2 border-b border-green-200 dark:border-green-700"
+                                                    >
+                                                        {/* العنوان */}
+                                                        <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 text-right">
+                                                            {column.header}
+                                                        </div>
+
+                                                        {/* القيمة */}
+                                                        <div className="flex justify-center">
+                                                            <div
+                                                                className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
+                                                                    bg-white dark:bg-green-900 
+                                                                    border border-green-300 dark:border-green-700 
+                                                                    rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
+                                                            >
+                                                                {value !== null && value !== undefined ? (
+                                                                    typeof value === "object" && React.isValidElement(value) ? (
+                                                                        value
+                                                                    ) : (
+                                                                        <span className="text-center">{getDisplayValue(value)}</span>
+                                                                    )
+                                                                ) : (
+                                                                    <span className="text-green-400/60 italic text-center">-</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                );
+                                            })}
+                                        </div>
                                     </div>
+
 
 
 

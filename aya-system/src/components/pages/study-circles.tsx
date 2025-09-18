@@ -690,7 +690,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               },
               ...((userRole === 'superadmin' || userRole === 'admin') ? [{
                 key: 'actions',
-                header: '⚙️ الإجراء',
+                header: '⚙️ الإجراءات',
                 align: 'center' as const,
                 render: (c: StudyCircle) => (
                   <div className="flex gap-2">

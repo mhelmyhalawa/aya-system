@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import {
   Calendar,
   Clock,
@@ -573,9 +574,9 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
             </div>
             <div className="md:col-span-2">
               <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm overflow-hidden">
-                <CardHeader className="pb-4 bg-gradient-to-r from-green-100 via-green-200 to-green-700 p-4">
+                <CardHeader className="pb-4 bg-gradient-to-r from-green-700 via-green-500 to-green-700 p-4">
                   <div className="flex justify-between  items-center">
-                    <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <CardTitle className="text-sm font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
                       <div className="flex items-center gap-2">
                         <CalendarCheck className="h-5 w-5 text-green-700" />
                         {selectedCircle ?
@@ -585,7 +586,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                       </div>
                       {selectedCircle && (
                         <CardDescription className="text-gray-700 text-xs sm:text-sm mt-1 sm:mt-0">
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 sm:text-sm ">
                             {studentsCount[selectedCircle] || 0} طالب
                           </Badge>
                         </CardDescription>
@@ -747,20 +748,20 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                         columns={[
                           {
                             key: "student",
-                            header: "🎓 الطالب",
+                            header: "👨‍🎓 بيانات الطالب",
                             align: "right",
                             render: (item: StudentWithAttendance) => (
-                              <div className="flex items-center gap-2">
-                                <UserRound className="h-5 w-5 text-gray-400" />
-                                <div>
-                                  <div className="font-medium">{item.student.full_name}</div>
+                              <div className="flex items-center gap-3 py-2">
+                                <UserRound className="h-6 w-6 text-gray-400" />
+                                <div className="min-w-[200px]">
+                                  <div className="font-medium text-base">{item.student.full_name}</div>
                                   {item.student.guardian && (
-                                    <div className="text-xs text-blue-600">
+                                    <div className="text-sm text-blue-600">
                                       <span className="font-medium">ولي الأمر:</span>{" "}
                                       {item.student.guardian.full_name}
                                     </div>
                                   )}
-                                  <div className="text-xs text-gray-500">
+                                  <div className="text-xs text-gray-500 mt-1">
                                     {getGradeLevelName(item.student.grade_level || item.student.grade)}
                                   </div>
                                 </div>
@@ -769,7 +770,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                           },
                           {
                             key: "status",
-                            header: "📋 الحالة",
+                            header: "📋 حالة الحضور",
                             align: "center",
                             render: (item: StudentWithAttendance) => (
                               <Select
@@ -779,7 +780,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                                 }
                               >
                                 <SelectTrigger
-                                  className={`w-28 font-medium ${attendanceFormData[item.student.id]?.status === "present"
+                                  className={`w-36 font-medium text-base px-4 py-2 ${attendanceFormData[item.student.id]?.status === "present"
                                     ? "bg-green-100 text-green-800 border-green-300"
                                     : attendanceFormData[item.student.id]?.status === "absent"
                                       ? "bg-red-100 text-red-800 border-red-300"
@@ -841,49 +842,49 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                                     }));
                                     setHasChanges(true);
                                   }}
-                                  className="w-20 text-center text-sm"
+                                  className="w-28 text-center text-base py-2 px-3 bg-amber-50 border-amber-300"
                                 />
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400 text-base">-</span>
                               ),
                           },
                           {
                             key: "note",
-                            header: "📝 ملاحظات",
+                            header: "📝 ملاحظات الحضور",
                             align: "right",
                             render: (item: StudentWithAttendance) =>
                               attendanceFormData[item.student.id]?.note ? (
-                                <div className="flex items-center gap-1">
-                                  <FileText className="h-4 w-4 text-gray-400" />
-                                  <span className="truncate max-w-[200px]">
+                                <div className="flex items-center gap-2 py-2">
+                                  <FileText className="h-5 w-5 text-gray-500" />
+                                  <span className="truncate max-w-[250px] text-base">
                                     {attendanceFormData[item.student.id]?.note}
                                   </span>
                                 </div>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400 text-base">-</span>
                               ),
                           },
                           {
                             key: "actions",
-                            header: "📋 تفاصيل",
+                            header: "📋 تعديل البيانات",
                             align: "center",
                             render: (item: StudentWithAttendance) => (
                               <Button
                                 variant="ghost"
-                                size="sm"
+                                size="lg"
                                 onClick={() => handleEditAttendance(item.student.id)}
-                                className="text-islamic-green hover:text-islamic-green/80 hover:bg-islamic-green/10 rounded-md p-2 transition-colors"
+                                className="text-islamic-green hover:text-islamic-green/80 hover:bg-islamic-green/10 rounded-xl px-6 py-3 transition-colors"
                               >
-                                <Edit className="h-4 w-4 mr-1" />
-                                تفاصيل
+                                <Edit className="h-5 w-5 mr-2" />
+                                تعديل
                               </Button>
                             ),
                           },
                         ]}
                         emptyMessage="لا يوجد طلاب"
-                        className="overflow-x-auto rounded-xl border border-green-300 shadow-md text-sm"
+                        className="overflow-x-auto rounded-xl border-2 border-green-300 shadow-lg text-base"
                         getRowClassName={(_, idx) =>
-                          `${idx % 2 === 0 ? "bg-green-50 hover:bg-green-100" : "bg-white hover:bg-green-50"} cursor-pointer transition-colors`
+                          `${idx % 2 === 0 ? "bg-green-50 hover:bg-green-100" : "bg-white hover:bg-green-50"} cursor-pointer transition-colors py-3`
                         }
                       />
 
@@ -926,129 +927,90 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
       </Card>
 
       {/* نافذة تحرير معلومات حضور طالب */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent
-          className="sm:max-w-[480px] w-full rounded-xl p-4 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-          dir="rtl"
-        >
-          {/* الإطار الداخلي */}
-          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+      <FormDialog
+        title="تفاصيل الحضور"
+        description={editingStudentId && (() => {
+          const studentWithAttendance = studentsWithAttendance.find(s => s.student.id === editingStudentId);
+          const student = studentWithAttendance?.student;
 
-            {/* الهيدر */}
-            <DialogHeader className="pb-2 text-center">
-              <DialogTitle>
-                <h3 className="flex items-center justify-center gap-2 
-                         bg-gradient-to-r from-orange-400 via-orange-300 to-yellow-400 
-                         text-white text-xl font-extrabold py-3 px-5 rounded-2xl shadow-md 
-                         transition-transform duration-200 hover:scale-105">
-                  <Pencil className="h-5 w-5 text-white" />
-                  تفاصيل الحضور
-                </h3>
-              </DialogTitle>
-              <DialogDescription className="text-gray-600 text-sm mt-1">
-                {editingStudentId && (() => {
-                  const studentWithAttendance = studentsWithAttendance.find(s => s.student.id === editingStudentId);
-                  const student = studentWithAttendance?.student;
+          if (!student) return null;
 
-                  if (!student) return null;
-
-                  return (
-                    <div className="flex flex-col items-center space-y-1">
-                      <div className="font-medium">
-                        {student.full_name}
-                      </div>
-                      {student.guardian && (
-                        <div className="text-xs text-blue-600">
-                          <span className="font-medium">ولي الأمر:</span> {student.guardian.full_name}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </DialogDescription>
-            </DialogHeader>
-
-            {/* الجسم */}
-            <div className="space-y-4">
-              {/* حالة الحضور */}
-              <div className="space-y-2">
-                <Label htmlFor="attendance-status" className="text-gray-800 text-sm">حالة الحضور</Label>
-                <Select
-                  value={editForm.status}
-                  onValueChange={(value: AttendanceStatus) => setEditForm({ ...editForm, status: value })}
-                >
-                  <SelectTrigger
-                    id="attendance-status"
-                    className={`text-sm rounded-md ${getAttendanceStatusColor(editForm.status)}`}
-                  >
-                    <SelectValue>
-                      {getAttendanceStatusName(editForm.status)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {attendanceStatusOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          return (
+            <div className="flex flex-col items-center space-y-1">
+              <div className="font-medium">
+                {student.full_name}
               </div>
-
-              {/* دقائق التأخير إذا كان متأخر */}
-              {editForm.status === 'late' && (
-                <div className="space-y-2">
-                  <Label htmlFor="late-minutes" className="text-gray-800 text-sm">دقائق التأخير</Label>
-                  <Input
-                    id="late-minutes"
-                    type="number"
-                    min={0}
-                    value={editForm.late_minutes || 0}
-                    onChange={(e) => {
-                      const value = parseInt(e.target.value) || 0;
-                      setEditForm({ ...editForm, late_minutes: value < 0 ? 0 : value });
-                    }}
-                    className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
-                  />
+              {student.guardian && (
+                <div className="text-xs text-blue-600">
+                  <span className="font-medium">ولي الأمر:</span> {student.guardian.full_name}
                 </div>
               )}
-
-              {/* الملاحظات */}
-              <div className="space-y-2">
-                <Label htmlFor="attendance-note" className="text-gray-800 text-sm">ملاحظات</Label>
-                <Textarea
-                  id="attendance-note"
-                  value={editForm.note || ''}
-                  onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
-                  placeholder="أدخل أي ملاحظات حول حضور الطالب"
-                  rows={3}
-                  className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
-                />
-              </div>
             </div>
-
-            {/* الفوتر */}
-            <DialogFooter className="gap-3 flex justify-end mt-4">
-              <Button
-                type="button"
-                onClick={handleSaveEdit}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-md px-4 py-2 text-sm transition-colors"
+          );
+        })()}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSave={handleSaveEdit}
+        saveButtonText="حفظ التغييرات"
+        cancelButtonText="إلغاء"
+        mode="edit"
+        maxWidth="450px"
+      >
+        <div className="space-y-4">
+          {/* حالة الحضور */}
+          <FormRow label="حالة الحضور">
+            <Select
+              value={editForm.status}
+              onValueChange={(value: AttendanceStatus) => setEditForm({ ...editForm, status: value })}
+            >
+              <SelectTrigger
+                id="attendance-status"
+                className={`text-sm rounded-md ${getAttendanceStatusColor(editForm.status)}`}
               >
-                حفظ التغييرات
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsEditDialogOpen(false)}
-                className="border-gray-300 text-gray-700 hover:bg-gray-100 text-sm px-3 py-1"
-              >
-                إلغاء
-              </Button>
-            </DialogFooter>
+                <SelectValue>
+                  {getAttendanceStatusName(editForm.status)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {attendanceStatusOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FormRow>
 
-          </div>
-        </DialogContent>
-      </Dialog>
+          {/* دقائق التأخير إذا كان متأخر */}
+          {editForm.status === 'late' && (
+            <FormRow label="دقائق التأخير">
+              <Input
+                id="late-minutes"
+                type="number"
+                min={0}
+                value={editForm.late_minutes || 0}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value) || 0;
+                  setEditForm({ ...editForm, late_minutes: value < 0 ? 0 : value });
+                }}
+                className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+              />
+            </FormRow>
+          )}
+
+          {/* الملاحظات */}
+          <FormRow label="ملاحظات">
+            <Textarea
+              id="attendance-note"
+              value={editForm.note || ''}
+              onChange={(e) => setEditForm({ ...editForm, note: e.target.value })}
+              placeholder="أدخل أي ملاحظات حول حضور الطالب"
+              rows={3}
+              className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
     </div>
 
 
