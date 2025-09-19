@@ -1413,7 +1413,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
       {/* معالج (Wizard) إضافة/تعديل سجل */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[640px] w-full rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100">
+        <DialogContent dir="rtl" className="sm:max-w-[640px] w-full rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100">
           <DialogHeader className="pb-1">
             <DialogTitle className="text-xl font-bold text-center">
               <h3 className="text-center leading-tight text-green-800 bg-gradient-to-r from-green-100 to-blue-100 py-2 px-3 rounded-lg">
@@ -1465,10 +1465,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       المعلم <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
-                      <SelectTrigger id="teacher">
+                      <SelectTrigger id="teacher" dir="rtl" className="text-right">
                         <SelectValue placeholder="اختر المعلم" />
                       </SelectTrigger>
-                      <SelectContent position="popper">
+                      <SelectContent position="popper" dir="rtl">
                         {visibleTeachers && visibleTeachers.length > 0 ? (
                           visibleTeachers.map(teacher => (
                             <SelectItem key={teacher.id} value={teacher.id}>
@@ -1490,10 +1490,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   <div className="grid gap-2">
                     <Label htmlFor="circle">الحلقة</Label>
                     <Select value={formData.circle_id || ''} onValueChange={(value) => handleCircleChange(value)} disabled={!formData.recorded_by}>
-                      <SelectTrigger id="circle">
+                      <SelectTrigger id="circle" dir="rtl" className="text-right">
                         <SelectValue placeholder="اختر الحلقة" />
                       </SelectTrigger>
-                      <SelectContent position="popper">
+                      <SelectContent position="popper" dir="rtl">
                         {formFilteredCircles.length > 0 ? (
                           formFilteredCircles.map(circle => (
                             <SelectItem key={circle.id} value={circle.id}>
@@ -1512,10 +1512,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       الطالب <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.student_id || ''} onValueChange={(value) => handleInputChange('student_id', value)} disabled={!formData.recorded_by}>
-                      <SelectTrigger id="student">
+                      <SelectTrigger id="student" dir="rtl" className="text-right">
                         <SelectValue placeholder="اختر الطالب" />
                       </SelectTrigger>
-                      <SelectContent position="popper">
+                      <SelectContent position="popper" dir="rtl">
                         {formFilteredStudents.length > 0 ? (
                           formFilteredStudents.map(student => (
                             <SelectItem key={student.id} value={student.id}>
@@ -1546,10 +1546,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       نوع السجل <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
-                      <SelectTrigger id="memorization_type">
+                      <SelectTrigger id="memorization_type" dir="rtl" className="text-right">
                         <SelectValue placeholder="اختر النوع" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent dir="rtl">
                         <SelectItem value="all">جميع الأنواع</SelectItem>
                         {memorizationTypeOptions.map(option => (
                           <SelectItem key={option.value} value={option.value}>
@@ -1564,7 +1564,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="date" className="flex items-center gap-1 mb-2">
                       التاريخ <span className="text-red-500">*</span>
                     </Label>
-                    <Input id="date" type="date" value={formData.date || ''} onChange={(e) => handleInputChange('date', e.target.value)} min={new Date().toISOString().split('T')[0]} />
+                    <Input id="date" type="date" dir="rtl" className="text-right" value={formData.date || ''} onChange={(e) => handleInputChange('date', e.target.value)} min={new Date().toISOString().split('T')[0]} />
                     {formErrors.date && <p className="text-sm text-red-500 mt-1">{formErrors.date}</p>}
                   </div>
                 </div>
@@ -1575,10 +1575,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       من سورة <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.from_surah ? formData.from_surah.toString() : ''} onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}>
-                      <SelectTrigger id="from_surah">
+                      <SelectTrigger id="from_surah" dir="rtl" className="text-right">
                         <SelectValue placeholder="اختر السورة">{formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : 'اختر السورة'}</SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
+                      <SelectContent className="max-h-[300px]" dir="rtl">
                         {quranSurahs.map(surah => (
                           <SelectItem key={surah.number} value={surah.number.toString()}>
                             {surah.number}. {getSurahName(surah.number)}
@@ -1594,10 +1594,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       إلى سورة <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.to_surah ? formData.to_surah.toString() : ''} onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}>
-                      <SelectTrigger id="to_surah">
+                      <SelectTrigger id="to_surah" dir="rtl" className="text-right">
                         <SelectValue placeholder="اختر السورة">{formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : 'اختر السورة'}</SelectValue>
                       </SelectTrigger>
-                      <SelectContent className="max-h-[300px]">
+                      <SelectContent className="max-h-[300px]" dir="rtl">
                         {quranSurahs.map(surah => (
                           <SelectItem key={surah.number} value={surah.number.toString()}>
                             {surah.number}. {getSurahName(surah.number)}
@@ -1614,7 +1614,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="from_ayah" className="flex items-center gap-1 mb-2">
                       من آية <span className="text-red-500">*</span>
                     </Label>
-                    <Input id="from_ayah" type="number" min={1} value={formData.from_ayah || ''} onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))} />
+                    <Input id="from_ayah" type="number" min={1} dir="rtl" className="text-right" value={formData.from_ayah || ''} onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))} />
                     {formErrors.from_ayah && <p className="text-sm text-red-500 mt-1">{formErrors.from_ayah}</p>}
                   </div>
 
@@ -1622,7 +1622,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="to_ayah" className="flex items-center gap-1 mb-2">
                       إلى آية <span className="text-red-500">*</span>
                     </Label>
-                    <Input id="to_ayah" type="number" min={1} value={formData.to_ayah || ''} onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))} />
+                    <Input id="to_ayah" type="number" min={1} dir="rtl" className="text-right" value={formData.to_ayah || ''} onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))} />
                     {formErrors.to_ayah && <p className="text-sm text-red-500 mt-1">{formErrors.to_ayah}</p>}
                   </div>
                 </div>
@@ -1671,7 +1671,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
                 <div>
                   <Label htmlFor="notes" className="mb-2">ملاحظات</Label>
-                  <Textarea id="notes" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-24" />
+                  <Textarea id="notes" dir="rtl" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-24 text-right" />
                 </div>
               </div>
             )}
