@@ -660,7 +660,7 @@ export const studyCirclesLabels = {
   teacher: "المعلم",
   location: "المكان",
   schedule: "الجدول",
-  maxStudents: "الحد الأقصى للطلاب",
+  maxStudents: "سعة الحلقة",
 
   // الإجراءات
   addCircle: "إضافة حلقة جديدة",
