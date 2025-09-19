@@ -15,7 +15,8 @@ import {
   MapPin,
   Trash2,
   Database,
-  UserCircle
+  UserCircle,
+  GraduationCap
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { getAllGuardians, searchGuardians, deleteGuardian, exportGuardiansToJson } from "@/lib/guardian-service";
@@ -35,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabase-client';
 import { DeleteConfirmationDialog } from "../ui/delete-confirmation-dialog";
 import { GenericTable } from "../ui/generic-table";
+import { FormDialog, FormRow } from "../ui/form-dialog";
 
 /**
  * Fetches students associated with a specific guardian
@@ -181,6 +183,8 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   // حوار تأكيد الحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [guardianToDelete, setGuardianToDelete] = useState<Guardian | null>(null);
+  // حالة تحميل خاصة بعملية الحذف فقط (لتجنب تعطيل الزر بسبب تحميل عام للصفحة)
+  const [isDeleteProcessing, setIsDeleteProcessing] = useState(false);
 
   // نموذج ولي الأمر
   const [guardianId, setGuardianId] = useState<string>("");
@@ -474,6 +478,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
     if (!guardianToDelete) return;
 
     try {
+      setIsDeleteProcessing(true);
       const result = await deleteGuardian(guardianToDelete.id);
 
       if (result.success) {
@@ -500,6 +505,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
     } finally {
       setIsDeleteDialogOpen(false);
       setGuardianToDelete(null);
+      setIsDeleteProcessing(false);
     }
   };
 
@@ -607,6 +613,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
       setLoading(false);
     }
   };
+
 
   // وظيفة حذف الطالب
   const handleDeleteStudent = async (studentId: string) => {
@@ -782,7 +789,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   // التحقق من الصلاحيات
   if (userRole !== 'superadmin' && userRole !== 'admin' && userRole !== 'teacher') {
     return (
-  <div className="w-full max-w-[1600px] mx-auto p-8 text-center">
+      <div className="w-full max-w-[1600px] mx-auto p-8 text-center">
         <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">{guardiansLabels.accessDenied}</h2>
         <p className="text-muted-foreground mb-6">{guardiansLabels.accessDeniedMessage}</p>
@@ -794,9 +801,11 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   }
 
   return (
-  <div className="w-full max-w-[1600px] mx-auto py-6" dir="rtl">
-      <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
+
+      <Card>
+        {/* الهيدر */}
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
@@ -810,20 +819,27 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             </div>
 
             <div className="flex gap-2">
+
               <Button
                 className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
                 onClick={handleAddGuardian}
+                title="إضافة ولي أمر جديد"
               >
-                <span className="text-lg">👤</span>
-                <span>{guardiansLabels.addGuardian}</span>
+                {/* الأيقونة */}
+                <UserPlus className="h-5 w-5" />
+                {/* النص يظهر فقط في الديسكتوب */}
+                <span className="hidden sm:inline">إضافة ولي أمر جديد</span>
               </Button>
 
               <Button
                 className="flex items-center gap-2 rounded-3xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
                 onClick={() => handleAddStudent("", true)}
+                title="إضافة طالب جديد"
               >
-                <span className="text-lg">🧒</span>
-                <span>إضافة طالب جديد</span>
+                {/* الأيقونة */}
+                <GraduationCap className="h-5 w-5" />
+                {/* النص يظهر فقط في الديسكتوب */}
+                <span className="hidden sm:inline">إضافة طالب جديد</span>
               </Button>
 
 
@@ -893,21 +909,21 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               data={paginatedGuardians}
               columns={[
                 {
-                  key: 'index',
-                  header: '#️⃣',
+                  key: 'index_full_name',
+                  header: '#️⃣👤',
                   align: 'center' as const,
                   render: (item) => {
-                    // Get the index from the paginatedGuardians array instead
-                    const itemIndex = paginatedGuardians.findIndex(guardian => guardian.id === item.id);
-                    return (currentPage - 1) * itemsPerPage + itemIndex + 1;
+                    // نجيب ترتيب العنصر
+                    const itemIndex = paginatedGuardians.findIndex(
+                      (guardian) => guardian.id === item.id
+                    );
+                    const index = (currentPage - 1) * itemsPerPage + itemIndex + 1;
+
+                    // نعرض الرقم مع الاسم
+                    return `${index} - ${item.full_name}`;
                   },
                 },
-                {
-                  key: 'full_name',
-                  header: `👤 ${guardiansLabels.fullName}`,
-                  align: 'center' as const,
-                  render: (guardian) => guardian.full_name,
-                },
+
                 {
                   key: 'phone_number',
                   header: `📞 ${guardiansLabels.phoneNumber}`,
@@ -929,8 +945,10 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   render: (guardian) =>
                     guardian.email ? (
                       <div className="flex items-center justify-center gap-1">
-                        <Mail className="h-4 w-4 text-islamic-green/60" />
-                        <span dir="ltr" className="text-islamic-green/80">{guardian.email}</span>
+                        <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-islamic-green/60" />
+                        <span dir="ltr" className="text-islamic-green/80 text-xs truncate block">
+                          {guardian.email}
+                        </span>
                       </div>
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -978,7 +996,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                       >
                         <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
                       </Button>
-                      <Button
+                      {/* <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeleteGuardian(guardian)}
@@ -986,27 +1004,13 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                         title={guardiansLabels.deleteTooltip}
                       >
                         <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                      </Button>
+                      </Button> */}
                     </div>
                   ),
                 },
               ]}
               emptyMessage={searchTerm ? guardiansLabels.noSearchResults : guardiansLabels.noGuardians}
             />
-            {!searchTerm && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddGuardian}
-                className="mt-2 flex items-center gap-2 text-sm"
-              >
-                <UserPlus className="h-4 w-4" />
-                <span>{guardiansLabels.addGuardianPrompt}</span>
-              </Button>
-            )}
-
-
-
           </>
         </CardContent>
         <CardFooter className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -1025,98 +1029,75 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
       </Card>
 
       {/* حوار إضافة ولي أمر */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-[500px]">
-          <DialogHeader className="flex justify-center items-center">
-            <DialogTitle className="flex items-center gap-2 text-islamic-green text-xl">
-              {dialogTitle}
-              <UserPlus className="h-5 w-5" />
-            </DialogTitle>
-          </DialogHeader>
+      <FormDialog
+        title={dialogTitle}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onSave={handleSaveGuardian}
+        saveButtonText={dialogMode === "add"
+          ? "إضافة ولي أمر جديد"
+          : "تحديث بيانات ولي الأمر"}
+        cancelButtonText={guardiansLabels.cancel}
+        mode={dialogMode}
+      >
+        <div className="grid gap-4 py-2">
+          {/* الاسم الكامل */}
+          <FormRow label={`${guardiansLabels.fullName} *`}>
+            <Input
+              id="full_name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder={guardiansLabels.fullName}
+              className="bg-green-50 border-green-200 text-green-900 rounded-md text-sm py-1 px-2 text-right focus:border-islamic-green"
+              required
+            />
+          </FormRow>
 
-          <div className="flex flex-col gap-4 py-4">
-            {/* الاسم الكامل */}
-            <div>
-              <Label htmlFor="full_name" className="mb-2 block">
-                {guardiansLabels.fullName} <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="full_name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder={guardiansLabels.fullName}
-                className="focus:border-islamic-green"
-                required
-              />
-            </div>
+          {/* رقم الهاتف */}
+          <FormRow label={`${guardiansLabels.phoneNumber} *`}>
+            <Input
+              id="phone_number"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              placeholder={guardiansLabels.phoneNumber}
+              dir="ltr"
+              className="bg-yellow-50 border-yellow-200 text-yellow-900 rounded-md text-sm py-1 px-2 text-left focus:border-islamic-green"
+              required
+            />
+          </FormRow>
 
-            {/* رقم الهاتف */}
-            <div>
-              <Label htmlFor="phone_number" className="mb-2 block">
-                {guardiansLabels.phoneNumber} <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="phone_number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder={guardiansLabels.phoneNumber}
-                dir="ltr"
-                className="text-left focus:border-islamic-green"
-                required
-              />
-            </div>
+          {/* البريد الإلكتروني */}
+          <FormRow label={`${guardiansLabels.email} (${guardiansLabels.optionalField})`}>
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={guardiansLabels.email}
+              dir="ltr"
+              className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 text-left focus:border-islamic-green"
+            />
+          </FormRow>
 
-            {/* البريد الإلكتروني */}
-            <div>
-              <Label htmlFor="email" className="mb-2 block">
-                {guardiansLabels.email} <span className="text-muted-foreground text-sm">{guardiansLabels.optionalField}</span>
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={guardiansLabels.email}
-                dir="ltr"
-                className="text-left focus:border-islamic-green"
-              />
-            </div>
-
-            {/* العنوان / ملاحظات */}
-            <div>
-              <Label htmlFor="address" className="mb-2 block">
-                {guardiansLabels.address} <span className="text-muted-foreground text-sm">{guardiansLabels.optionalField}</span>
-              </Label>
-              <Textarea
-                id="address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder={guardiansLabels.address}
-                rows={3}
-                className="focus:border-islamic-green"
-              />
-            </div>
-          </div>
-
-          <DialogFooter dir="rtl" className="flex justify-start gap-2">
-            <Button onClick={handleSaveGuardian} className="bg-islamic-green hover:bg-islamic-green/90">
-              {guardiansLabels.save}
-            </Button>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              {guardiansLabels.cancel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-
-
+          {/* العنوان / ملاحظات */}
+          <FormRow label={`${guardiansLabels.address} (${guardiansLabels.optionalField})`}>
+            <Textarea
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder={guardiansLabels.address}
+              rows={3}
+              className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2 text-right focus:border-islamic-green"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
       {/* مربع حوار تأكيد الحذف */}
       <DeleteConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         onConfirm={confirmDeleteGuardian}
-        isLoading={loading}
+        isLoading={isDeleteProcessing}
         title={guardiansLabels.deleteGuardian}
         description={
           <>
@@ -1129,336 +1110,276 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         cancelButtonText={guardiansLabels.cancel}
       />
       {/* حوار إضافة طالب جديد */}
-      <Dialog open={isStudentDialogOpen} onOpenChange={setIsStudentDialogOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-[650px]">
-          <DialogHeader className="flex justify-center items-center">
-            <DialogTitle className="flex items-center gap-2 text-islamic-green text-xl">
-              إضافة طالب جديد
-              <UserPlus className="h-5 w-5" />
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-6 py-4">
-            {/* الصف الأول - المعلم */}
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* المعلم */}
-              <div className="flex-1">
-                <Label htmlFor="guardian_info" className="mb-2 block">
-                  المعلم <span className="text-islamic-green">(تم تحديده تلقائياً)</span>
-                </Label>
-                {userRole === 'teacher' ? (
-                  <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
-                    <UserCircle className="h-4 w-4 text-islamic-green/60" />
-                    <span>
-                      {(() => {
-                        // البحث عن المعلم بمعرّف المستخدم
-                        if (userId && teachers.length > 0) {
-                          const currentteacher = teachers.find(s => s.id === userId);
-                          if (currentteacher) {
-                            if (!teacherId) {
-                              setteacherId(currentteacher.id);
-                            }
-                            return (
-                              <span className="text-islamic-green font-semibold">
-                                {currentteacher.full_name}{" "}
-                              </span>
-                            );
-                          }
-                        }
-                        // إذا لم يتم العثور على المعلم، أظهر "المعلم" مع العبارة
-                        return (
-                          <span className="text-islamic-green font-semibold">
-                            <Label htmlFor="guardian_info" className="mb-2 block">
-                              المعلم <span className="text-islamic-green">(تم تحديده تلقائياً)</span>
-                            </Label>
-                          </span>
-
-                        );
-                      })()}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <div className="relative md:w-1/2">
-                      <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="البحث عن معلم"
-                        value={teacherSearchTerm}
-                        onChange={(e) => setteacherSearchTerm(e.target.value)}
-                        className="pl-3 pr-10 mb-2 md:mb-0"
-                      />
-                    </div>
-                    <div className="md:w-1/2">
-                      <Select
-                        value={teacherId}
-                        onValueChange={setteacherId}
-                      >
-                        <SelectTrigger className="focus:border-islamic-green">
-                          <SelectValue placeholder="اختر المعلم" />
-                        </SelectTrigger>
-                        <SelectContent position="item-aligned" align="start" side="bottom">
-                          {teachers
-                            .filter(teacher =>
-                              !teacherSearchTerm ||
-                              teacher.full_name.includes(teacherSearchTerm)
-                            )
-                            .map(teacher => (
-                              <SelectItem key={teacher.id} value={teacher.id}>
-                                <div className="flex flex-col">
-                                  <span>{teacher.full_name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {teacher.role === 'admin' ? 'مشرف' : 'معلم'}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))
-                          }
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* الصف الثاني - البيانات الأساسية للطالب */}
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* اسم الطالب */}
-              <div className="flex-1">
-                <Label htmlFor="student_full_name" className="mb-2 block">
-                  اسم الطالب/الطالبة <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="student_full_name"
-                  value={studentFullName}
-                  onChange={(e) => setStudentFullName(e.target.value)}
-                  placeholder="اسم الطالب الكامل"
-                  className="focus:border-islamic-green"
-                  required
-                />
-              </div>
-
-              {/* الصف الدراسي */}
-              <div className="flex-1">
-                <Label htmlFor="student_grade" className="mb-2 block">
-                  الصف الدراسي <span className="text-destructive">*</span>
-                </Label>
-                <Select value={studentGrade} onValueChange={setStudentGrade}>
-                  <SelectTrigger className="focus:border-islamic-green">
-                    <SelectValue placeholder="اختر الصف" />
-                  </SelectTrigger>
-                  <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                    <SelectGroup>
-                      <SelectLabel className="font-bold text-islamic-green">مرحلة رياض الأطفال</SelectLabel>
-                      {studentsLabels.gradeOptions.slice(0, 2).map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="font-bold text-islamic-green">المرحلة الابتدائية</SelectLabel>
-                      {studentsLabels.gradeOptions.slice(2, 8).map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                    <SelectGroup>
-                      <SelectLabel className="font-bold text-islamic-green">مراحل أخرى</SelectLabel>
-                      {studentsLabels.gradeOptions.slice(8).map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* الصف الثاني - معلومات إضافية */}
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* تاريخ الميلاد */}
-              <div className="flex-1">
-                <Label htmlFor="student_date_of_birth" className="mb-2 block">
-                  تاريخ الميلاد <span className="text-muted-foreground text-sm">(اختياري)</span>
-                </Label>
-                <Input
-                  id="student_date_of_birth"
-                  type="date"
-                  value={studentDateOfBirth}
-                  onChange={(e) => setStudentDateOfBirth(e.target.value)}
-                  placeholder="تاريخ الميلاد"
-                  dir="ltr"
-                  className="text-left focus:border-islamic-green"
-                />
-              </div>
-
-              {/* مستوى حفظ القرآن */}
-              <div className="flex-1">
-                <Label htmlFor="student_quran_progress" className="mb-2 block">
-                  آخر ما وصل إليه في القرآن <span className="text-muted-foreground text-sm">(اختياري)</span>
-                </Label>
-                <Select value={studentLastQuranProgress} onValueChange={setStudentLastQuranProgress}>
-                  <SelectTrigger className="focus:border-islamic-green">
-                    <SelectValue placeholder="اختر آخر ما وصل إليه" />
-                  </SelectTrigger>
-                  <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                    <SelectGroup>
-                      <SelectLabel className="font-bold text-islamic-green">الأجزاء</SelectLabel>
-                      {studentsLabels.quranPartsOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* الصف الثالث - ولي الأمر */}
-            {isGeneralAddStudent ? (
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                  <Label htmlFor="guardian_selection" className="mb-2 block">
-                    ولي الأمر <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="flex flex-col md:flex-row gap-2">
-                    <div className="relative md:w-1/2">
-                      <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="البحث عن ولي أمر"
-                        value={guardianSearchTerm}
-                        onChange={(e) => setGuardianSearchTerm(e.target.value)}
-                        className="pl-3 pr-10 mb-2 md:mb-0"
-                      />
-                    </div>
-                    <div className="md:w-1/2">
-                      <Select
-                        value={selectedGuardianId}
-                        onValueChange={setSelectedGuardianId}
-                      >
-                        <SelectTrigger className="focus:border-islamic-green">
-                          <SelectValue placeholder="اختر ولي الأمر" />
-                        </SelectTrigger>
-                        <SelectContent position="item-aligned" align="start" side="bottom">
-                          {guardians
-                            .filter(guardian =>
-                              !guardianSearchTerm ||
-                              guardian.full_name.includes(guardianSearchTerm) ||
-                              (guardian.phone_number && guardian.phone_number.includes(guardianSearchTerm))
-                            )
-                            .map(guardian => (
-                              <SelectItem key={guardian.id} value={guardian.id}>
-                                <div className="flex flex-col">
-                                  <span>{guardian.full_name}</span>
-                                  {guardian.phone_number && (
-                                    <span className="text-xs text-muted-foreground">{guardian.phone_number}</span>
-                                  )}
-                                </div>
-                              </SelectItem>
-                            ))
-                          }
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </div>
+      <FormDialog
+        title="إضافة طالب جديد"
+        open={isStudentDialogOpen}
+        onOpenChange={setIsStudentDialogOpen}
+        onSave={handleSaveStudent}
+        saveButtonText="إضافة الطالب"
+        cancelButtonText={studentsLabels.cancel}
+        mode="add"
+      >
+        <div className="grid gap-4 py-2">
+          {/* المعلم */}
+          <FormRow label="المعلم">
+            {userRole === "teacher" ? (
+              <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
+                <UserCircle className="h-4 w-4 text-islamic-green/60" />
+                <span className="text-islamic-green font-semibold">
+                  {(() => {
+                    if (userId && teachers.length > 0) {
+                      const currentTeacher = teachers.find((s) => s.id === userId);
+                      if (currentTeacher) {
+                        if (!teacherId) setteacherId(currentTeacher.id);
+                        return currentTeacher.full_name;
+                      }
+                    }
+                    return "المعلم (تم تحديده تلقائياً)";
+                  })()}
+                </span>
               </div>
             ) : (
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="flex-1">
-                  <Label htmlFor="guardian_info" className="mb-2 block">
-                    ولي الأمر <span className="text-islamic-green">(تم تحديده تلقائياً)</span>
-                  </Label>
-                  <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
-                    <span className="text-islamic-green font-semibold">
-                      {(() => {
-                        const selectedGuardian = guardians.find(g => g.id === selectedGuardianId);
-                        return selectedGuardian ? selectedGuardian.full_name : "ولي الأمر المحدد";
-                      })()}
-                    </span>
-                  </div>
+              <div className="flex flex-col md:flex-row gap-2">
+                <div className="relative md:w-1/2">
+                  <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="البحث عن معلم"
+                    value={teacherSearchTerm}
+                    onChange={(e) => setteacherSearchTerm(e.target.value)}
+                    className="pl-3 pr-10"
+                  />
+                </div>
+                <div className="md:w-1/2">
+                  <Select value={teacherId} onValueChange={setteacherId}>
+                    <SelectTrigger className="focus:border-islamic-green">
+                      <SelectValue placeholder="اختر المعلم" />
+                    </SelectTrigger>
+                    <SelectContent position="item-aligned" align="start" side="bottom">
+                      {teachers
+                        .filter(
+                          (t) =>
+                            !teacherSearchTerm ||
+                            t.full_name.includes(teacherSearchTerm)
+                        )
+                        .map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            <div className="flex flex-col">
+                              <span>{t.full_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {t.role === "admin" ? "مشرف" : "معلم"}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
+          </FormRow>
 
-            {/* الصف الرابع - معلومات الاتصال */}
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* رقم الهاتف */}
-              <div className="flex-1">
-                <Label htmlFor="student_phone_number" className="mb-2 block">
-                  رقم الهاتف <span className="text-muted-foreground text-sm">(اختياري)</span>
-                </Label>
-                <Input
-                  id="student_phone_number"
-                  value={studentPhoneNumber}
-                  onChange={(e) => setStudentPhoneNumber(e.target.value)}
-                  placeholder="رقم هاتف الطالب"
-                  dir="ltr"
-                  className="text-left focus:border-islamic-green"
-                />
+          {/* اسم الطالب */}
+          <FormRow label="اسم الطالب/الطالبة *">
+            <Input
+              id="student_full_name"
+              value={studentFullName}
+              onChange={(e) => setStudentFullName(e.target.value)}
+              placeholder="اسم الطالب الكامل"
+              required
+              className="focus:border-islamic-green"
+            />
+          </FormRow>
+
+          {/* الصف الدراسي */}
+          <FormRow label="الصف الدراسي *">
+            <Select value={studentGrade} onValueChange={setStudentGrade}>
+              <SelectTrigger className="focus:border-islamic-green">
+                <SelectValue placeholder="اختر الصف" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectGroup>
+                  <SelectLabel className="font-bold text-islamic-green">
+                    مرحلة رياض الأطفال
+                  </SelectLabel>
+                  {studentsLabels.gradeOptions.slice(0, 2).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="font-bold text-islamic-green">
+                    المرحلة الابتدائية
+                  </SelectLabel>
+                  {studentsLabels.gradeOptions.slice(2, 8).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                <SelectGroup>
+                  <SelectLabel className="font-bold text-islamic-green">
+                    مراحل أخرى
+                  </SelectLabel>
+                  {studentsLabels.gradeOptions.slice(8).map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormRow>
+
+          {/* تاريخ الميلاد */}
+          <FormRow label="تاريخ الميلاد (اختياري)">
+            <Input
+              id="student_date_of_birth"
+              type="date"
+              value={studentDateOfBirth}
+              onChange={(e) => setStudentDateOfBirth(e.target.value)}
+              className="text-left focus:border-islamic-green"
+            />
+          </FormRow>
+
+          {/* مستوى الحفظ */}
+          <FormRow label="آخر ما وصل إليه في القرآن (اختياري)">
+            <Select
+              value={studentLastQuranProgress}
+              onValueChange={setStudentLastQuranProgress}
+            >
+              <SelectTrigger className="focus:border-islamic-green">
+                <SelectValue placeholder="اختر آخر ما وصل إليه" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectGroup>
+                  <SelectLabel className="font-bold text-islamic-green">
+                    الأجزاء
+                  </SelectLabel>
+                  {studentsLabels.quranPartsOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </FormRow>
+
+          {/* ولي الأمر */}
+          {isGeneralAddStudent ? (
+            <FormRow label="ولي الأمر *">
+              <div className="flex flex-col md:flex-row gap-2">
+                <div className="relative md:w-1/2">
+                  <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="البحث عن ولي أمر"
+                    value={guardianSearchTerm}
+                    onChange={(e) => setGuardianSearchTerm(e.target.value)}
+                    className="pl-3 pr-10"
+                  />
+                </div>
+                <div className="md:w-1/2">
+                  <Select
+                    value={selectedGuardianId}
+                    onValueChange={setSelectedGuardianId}
+                  >
+                    <SelectTrigger className="focus:border-islamic-green">
+                      <SelectValue placeholder="اختر ولي الأمر" />
+                    </SelectTrigger>
+                    <SelectContent align="start" side="bottom">
+                      {guardians
+                        .filter(
+                          (g) =>
+                            !guardianSearchTerm ||
+                            g.full_name.includes(guardianSearchTerm) ||
+                            (g.phone_number &&
+                              g.phone_number.includes(guardianSearchTerm))
+                        )
+                        .map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            <div className="flex flex-col">
+                              <span>{g.full_name}</span>
+                              {g.phone_number && (
+                                <span className="text-xs text-muted-foreground">
+                                  {g.phone_number}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-
-              {/* البريد الإلكتروني */}
-              <div className="flex-1">
-                <Label htmlFor="student_email" className="mb-2 block">
-                  البريد الإلكتروني <span className="text-muted-foreground text-sm">(اختياري)</span>
-                </Label>
-                <Input
-                  id="student_email"
-                  type="email"
-                  value={studentEmail}
-                  onChange={(e) => setStudentEmail(e.target.value)}
-                  placeholder="البريد الإلكتروني للطالب"
-                  dir="ltr"
-                  className="text-left focus:border-islamic-green"
-                />
+            </FormRow>
+          ) : (
+            <FormRow label="ولي الأمر (تم تحديده تلقائياً)">
+              <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
+                <span className="text-islamic-green font-semibold">
+                  {(() => {
+                    const selectedGuardian = guardians.find(
+                      (g) => g.id === selectedGuardianId
+                    );
+                    return selectedGuardian
+                      ? selectedGuardian.full_name
+                      : "ولي الأمر المحدد";
+                  })()}
+                </span>
               </div>
-            </div>
+            </FormRow>
+          )}
 
-            {/* الصف الرابع - الملاحظات */}
-            <div>
-              <Label htmlFor="student_notes" className="mb-2 block">
-                ملاحظات <span className="text-muted-foreground text-sm">(اختياري)</span>
-              </Label>
-              <Textarea
-                id="student_notes"
-                value={studentNotes}
-                onChange={(e) => setStudentNotes(e.target.value)}
-                placeholder="ملاحظات إضافية عن الطالب"
-                rows={3}
-                className="focus:border-islamic-green"
-              />
-            </div>
-          </div>
+          {/* رقم الهاتف */}
+          <FormRow label="رقم الهاتف (اختياري)">
+            <Input
+              id="student_phone_number"
+              value={studentPhoneNumber}
+              onChange={(e) => setStudentPhoneNumber(e.target.value)}
+              placeholder="رقم هاتف الطالب"
+              dir="ltr"
+              className="text-left focus:border-islamic-green"
+            />
+          </FormRow>
 
-          <DialogFooter dir="rtl" className="flex justify-start gap-2">
-            <Button onClick={handleSaveStudent} className="bg-islamic-green hover:bg-islamic-green/90">
-              حفظ
-            </Button>
-            <Button variant="outline" onClick={() => setIsStudentDialogOpen(false)}>
-              إلغاء
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* البريد الإلكتروني */}
+          <FormRow label="البريد الإلكتروني (اختياري)">
+            <Input
+              id="student_email"
+              type="email"
+              value={studentEmail}
+              onChange={(e) => setStudentEmail(e.target.value)}
+              placeholder="البريد الإلكتروني للطالب"
+              dir="ltr"
+              className="text-left focus:border-islamic-green"
+            />
+          </FormRow>
+
+          {/* ملاحظات */}
+          <FormRow label="ملاحظات (اختياري)">
+            <Textarea
+              id="student_notes"
+              value={studentNotes}
+              onChange={(e) => setStudentNotes(e.target.value)}
+              placeholder="ملاحظات إضافية عن الطالب"
+              rows={3}
+              className="focus:border-islamic-green"
+            />
+          </FormRow>
+        </div>
+      </FormDialog>
 
       <Dialog open={isStudentsListDialogOpen} onOpenChange={setIsStudentsListDialogOpen}>
-        <DialogContent dir="rtl" className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="flex flex-col items-center border-b border-green-200 pb-3 mb-2">
-            <DialogTitle className="text-xl text-islamic-green flex items-center gap-2">
+        <DialogContent dir="rtl" className="bg-gradient-to-r from-green-100 via-green-200 to-green-100 sm:max-w-[750px] max-h-[70vh] overflow-y-auto">
+          <DialogHeader className="flex flex-col items-center border-b border-green-200">
+            <DialogTitle className="text-sm text-islamic-green flex items-center gap-2">
               <span className="bg-green-100 p-1.5 rounded-full">
                 <UserCircle className="h-5 w-5 text-green-600" />
               </span>
               طلاب ولي الأمر: {selectedGuardianName}
             </DialogTitle>
-            <DialogDescription className="text-sm text-gray-600 mt-1">
-              قائمة الطلاب المرتبطين بولي الأمر (إجمالي: {selectedGuardianStudents.length} طالب)
-            </DialogDescription>
           </DialogHeader>
+
 
           <div className="py-2">
             {selectedGuardianStudents.length > 0 ? (
@@ -1470,21 +1391,16 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 }))}
                 columns={[
                   {
-                    key: 'serial',
-                    header: '#️⃣',
+                    key: 'serial_full_name',
+                    header: '#️⃣👤 الطالب',
                     align: 'center' as const,
-                    render: (student) => <span className="text-islamic-green/80 font-medium">{student.serial}</span>,
-                  },
-                  {
-                    key: 'full_name',
-                    header: '👤 الطالب',
-                    align: 'right' as const,
                     render: (student) => (
-                      <div className="font-medium text-right">
-                        {student.full_name}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-1 text-right">
+                        <span className="font-medium">{student.serial + " - " + student.full_name}</span>
                       </div>
                     ),
                   },
+
                   {
                     key: 'grade',
                     header: '🏫 الدراسي',
@@ -1522,41 +1438,41 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     align: 'center' as const,
                     render: (student) => student.circle_name || "غير محدد",
                   },
-                  {
-                    key: 'actions',
-                    header: '⚙️ الإجراءات',
-                    align: 'center' as const,
-                    render: (student) => (
-                      <div className="flex justify-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          // TODO: Implement handleEditStudent or remove this button if not needed
-                          onClick={() => {
-                            // Example: Open a dialog or show a toast
-                            toast({
-                              title: "ميزة تعديل الطالب غير متوفرة حالياً",
-                              description: "يرجى التواصل مع الإدارة لتفعيل هذه الخاصية.",
-                              variant: "destructive",
-                            });
-                          }}
-                          className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                          title="تعديل"
-                        >
-                          <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteStudent(student.id)}
-                          className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                          title="حذف"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                        </Button>
-                      </div>
-                    ),
-                  },
+                  // {
+                  //   key: 'actions',
+                  //   header: '⚙️ الإجراءات',
+                  //   align: 'center' as const,
+                  //   render: (student) => (
+                  //     <div className="flex justify-center gap-2">
+                  //       <Button
+                  //         variant="ghost"
+                  //         size="icon"
+                  //         // TODO: Implement handleEditStudent or remove this button if not needed
+                  //         onClick={() => {
+                  //           // Example: Open a dialog or show a toast
+                  //           toast({
+                  //             title: "ميزة تعديل الطالب غير متوفرة حالياً",
+                  //             description: "يرجى التواصل مع الإدارة لتفعيل هذه الخاصية.",
+                  //             variant: "destructive",
+                  //           });
+                  //         }}
+                  //         className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                  //         title="تعديل"
+                  //       >
+                  //         <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                  //       </Button>
+                  //       {/* <Button
+                  //         variant="ghost"
+                  //         size="icon"
+                  //         onClick={() => handleDeleteStudent(student.id)}
+                  //         className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                  //         title="حذف"
+                  //       >
+                  //         <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                  //       </Button> */}
+                  //     </div>
+                  //   ),
+                  // },
                 ]}
                 emptyMessage="لا يوجد طلاب"
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"

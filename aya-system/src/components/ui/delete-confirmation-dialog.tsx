@@ -72,7 +72,7 @@ export function DeleteConfirmationDialog({
 }: DeleteConfirmationDialogProps) {
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent dir="rtl" className="border-2 border-red-200 shadow-lg bg-white">
+      <AlertDialogContent dir="rtl" className="z-[100] max-w-[95vw] sm:max-w-lg border-2 border-red-200 shadow-lg bg-white">
         {/* زخرفة إسلامية في الخلفية */}
         <div className="absolute top-0 left-0 w-full h-full opacity-5 bg-[url('/patterns/islamic-pattern.svg')] bg-repeat pointer-events-none rounded-lg"></div>
         

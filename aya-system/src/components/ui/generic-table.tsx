@@ -76,7 +76,11 @@ export function GenericTable<T extends { id: string }>(props: {
 
     // فرض نمط البطاقات على الموبايل
     useEffect(() => {
-        if (isMobile) setViewMode('card');
+        if (isMobile) {
+            setViewMode('card');
+        } else {
+            setViewMode('table');
+        }
     }, [isMobile]);
 
     // دالة لترتيب البيانات حسب العمود الأول
@@ -465,7 +469,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                         </div>
                                     </div>
                                     {/* زر إظهار المزيد إذا كان هناك المزيد من الحقول */}
-                                    
+
                                     {hasMore && (
                                         <Button
                                             variant="ghost"
@@ -487,7 +491,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                             )}
                                         </Button>
                                     )}
-                                    
+
                                 </div>
                             );
                         };
