@@ -117,6 +117,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   const [formErrors, setFormErrors] = useState<{
     student_id?: string;
     recorded_by?: string;
+    date?: string;
+    type?: string;
     from_surah?: string;
     from_ayah?: string;
     to_surah?: string;
@@ -700,7 +702,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
       setFormFilteredStudents(students);
     }
 
-    setIsDialogOpen(true);
+  setIsDialogOpen(true);
+  setWizardStep(0);
   };
 
   // إعادة تعيين النموذج
@@ -849,7 +852,79 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
       ...prev,
       [field]: value
     }));
+    // إزالة خطأ الحقل عند التعديل لتحسين تجربة المستخدم
+    setFormErrors(prev => {
+      const next = { ...prev } as any;
+      if (field in next) delete next[field as keyof typeof next];
+      // معالجة خاصة لحقول الآيات المرتبطة
+      if (field === 'from_ayah' && next.to_ayah) delete next.to_ayah;
+      if (field === 'to_ayah' && next.from_ayah) delete next.from_ayah;
+      return next;
+    });
   };
+
+  // حالة المعالج (Wizard) متعدد الخطوات
+  const [wizardStep, setWizardStep] = useState<number>(0); // 0: الطالب، 1: الحفظ، 2: التسميع
+  const wizardSteps = [
+    { key: 'student', label: 'الطالب' },
+    { key: 'memorization', label: 'الحفظ' },
+    { key: 'recitation', label: 'التسميع' },
+  ] as const;
+
+  // تحقق خاص بكل خطوة قبل الانتقال
+  const validateWizardStep = (step: number): boolean => {
+    const errors: any = {};
+
+    if (step === 0) {
+      if (!formData.recorded_by) {
+        errors.recorded_by = 'الرجاء اختيار المعلم';
+      }
+      if (!formData.student_id) {
+        errors.student_id = 'الرجاء اختيار الطالب';
+      }
+    }
+
+    if (step === 1) {
+      if (!formData.date) {
+        errors.date = 'الرجاء اختيار التاريخ';
+      }
+      if (!formData.type) {
+        errors.type = 'الرجاء اختيار النوع';
+      }
+      if (!formData.from_surah) {
+        errors.from_surah = 'الرجاء اختيار السورة';
+      }
+      if (!formData.to_surah) {
+        errors.to_surah = 'الرجاء اختيار السورة';
+      }
+      if (formData.from_surah && formData.to_surah && formData.from_surah > formData.to_surah) {
+        errors.to_surah = 'لا بد أن تكون السورة الأخيرة بعد الأولى';
+      }
+      if (!formData.from_ayah || formData.from_ayah < 1) {
+        errors.from_ayah = 'أدخل رقم آية صحيح';
+      }
+      if (!formData.to_ayah || formData.to_ayah < 1) {
+        errors.to_ayah = 'أدخل رقم آية صحيح';
+      }
+      if (
+        formData.from_surah === formData.to_surah &&
+        formData.from_ayah && formData.to_ayah &&
+        formData.from_ayah > formData.to_ayah
+      ) {
+        errors.to_ayah = 'لا بد أن تكون آية النهاية بعد البداية';
+      }
+    }
+
+    setFormErrors((prev) => ({ ...prev, ...errors }));
+    return Object.keys(errors).length === 0;
+  };
+
+  const goNext = () => {
+    if (!validateWizardStep(wizardStep)) return;
+    setWizardStep((s) => Math.min(s + 1, wizardSteps.length - 1));
+  };
+
+  const goBack = () => setWizardStep((s) => Math.max(s - 1, 0));
 
   // معالجة تغيير أخطاء التجويد
   const handleTajweedErrorChange = (errorType: 'lahn_jali' | 'lahn_khafi', value: string) => {
@@ -1336,11 +1411,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         </CardContent>
       </Card>
 
-      {/* حوار إضافة/تعديل سجل */}
+      {/* معالج (Wizard) إضافة/تعديل سجل */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent
-          className="sm:max-w-[520px] w-full rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100"
-        >
+        <DialogContent className="sm:max-w-[640px] w-full rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100">
           <DialogHeader className="pb-1">
             <DialogTitle className="text-xl font-bold text-center">
               <h3 className="text-center leading-tight text-green-800 bg-gradient-to-r from-green-100 to-blue-100 py-2 px-3 rounded-lg">
@@ -1349,36 +1422,49 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             </DialogTitle>
           </DialogHeader>
 
+          {/* شريط خطوات المعالج - متجاوب */}
+          <div dir="rtl" className="w-full">
+            <ol className="flex items-center w-full gap-1 sm:gap-2">
+              {wizardSteps.map((step, i) => {
+                const active = i === wizardStep;
+                const done = i < wizardStep;
+                return (
+                  <li key={step.key} className="flex-1">
+                    <button type="button" onClick={() => (i < wizardStep ? setWizardStep(i) : null)} className={`w-full flex items-center justify-center sm:justify-between gap-2 p-2 rounded-lg text-xs sm:text-sm border transition-colors ${
+                      active
+                        ? 'bg-islamic-green text-white border-islamic-green'
+                        : done
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                    }`} aria-current={active ? 'step' : undefined} aria-disabled={!done && !active}>
+                      <div className="flex items-center gap-2">
+                        {i === 0 && <User size={14} />}
+                        {i === 1 && <SaveIcon size={14} />}
+                        {i === 2 && <BookOpen size={14} />}
+                        <span className="hidden sm:inline">{step.label}</span>
+                      </div>
+                      <span className="sm:hidden">{i + 1}/{wizardSteps.length}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+            {/* شريط تقدم */}
+            <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div className="h-full bg-islamic-green transition-all" style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }} />
+            </div>
+          </div>
 
-
-          <div className="p-5 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <Tabs defaultValue="student" dir="rtl" className="w-full">
-              <TabsList className="grid grid-cols-3 mb-6">
-                <TabsTrigger value="student" className="flex items-center gap-2">
-                  <User size={16} />
-                  <span>الطالب</span>
-                </TabsTrigger>
-                <TabsTrigger value="memorization" className="flex items-center gap-2">
-                  <SaveIcon size={16} />
-                  <span>الحفظ</span>
-                </TabsTrigger>
-                <TabsTrigger value="recitation" className="flex items-center gap-2">
-                  <BookOpen size={16} />
-                  <span>التسميع</span>
-                </TabsTrigger>
-              </TabsList>
-
-              {/* تب الطالب */}
-              <TabsContent value="student" className="space-y-4">
+          {/* محتوى كل خطوة */}
+          <div className="p-4 sm:p-5 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mt-3">
+            {wizardStep === 0 && (
+              <div className="space-y-4">
                 <div className="grid gap-4">
                   <div className="grid gap-2">
                     <Label htmlFor="teacher" className="flex items-center gap-1">
                       المعلم <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={formData.recorded_by || (currentUser ? currentUser.id : '')}
-                      onValueChange={(value) => handleTeacherChange(value)}
-                    >
+                    <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
                       <SelectTrigger id="teacher">
                         <SelectValue placeholder="اختر المعلم" />
                       </SelectTrigger>
@@ -1387,37 +1473,23 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                           visibleTeachers.map(teacher => (
                             <SelectItem key={teacher.id} value={teacher.id}>
                               {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0, 4)}`}
-                              {teacher.role && (
-                                teacher.role === 'teacher'
-                                  ? ' (معلم)'
-                                  : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`
-                              )}
+                              {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value={currentUser?.id || "initial"}>
+                          <SelectItem value={currentUser?.id || 'initial'}>
                             {currentUser?.full_name || 'المستخدم الحالي'}
-                            {currentUser?.role && (
-                              currentUser.role === 'teacher'
-                                ? ' (معلم)'
-                                : ` (${currentUser.role === 'admin' ? 'مشرف' : currentUser.role})`
-                            )}
+                            {currentUser?.role && (currentUser.role === 'teacher' ? ' (معلم)' : ` (${currentUser.role === 'admin' ? 'مشرف' : currentUser.role})`)}
                           </SelectItem>
                         )}
                       </SelectContent>
                     </Select>
-                    {formErrors.recorded_by && (
-                      <p className="text-sm text-red-500">{formErrors.recorded_by}</p>
-                    )}
+                    {formErrors.recorded_by && <p className="text-sm text-red-500">{formErrors.recorded_by}</p>}
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="circle">الحلقة</Label>
-                    <Select
-                      value={formData.circle_id || ''}
-                      onValueChange={(value) => handleCircleChange(value)}
-                      disabled={!formData.recorded_by}
-                    >
+                    <Select value={formData.circle_id || ''} onValueChange={(value) => handleCircleChange(value)} disabled={!formData.recorded_by}>
                       <SelectTrigger id="circle">
                         <SelectValue placeholder="اختر الحلقة" />
                       </SelectTrigger>
@@ -1439,11 +1511,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="student" className="flex items-center gap-1">
                       الطالب <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={formData.student_id || ''}
-                      onValueChange={(value) => handleInputChange('student_id', value)}
-                      disabled={!formData.recorded_by}
-                    >
+                    <Select value={formData.student_id || ''} onValueChange={(value) => handleInputChange('student_id', value)} disabled={!formData.recorded_by}>
                       <SelectTrigger id="student">
                         <SelectValue placeholder="اختر الطالب" />
                       </SelectTrigger>
@@ -1453,39 +1521,31 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                             <SelectItem key={student.id} value={student.id}>
                               <div className="flex items-center justify-between w-full">
                                 {student.guardian && student.guardian.full_name && (
-                                  <span className="text-gray-500 text-xs mr-2">
-                                    (ولي الأمر: {student.guardian.full_name})
-                                  </span>
+                                  <span className="text-gray-500 text-xs mr-2">(ولي الأمر: {student.guardian.full_name})</span>
                                 )}
                                 <span className="font-medium">{student.full_name || `طالب ${student.id.slice(0, 4)}`}</span>
                               </div>
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="no-students" disabled>
-                            {formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}
-                          </SelectItem>
+                          <SelectItem value="no-students" disabled>{formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}</SelectItem>
                         )}
                       </SelectContent>
                     </Select>
-                    {formErrors.student_id && (
-                      <p className="text-sm text-red-500">{formErrors.student_id}</p>
-                    )}
+                    {formErrors.student_id && <p className="text-sm text-red-500">{formErrors.student_id}</p>}
                   </div>
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              {/* تب الحفظ */}
-              <TabsContent value="memorization" className="space-y-4">
+            {wizardStep === 1 && (
+              <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div>
                     <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2">
                       نوع السجل <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) => handleInputChange('type', value)}
-                    >
+                    <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
                       <SelectTrigger id="memorization_type">
                         <SelectValue placeholder="اختر النوع" />
                       </SelectTrigger>
@@ -1504,13 +1564,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="date" className="flex items-center gap-1 mb-2">
                       التاريخ <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={formData.date || ''}
-                      onChange={(e) => handleInputChange('date', e.target.value)}
-                      min={new Date().toISOString().split('T')[0]} // تحديد الحد الأدنى للتاريخ هو اليوم الحالي
-                    />
+                    <Input id="date" type="date" value={formData.date || ''} onChange={(e) => handleInputChange('date', e.target.value)} min={new Date().toISOString().split('T')[0]} />
+                    {formErrors.date && <p className="text-sm text-red-500 mt-1">{formErrors.date}</p>}
                   </div>
                 </div>
 
@@ -1519,14 +1574,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="from_surah" className="flex items-center gap-1 mb-2">
                       من سورة <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={formData.from_surah ? formData.from_surah.toString() : ''}
-                      onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}
-                    >
+                    <Select value={formData.from_surah ? formData.from_surah.toString() : ''} onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}>
                       <SelectTrigger id="from_surah">
-                        <SelectValue placeholder="اختر السورة">
-                          {formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : "اختر السورة"}
-                        </SelectValue>
+                        <SelectValue placeholder="اختر السورة">{formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : 'اختر السورة'}</SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {quranSurahs.map(surah => (
@@ -1536,23 +1586,16 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                         ))}
                       </SelectContent>
                     </Select>
-                    {formErrors.from_surah && (
-                      <p className="text-sm text-red-500 mt-1">{formErrors.from_surah}</p>
-                    )}
+                    {formErrors.from_surah && <p className="text-sm text-red-500 mt-1">{formErrors.from_surah}</p>}
                   </div>
 
                   <div>
                     <Label htmlFor="to_surah" className="flex items-center gap-1 mb-2">
                       إلى سورة <span className="text-red-500">*</span>
                     </Label>
-                    <Select
-                      value={formData.to_surah ? formData.to_surah.toString() : ''}
-                      onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}
-                    >
+                    <Select value={formData.to_surah ? formData.to_surah.toString() : ''} onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}>
                       <SelectTrigger id="to_surah">
-                        <SelectValue placeholder="اختر السورة">
-                          {formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : "اختر السورة"}
-                        </SelectValue>
+                        <SelectValue placeholder="اختر السورة">{formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : 'اختر السورة'}</SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
                         {quranSurahs.map(surah => (
@@ -1562,9 +1605,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                         ))}
                       </SelectContent>
                     </Select>
-                    {formErrors.to_surah && (
-                      <p className="text-sm text-red-500 mt-1">{formErrors.to_surah}</p>
-                    )}
+                    {formErrors.to_surah && <p className="text-sm text-red-500 mt-1">{formErrors.to_surah}</p>}
                   </div>
                 </div>
 
@@ -1573,42 +1614,26 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <Label htmlFor="from_ayah" className="flex items-center gap-1 mb-2">
                       من آية <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="from_ayah"
-                      type="number"
-                      min={1}
-                      value={formData.from_ayah || ''}
-                      onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))}
-                    />
-                    {formErrors.from_ayah && (
-                      <p className="text-sm text-red-500 mt-1">{formErrors.from_ayah}</p>
-                    )}
+                    <Input id="from_ayah" type="number" min={1} value={formData.from_ayah || ''} onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))} />
+                    {formErrors.from_ayah && <p className="text-sm text-red-500 mt-1">{formErrors.from_ayah}</p>}
                   </div>
 
                   <div>
                     <Label htmlFor="to_ayah" className="flex items-center gap-1 mb-2">
                       إلى آية <span className="text-red-500">*</span>
                     </Label>
-                    <Input
-                      id="to_ayah"
-                      type="number"
-                      min={1}
-                      value={formData.to_ayah || ''}
-                      onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))}
-                    />
-                    {formErrors.to_ayah && (
-                      <p className="text-sm text-red-500 mt-1">{formErrors.to_ayah}</p>
-                    )}
+                    <Input id="to_ayah" type="number" min={1} value={formData.to_ayah || ''} onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))} />
+                    {formErrors.to_ayah && <p className="text-sm text-red-500 mt-1">{formErrors.to_ayah}</p>}
                   </div>
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              {/* تب التسميع */}
-              <TabsContent value="recitation" className="space-y-4">
-
+            {wizardStep === 2 && (
+              <div className="space-y-4">
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
                   <div className="grid grid-cols-1 gap-4">
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       {[
                         { id: 'score', label: 'درجة التسميع', required: true, value: formData.score, onChange: (val) => handleInputChange('score', val) },
                         { id: 'lahn_jali', label: 'اللحن الجلي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_jali, onChange: (val) => handleTajweedErrorChange('lahn_jali', val) },
@@ -1629,46 +1654,35 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                             value={field.value || ''}
                             onChange={(e) => {
                               let val = parseFloat(e.target.value);
-                              if (isNaN(val)) val = undefined;
+                              if (isNaN(val)) val = undefined as any;
                               if (field.id === 'score') {
                                 if (val > 100) val = 100;
                                 if (val < 0) val = 0;
                               }
-                              field.onChange(val);
+                              field.onChange(val as any);
                             }}
                           />
-                          {field.id === 'score' && formErrors.score && (
-                            <p className="text-xs text-red-500 mt-1 text-right">{formErrors.score}</p>
-                          )}
+                          {field.id === 'score' && formErrors.score && <p className="text-xs text-red-500 mt-1 text-right">{formErrors.score}</p>}
                         </div>
                       ))}
                     </div>
                   </div>
                 </div>
 
-
                 <div>
                   <Label htmlFor="notes" className="mb-2">ملاحظات</Label>
-                  <Textarea
-                    id="notes"
-                    value={formData.notes || ''}
-                    onChange={(e) => handleInputChange('notes', e.target.value)}
-                    placeholder="أدخل أي ملاحظات خاصة بالتسميع..."
-                    className="h-24"
-                  />
+                  <Textarea id="notes" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-24" />
                 </div>
-              </TabsContent>
-            </Tabs>
+              </div>
+            )}
           </div>
 
-
           <DialogFooter dir="rtl" className="flex items-center justify-between">
-
             <table className="w-full">
               <tbody>
                 <tr>
-                  <td className="text-right">  {/* hint بمعلومات الطالب على أقصى اليسار */}
-                    <div className="text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden overflow-ellipsis max-w-[250px]">
+                  <td className="text-right align-middle">
+                    <div className="text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden overflow-ellipsis max-w-[260px]">
                       {formData.student_id ? (
                         <>
                           <span>الطالب: </span>
@@ -1679,32 +1693,31 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       ) : (
                         <span className="text-gray-400 dark:text-gray-500">الرجاء اختيار طالب</span>
                       )}
-                    </div></td>
-
-
-                  <td>
-                    {/* الأزرار على اليسار */}
-                    <div className="flex gap-2 justify-end">
-                      <Button
-                        type="button"
-                        onClick={handleSaveRecord}
-                        disabled={isLoading}
-                        className="bg-purple-700 hover:bg-purple-800 text-white text-sm px-4 py-2 rounded transition-all"
-                      >
-                        {isLoading ? 'جاري الحفظ...' : recordToEdit ? 'تحديث السجل' : 'إضافة السجل'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setIsDialogOpen(false)}
-                        className="bg-yellow-300 hover:bg-yellow-400 text-gray-800 text-sm px-4 py-2 rounded transition-all"
-                      >
-                        إلغاء
-                      </Button>
                     </div>
                   </td>
+                  <td className="align-middle">
+                    <div className="flex gap-2 justify-end items-center">
+                      <Button type="button" variant="secondary" onClick={() => setIsDialogOpen(false)} className="bg-yellow-300 hover:bg-yellow-400 text-gray-800 text-sm px-4 py-2 rounded transition-all">
+                        إلغاء
+                      </Button>
 
+                      {wizardStep > 0 && (
+                        <Button type="button" onClick={goBack} disabled={isLoading} className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-4 py-2 rounded transition-all">
+                          رجوع
+                        </Button>
+                      )}
 
+                      {wizardStep < wizardSteps.length - 1 ? (
+                        <Button type="button" onClick={goNext} disabled={isLoading} className="bg-islamic-green hover:bg-green-700 text-white text-sm px-4 py-2 rounded transition-all">
+                          التالي
+                        </Button>
+                      ) : (
+                        <Button type="button" onClick={handleSaveRecord} disabled={isLoading} className="bg-purple-700 hover:bg-purple-800 text-white text-sm px-4 py-2 rounded transition-all">
+                          {isLoading ? 'جاري الحفظ...' : recordToEdit ? 'تحديث السجل' : 'إضافة السجل'}
+                        </Button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
