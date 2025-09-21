@@ -826,7 +826,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 title="إضافة ولي أمر جديد"
               >
                 {/* الأيقونة */}
-                <UserPlus className="h-5 w-5" />
+                <span className="text-lg">👤</span>
                 {/* النص يظهر فقط في الديسكتوب */}
                 <span className="hidden sm:inline">إضافة ولي أمر جديد</span>
               </Button>
@@ -837,7 +837,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 title="إضافة طالب جديد"
               >
                 {/* الأيقونة */}
-                <GraduationCap className="h-5 w-5" />
+                <span className="text-lg">🧒</span>
                 {/* النص يظهر فقط في الديسكتوب */}
                 <span className="hidden sm:inline">إضافة طالب جديد</span>
               </Button>

@@ -10,7 +10,7 @@ import {
     DialogClose
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Check, Pencil, PlusCircle, Save, X } from "lucide-react";
+import { Check, PlusCircle, X, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type FormDialogProps = {
@@ -103,12 +103,12 @@ export function FormDialog({
             <DialogPortal>
                 <DialogOverlay className="bg-black/60" />
                 <div
-                    className="fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-2 border bg-background p-3 sm:p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-w-[90%] sm:max-w-[450px] h-auto max-h-[85vh] overflow-y-auto"
-                    style={{ maxWidth: maxWidth }}
+                    className="fixed inset-x-0 top-0 sm:left-[50%] sm:top-[50%] z-50 grid w-full sm:w-auto sm:translate-x-[-50%] sm:translate-y-[-50%] gap-2 border bg-background p-3 sm:p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%] sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-w-full sm:max-w-[450px] h-full sm:h-auto max-h-full sm:max-h-[85vh] overflow-hidden sm:overflow-visible"
+                    style={{ maxWidth: maxWidth, '--dialog-max-width': maxWidth } as React.CSSProperties}
                     dir="rtl"
                 >
                     {/* زر الإغلاق مخصص للواجهة العربية والموبايل - أكبر وأكثر بروزًا على الهاتف */}
-                    <DialogClose className="absolute left-2 sm:left-3 top-2 sm:top-3 rounded-full w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center bg-red-500 text-white hover:bg-red-600 shadow-md transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 z-50">
+                    <DialogClose className="absolute left-2 sm:left-3 top-2 sm:top-3 rounded-full w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center bg-red-500 text-white hover:bg-red-600 shadow-md transition-all active:scale-95 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 z-50">
                         <X className="h-5 w-5 sm:h-4 sm:w-4" />
                         <span className="sr-only">إغلاق</span>
                     </DialogClose>
@@ -116,7 +116,7 @@ export function FormDialog({
                     {/* الإطار الداخلي */}
                     <div>
                         {/* الهيدر */}
-                        <DialogHeader className="pb-1 flex justify-center items-center mt-6 sm:mt-1">
+                        <DialogHeader className="pb-1 flex justify-center items-center mt-12 sm:mt-1">
                             <DialogTitle className="w-full flex justify-center">
                                 <h3 className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-green-500 text-white text-base font-semibold py-1.5 px-5 rounded-xl shadow-md transform transition-transform hover:scale-105">
                                     <span>{title}</span>
@@ -125,12 +125,12 @@ export function FormDialog({
                         </DialogHeader>
 
                         {/* الجسم */}
-                        <div className="space-y-3 mt-1 pb-1 max-h-[55vh] overflow-y-auto px-1">
+                        <div className="space-y-3 mt-2 pb-24 sm:pb-1 overflow-y-auto px-1 h-[calc(100vh-170px)] sm:h-auto sm:max-h-[55vh]">
                             {children}
                         </div>
 
                         {/* الفوتر */}
-                        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t border-gray-200">
+                        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t border-gray-200 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static fixed bottom-0 left-0 right-0 px-3 sm:px-0 py-3 sm:py-0">
                             {extraButtons}
                             {/* زر إغلاق إضافي في الفوتر للأجهزة المحمولة */}
                             {!hideCancelButton && (
@@ -149,7 +149,7 @@ export function FormDialog({
                                 onClick={onSave}
                                 disabled={isLoading}
                                 className={cn(
-                                    "text-white rounded-lg px-3 py-1.5 text-sm transition-transform transform hover:scale-105 flex items-center justify-center gap-1.5 w-full sm:w-auto shadow-md",
+                                    "text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 w-full sm:w-auto shadow-md",
                                     mode === "add"
                                         ? "bg-blue-600 hover:bg-blue-700"
                                         : "bg-green-600 hover:bg-green-700"
@@ -157,18 +157,19 @@ export function FormDialog({
                             >
                                 {isLoading ? (
                                     <>
-                                        <div className="h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
-                                        <span>جاري...</span>
+                                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <span className="leading-none">جاري...</span>
                                     </>
                                 ) : (
                                     <>
-                                        {mode === "add" ? (
-                                            <PlusCircle className="h-3.5 w-3.5 sm:mr-1" />
+                                        {saveButtonText === 'التالي' ? (
+                                            <ChevronLeft className="h-4 w-4" />
+                                        ) : mode === 'add' ? (
+                                            <PlusCircle className="h-4 w-4" />
                                         ) : (
-                                            <Check className="h-3.5 w-3.5 sm:mr-1" />
+                                            <Check className="h-4 w-4" />
                                         )}
-                                        <span className="hidden sm:inline">{saveButtonText}</span>
-                                        <span className="sm:hidden">{mode === "add" ? "إضافة" : "حفظ"}</span>
+                                        <span className="leading-none tracking-wide">{saveButtonText}</span>
                                     </>
                                 )}
                             </Button>
