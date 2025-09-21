@@ -370,14 +370,14 @@ export function GenericTable<T extends { id: string }>(props: {
                                         }
                                     }}
                                     className={cn(
-                                        'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm transition-all duration-200 overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 h-full',
+                                        'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm transition-all duration-200 overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 md:h-full',
                                         cardWidth ? '' : 'w-full',
                                         highlightOnHover && 'hover:shadow-md hover:border-green-400/60 dark:hover:border-green-600/60'
                                     )}
                                     style={cardWidth ? { width: cardWidth } : undefined}
                                 >
                                     {/* الرأس */}
-                                    <div className="px-3 py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
+                                    <div className="px-3 py-2 sm:py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
                                                     dark:from-green-800 dark:via-green-700 dark:to-green-600 
                                                     text-white rounded-t-lg shadow-md flex items-center justify-between">
                                         <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1">
@@ -406,7 +406,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                                             text-green-800 dark:text-green-100 text-right 
                                                                             bg-green-50 dark:bg-green-900/50">
                                                                 <div
-                                                                    className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
+                                                                    className="w-full sm:max-w-xs text-sm text-green-800 dark:text-green-100 
                                                                                 bg-green-50 dark:bg-green-800/30  
                                                                                 border border-green-200 dark:border-green-700
                                                                                 rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
@@ -429,7 +429,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                         </table>
 
                                         {/* نسخة الفورم - تظهر فقط على الموبايل (أصغر من sm) */}
-                                        <div className="sm:hidden space-y-4">
+                                        <div className="sm:hidden space-y-3">
                                             {visibleColumns.map((column) => {
                                                 const value = column.render
                                                     ? column.render(item)
@@ -447,7 +447,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                         {/* القيمة */}
                                                         <div className="flex justify-center">
                                                             <div
-                                                                className="w-full max-w-xs text-sm text-green-800 dark:text-green-100 
+                                                                className="w-full sm:max-w-xs text-sm text-green-800 dark:text-green-100 
                                                                     bg-green-50 dark:bg-green-800/30  
                                                                     border border-green-200 dark:border-green-700 
                                                                     rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"

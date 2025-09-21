@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { getAllGuardians, searchGuardians, deleteGuardian, exportGuardiansToJson } from "@/lib/guardian-service";
+import { getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { addStudent } from "@/lib/supabase-service";
 import { getteachers } from "@/lib/profile-service";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -37,6 +38,7 @@ import { supabase } from '@/lib/supabase-client';
 import { DeleteConfirmationDialog } from "../ui/delete-confirmation-dialog";
 import { GenericTable } from "../ui/generic-table";
 import { FormDialog, FormRow } from "../ui/form-dialog";
+import { StudentFormDialog, StudentFormData } from "@/components/students/StudentFormDialog";
 
 /**
  * Fetches students associated with a specific guardian
@@ -70,6 +72,7 @@ export async function getStudentsByGuardianId(guardianId: string) {
     return students.map(student => ({
       ...student,
       teacher_name: student.study_circles?.teacher?.full_name || null,
+      teacher_id: student.study_circles?.teacher?.id || student.teacher_id || null,
       circle_name: student.study_circles?.name || null,
       grade: student.grade_level || student.grade || null
     }));
@@ -195,25 +198,24 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // حوار إضافة طالب
   const [isStudentDialogOpen, setIsStudentDialogOpen] = useState(false);
-  const [studentFullName, setStudentFullName] = useState<string>("");
-  const [studentGrade, setStudentGrade] = useState<string>("");
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [studentInitialData, setStudentInitialData] = useState<Partial<StudentFormData> | undefined>(undefined);
   const [selectedGuardianId, setSelectedGuardianId] = useState<string>("");
-  const [studentDateOfBirth, setStudentDateOfBirth] = useState<string>("");
-  const [studentPhoneNumber, setStudentPhoneNumber] = useState<string>("");
-  const [studentEmail, setStudentEmail] = useState<string>("");
-  const [studentLastQuranProgress, setStudentLastQuranProgress] = useState<string>("");
-  const [studentNotes, setStudentNotes] = useState<string>("");
   const [teacherId, setteacherId] = useState<string>("");
   const [teacherSearchTerm, setteacherSearchTerm] = useState<string>("");
   const [teachers, setteachers] = useState<Profile[]>([]);
   const [isGeneralAddStudent, setIsGeneralAddStudent] = useState(false);
   const [guardianSearchTerm, setGuardianSearchTerm] = useState<string>("");
   const [studyCircleId, setStudyCircleId] = useState<string>("");
+  const [teacherCircles, setTeacherCircles] = useState<{id: string; name: string; teacher_id?: string}[]>([]);
+  const [isLoadingTeacherCircles, setIsLoadingTeacherCircles] = useState(false);
 
   // 1. أولاً، أضف متغيرات الحالة الجديدة لحوار عرض الطلاب
   const [isStudentsListDialogOpen, setIsStudentsListDialogOpen] = useState(false);
   const [selectedGuardianStudents, setSelectedGuardianStudents] = useState<any[]>([]);
   const [selectedGuardianName, setSelectedGuardianName] = useState("");
+  // عند تحرير طالب من قائمة طلاب ولي الأمر نحتاج معرفة السياق لإبقاء القائمة مفتوحة
+  const [editingFromStudentsList, setEditingFromStudentsList] = useState(false);
 
   // Pagination config
   const itemsPerPage = 10;
@@ -353,105 +355,113 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // إضافة طالب جديد
   const handleAddStudent = (guardianId?: string, isGeneral: boolean = false) => {
-    setStudentFullName("");
-    setStudentGrade("");
-    setStudentDateOfBirth("");
-    setStudentPhoneNumber("");
-    setStudentEmail("");
-    setStudentLastQuranProgress("");
-    setStudentNotes("");
-    setteacherSearchTerm("");
+  setteacherSearchTerm("");
     setGuardianSearchTerm("");
     setSelectedGuardianId(guardianId || "");
     setIsGeneralAddStudent(isGeneral);
-
-    // تعيين المعلم تلقائياً إذا كان المستخدم معلماً
+    setEditingStudentId(null);
+    setStudentInitialData(undefined);
     setteacherId(userRole === 'teacher' && userId ? userId : "");
-
+    setStudyCircleId("");
+    setTeacherCircles([]);
     setIsStudentDialogOpen(true);
   };
 
   // In the handleSaveStudent function in guardians-list.tsx
-  const handleSaveStudent = async () => {
-    // التحقق من وجود البيانات المطلوبة
-    if (!studentFullName || !studentGrade) {
-      toast({
-        title: "بيانات غير مكتملة",
-        description: "الرجاء تعبئة اسم الطالب والصف الدراسي",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (isGeneralAddStudent && !selectedGuardianId) {
-      toast({
-        title: "بيانات غير مكتملة",
-        description: "الرجاء اختيار ولي أمر للطالب",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleSubmitStudent = async (data: StudentFormData) => {
     try {
-      // Log the values for debugging
-      console.log("Creating student with values:", {
-        full_name: studentFullName,
-        guardian_id: selectedGuardianId,
-        grade_level: studentGrade,
-        date_of_birth: studentDateOfBirth,
-        phone_number: studentPhoneNumber,
-        email: studentEmail,
-        memorized_parts: studentLastQuranProgress,
-        teacher_id: teacherId
-      });
-
-      // إنشاء كائن الطالب
-      const newStudent: StudentCreate = {
-        full_name: studentFullName,
-        guardian_id: selectedGuardianId,
-        grade_level: studentGrade,
-        date_of_birth: studentDateOfBirth || undefined,
-        phone_number: studentPhoneNumber || undefined,
-        email: studentEmail || undefined,
-        memorized_parts: studentLastQuranProgress || undefined,
-        notes: studentNotes || undefined,
-        study_circle_id: studyCircleId || undefined
-      };
-
-      // Ensure we're not sending empty strings that should be null/undefined
-      Object.keys(newStudent).forEach(key => {
-        if (newStudent[key] === "") {
-          newStudent[key] = undefined;
+      if (!editingStudentId) {
+        const newStudent: StudentCreate = {
+          full_name: data.full_name,
+          guardian_id: data.guardian_id || selectedGuardianId,
+          grade_level: data.grade_level!,
+          date_of_birth: data.date_of_birth || undefined,
+          phone_number: data.phone_number || undefined,
+          email: data.email || undefined,
+          memorized_parts: data.memorized_parts || undefined,
+          notes: data.notes || undefined,
+          study_circle_id: data.study_circle_id || undefined
+        };
+        const result = await addStudent(newStudent);
+        if (result.success) {
+          toast({ title: 'تم إضافة الطالب بنجاح', className: 'bg-green-50 border-green-200' });
+          setIsStudentDialogOpen(false);
+          loadStudentCounts();
+        } else {
+          toast({ title: 'فشل في حفظ بيانات الطالب', description: result.message || 'حدث خطأ غير متوقع', variant: 'destructive' });
         }
-      });
-
-      console.log("Final student data being sent:", newStudent);
-      const result = await addStudent(newStudent);
-
-      if (result.success) {
-        toast({
-          title: "تم إضافة الطالب بنجاح",
-          description: "",
-          className: "bg-green-50 border-green-200",
-        });
-        setIsStudentDialogOpen(false);
-
-        // تحديث عدد الطلاب بعد إضافة طالب جديد
-        loadStudentCounts();
       } else {
-        toast({
-          title: "فشل في حفظ بيانات الطالب",
-          description: result.message || "حدث خطأ غير متوقع",
-          variant: "destructive",
-        });
+        const updatedStudent: any = {
+          id: editingStudentId,
+          full_name: data.full_name,
+          guardian_id: data.guardian_id || selectedGuardianId,
+          grade_level: data.grade_level,
+          date_of_birth: data.date_of_birth || null,
+          phone_number: data.phone_number || null,
+          email: data.email || null,
+          memorized_parts: data.memorized_parts || null,
+          notes: data.notes || null,
+          study_circle_id: data.study_circle_id || null
+        };
+        const { updateStudent } = await import('@/lib/supabase-service');
+        const result = await updateStudent(updatedStudent);
+        if (result.success) {
+          toast({ title: 'تم تحديث بيانات الطالب', className: 'bg-green-50 border-green-200' });
+          setIsStudentDialogOpen(false);
+          setSelectedGuardianStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, ...updatedStudent } : s));
+        } else {
+          toast({ title: 'فشل في تحديث بيانات الطالب', description: result.message || 'حدث خطأ غير متوقع', variant: 'destructive' });
+        }
       }
-    } catch (error) {
-      console.error("خطأ في حفظ بيانات الطالب:", error);
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع",
-        variant: "destructive",
-      });
+    } catch (err) {
+      console.error('خطأ في حفظ بيانات الطالب:', err);
+      toast({ title: 'خطأ', description: 'حدث خطأ غير متوقع', variant: 'destructive' });
+    }
+  };
+
+  // فتح تعديل طالب من جدول طلاب ولي الأمر
+  const handleEditStudentFromGuardianList = (student: any) => {
+    // تأكد من بقاء قائمة طلاب ولي الأمر مفتوحة (أو إعادة فتحها)
+    setIsStudentsListDialogOpen(true);
+    setEditingFromStudentsList(true);
+    setEditingStudentId(student.id);
+    setSelectedGuardianId(student.guardian_id || selectedGuardianId);
+    setIsGeneralAddStudent(true);
+    const derivedTeacherId = student.teacher_id || student.study_circles?.teacher?.id || null;
+    if (derivedTeacherId) {
+      loadCirclesForTeacher(derivedTeacherId);
+    } else {
+      setTeacherCircles([]);
+    }
+    setStudentInitialData({
+      id: student.id,
+      full_name: student.full_name,
+      guardian_id: student.guardian_id,
+      grade_level: student.grade_level || student.grade,
+      date_of_birth: student.date_of_birth || undefined,
+      phone_number: student.phone_number || undefined,
+      email: student.email || undefined,
+      memorized_parts: student.memorized_parts || undefined,
+      notes: student.notes || undefined,
+      study_circle_id: student.study_circle_id || undefined,
+      teacher_id: derivedTeacherId || undefined,
+    });
+    // محاولة تحميل حلقات المعلم الحالي (إن وجدت) لتعبئة القائمة
+    setIsStudentDialogOpen(true);
+  };
+
+  // تحميل الحلقات بعد اختيار المعلم داخل نموذج الطالب (المكون العام)
+  const loadCirclesForTeacher = async (tid: string) => {
+    if (!tid) { setTeacherCircles([]); return; }
+    setIsLoadingTeacherCircles(true);
+    try {
+      const circles = await getStudyCirclesByTeacherId(tid);
+      setTeacherCircles(circles);
+    } catch (e) {
+      console.error('خطأ في تحميل الحلقات للمعلم', tid, e);
+      setTeacherCircles([]);
+    } finally {
+      setIsLoadingTeacherCircles(false);
     }
   };
 
@@ -616,39 +626,48 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
 
   // وظيفة حذف الطالب
-  const handleDeleteStudent = async (studentId: string) => {
-    if (!studentId) return;
+  // حالة حوار حذف الطالب
+  const [isDeleteStudentDialogOpen, setIsDeleteStudentDialogOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const [isProcessingStudentDelete, setIsProcessingStudentDelete] = useState(false);
+
+  // طلب حذف (فتح الحوار)
+  const requestDeleteStudent = (studentId: string) => {
+    setStudentToDelete(studentId);
+    setIsDeleteStudentDialogOpen(true);
+  };
+
+  // تنفيذ الحذف بعد التأكيد
+  const confirmDeleteStudent = async () => {
+    if (!studentToDelete) return;
     try {
-      setLoading(true);
-      // استدعاء خدمة حذف الطالب (يجب أن تكون موجودة في supabase-service أو ملف مشابه)
+      setIsProcessingStudentDelete(true);
       const { deleteStudent } = await import('@/lib/supabase-service');
-      const result = await deleteStudent(studentId);
+      const result = await deleteStudent(studentToDelete);
       if (result.success) {
         toast({
-          title: "تم حذف الطالب بنجاح",
-          description: "",
-          className: "bg-green-50 border-green-200",
+          title: 'تم حذف الطالب بنجاح',
+          className: 'bg-green-50 border-green-200'
         });
-        // تحديث قائمة الطلاب بعد الحذف
-        setSelectedGuardianStudents(prev =>
-          prev.filter(student => student.id !== studentId)
-        );
+        setSelectedGuardianStudents(prev => prev.filter(s => s.id !== studentToDelete));
       } else {
         toast({
-          title: "فشل في حذف الطالب",
-          description: result.message || "حدث خطأ غير متوقع",
-          variant: "destructive",
+          title: 'فشل في حذف الطالب',
+          description: result.message || 'حدث خطأ غير متوقع',
+          variant: 'destructive'
         });
       }
     } catch (error) {
-      console.error("خطأ في حذف الطالب:", error);
+      console.error('خطأ في حذف الطالب:', error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع أثناء حذف الطالب",
-        variant: "destructive",
+        title: 'خطأ',
+        description: 'حدث خطأ غير متوقع أثناء حذف الطالب',
+        variant: 'destructive'
       });
     } finally {
-      setLoading(false);
+      setIsProcessingStudentDelete(false);
+      setIsDeleteStudentDialogOpen(false);
+      setStudentToDelete(null);
     }
   };
 
@@ -905,129 +924,118 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               </div>
             </div>
 
-            <GenericTable
-              data={paginatedGuardians}
-              columns={[
-                {
-                  key: 'index_full_name',
-                  header: '#️⃣👤',
-                  align: 'center' as const,
-                  render: (item) => {
-                    // نجيب ترتيب العنصر
-                    const itemIndex = paginatedGuardians.findIndex(
-                      (guardian) => guardian.id === item.id
-                    );
-                    const index = (currentPage - 1) * itemsPerPage + itemIndex + 1;
 
-                    // نعرض الرقم مع الاسم
-                    return `${index} - ${item.full_name}`;
-                  },
-                },
-
-                {
-                  key: 'phone_number',
-                  header: `📞 ${guardiansLabels.phoneNumber}`,
-                  align: 'center' as const,
-                  render: (guardian) =>
-                    guardian.phone_number ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <Phone className="h-4 w-4 text-islamic-green/60" />
-                        <span dir="ltr" className="text-islamic-green/80">{guardian.phone_number}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    ),
-                },
-                {
-                  key: 'email',
-                  header: `✉️ ${guardiansLabels.email}`,
-                  align: 'center' as const,
-                  render: (guardian) =>
-                    guardian.email ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-islamic-green/60" />
-                        <span dir="ltr" className="text-islamic-green/80 text-xs truncate block">
-                          {guardian.email}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    ),
-                },
-                {
-                  key: 'students_count',
-                  header: `👶 ${guardiansLabels.studentCount}`,
-                  align: 'center' as const,
-                  render: (guardian) =>
-                    guardian.students_count > 0 ? (
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleShowGuardianStudents(guardian.id, guardian.full_name)}
-                        className="h-6 px-3 rounded-full font-bold text-white bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 shadow-lg hover:scale-105 transition-all duration-200 text-sm"
-                        title="عرض الطلاب"
-                      >
-                        {guardian.students_count}
-                      </Button>
-                    ) : (
-                      <span className="text-muted-foreground">0</span>
-                    ),
-                },
-                {
-                  key: 'actions',
-                  header: `⚙️ ${guardiansLabels.actions}`,
-                  align: 'center' as const,
-                  render: (guardian) => (
-                    <div className="flex justify-center items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditGuardian(guardian)}
-                        className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                        title={guardiansLabels.editTooltip}
-                      >
-                        <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleAddStudent(guardian.id)}
-                        className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                        title="إضافة طالب"
-                      >
-                        <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
-                      </Button>
-                      {/* <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteGuardian(guardian)}
-                        className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                        title={guardiansLabels.deleteTooltip}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                      </Button> */}
-                    </div>
-                  ),
-                },
-              ]}
-              emptyMessage={searchTerm ? guardiansLabels.noSearchResults : guardiansLabels.noGuardians}
-            />
           </>
         </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <div className="text-sm text-muted-foreground">
-            {guardiansLabels.totalGuardians}: <span className="font-medium">{guardians.length}</span>
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            {guardiansLabels.showing}{" "}
-            <span className="font-medium">
-              {Math.min((currentPage - 1) * itemsPerPage + 1, filteredGuardians.length)} - {Math.min(currentPage * itemsPerPage, filteredGuardians.length)}
-            </span>{" "}
-            {guardiansLabels.from} <span className="font-medium">{filteredGuardians.length}</span> {guardiansLabels.guardian}
-          </div>
-        </CardFooter>
       </Card>
+      <GenericTable
+        data={paginatedGuardians}
+        columns={[
+          {
+            key: 'index_full_name',
+            header: '#️⃣👤',
+            align: 'center' as const,
+            render: (item) => {
+              // نجيب ترتيب العنصر
+              const itemIndex = paginatedGuardians.findIndex(
+                (guardian) => guardian.id === item.id
+              );
+              const index = (currentPage - 1) * itemsPerPage + itemIndex + 1;
 
+              // نعرض الرقم مع الاسم
+              return `${index} - ${item.full_name}`;
+            },
+          },
+
+          {
+            key: 'phone_number',
+            header: `📞 ${guardiansLabels.phoneNumber}`,
+            align: 'center' as const,
+            render: (guardian) =>
+              guardian.phone_number ? (
+                <div className="flex items-center justify-center gap-1">
+                  <Phone className="h-4 w-4 text-islamic-green/60" />
+                  <span dir="ltr" className="text-islamic-green/80">{guardian.phone_number}</span>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
+          },
+          {
+            key: 'email',
+            header: `✉️ ${guardiansLabels.email}`,
+            align: 'center' as const,
+            render: (guardian) =>
+              guardian.email ? (
+                <div className="flex items-center justify-center gap-1">
+                  <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-islamic-green/60" />
+                  <span dir="ltr" className="text-islamic-green/80 text-xs truncate block">
+                    {guardian.email}
+                  </span>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
+          },
+          {
+            key: 'students_count',
+            header: `👶 ${guardiansLabels.studentCount}`,
+            align: 'center' as const,
+            render: (guardian) =>
+              guardian.students_count > 0 ? (
+                <Button
+                  variant="ghost"
+                  onClick={() => handleShowGuardianStudents(guardian.id, guardian.full_name)}
+                  className="h-6 px-3 rounded-full font-bold text-white bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 shadow-lg hover:scale-105 transition-all duration-200 text-sm"
+                  title="عرض الطلاب"
+                >
+                  {guardian.students_count}
+                </Button>
+              ) : (
+                <span className="text-muted-foreground">0</span>
+              ),
+          },
+          {
+            key: 'actions',
+            header: `⚙️ ${guardiansLabels.actions}`,
+            align: 'center' as const,
+            render: (guardian) => (
+              <div className="flex justify-center items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEditGuardian(guardian)}
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                  title={guardiansLabels.editTooltip}
+                >
+                  <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleAddStudent(guardian.id)}
+                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                  title="إضافة طالب"
+                >
+                  <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
+                </Button>
+                {userRole === 'superadmin' && (
+                  <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDeleteGuardian(guardian)}
+                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                  title={guardiansLabels.deleteTooltip}
+                  >
+                  <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                  </Button>
+                )}
+              </div>
+            ),
+          },
+        ]}
+        emptyMessage={searchTerm ? guardiansLabels.noSearchResults : guardiansLabels.noGuardians}
+      />
       {/* حوار إضافة ولي أمر */}
       <FormDialog
         title={dialogTitle}
@@ -1109,267 +1117,39 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         deleteButtonText={guardiansLabels.confirm}
         cancelButtonText={guardiansLabels.cancel}
       />
-      {/* حوار إضافة طالب جديد */}
-      <FormDialog
-        title="إضافة طالب جديد"
+      <StudentFormDialog
         open={isStudentDialogOpen}
-        onOpenChange={setIsStudentDialogOpen}
-        onSave={handleSaveStudent}
-        saveButtonText="إضافة الطالب"
-        cancelButtonText={studentsLabels.cancel}
-        mode="add"
-      >
-        <div className="grid gap-4 py-2">
-          {/* المعلم */}
-          <FormRow label="المعلم">
-            {userRole === "teacher" ? (
-              <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
-                <UserCircle className="h-4 w-4 text-islamic-green/60" />
-                <span className="text-islamic-green font-semibold">
-                  {(() => {
-                    if (userId && teachers.length > 0) {
-                      const currentTeacher = teachers.find((s) => s.id === userId);
-                      if (currentTeacher) {
-                        if (!teacherId) setteacherId(currentTeacher.id);
-                        return currentTeacher.full_name;
-                      }
-                    }
-                    return "المعلم (تم تحديده تلقائياً)";
-                  })()}
-                </span>
-              </div>
-            ) : (
-              <div className="flex flex-col md:flex-row gap-2">
-                <div className="relative md:w-1/2">
-                  <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="البحث عن معلم"
-                    value={teacherSearchTerm}
-                    onChange={(e) => setteacherSearchTerm(e.target.value)}
-                    className="pl-3 pr-10"
-                  />
-                </div>
-                <div className="md:w-1/2">
-                  <Select value={teacherId} onValueChange={setteacherId}>
-                    <SelectTrigger className="focus:border-islamic-green">
-                      <SelectValue placeholder="اختر المعلم" />
-                    </SelectTrigger>
-                    <SelectContent position="item-aligned" align="start" side="bottom">
-                      {teachers
-                        .filter(
-                          (t) =>
-                            !teacherSearchTerm ||
-                            t.full_name.includes(teacherSearchTerm)
-                        )
-                        .map((t) => (
-                          <SelectItem key={t.id} value={t.id}>
-                            <div className="flex flex-col">
-                              <span>{t.full_name}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {t.role === "admin" ? "مشرف" : "معلم"}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            )}
-          </FormRow>
+        mode={editingStudentId ? 'edit' : 'add'}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingStudentId(null);
+            // إذا كنا في وضع التحرير من داخل قائمة الطلاب نعيد إظهارها بعد إغلاق نموذج الطالب
+            if (editingFromStudentsList) {
+              setIsStudentsListDialogOpen(true);
+              setEditingFromStudentsList(false);
+            }
+          }
+          setIsStudentDialogOpen(open);
+        }}
+        initialData={studentInitialData}
+        onSubmit={handleSubmitStudent}
+        guardians={guardians}
+        teachers={teachers}
+        studyCircles={teacherCircles}
+        isTeacher={userRole === 'teacher'}
+        currentTeacherId={userId}
+        allowGuardianSelection={isGeneralAddStudent}
+        fixedGuardianId={!isGeneralAddStudent ? selectedGuardianId : undefined}
+        onLoadTeacherCircles={loadCirclesForTeacher}
+      />
 
-          {/* اسم الطالب */}
-          <FormRow label="اسم الطالب/الطالبة *">
-            <Input
-              id="student_full_name"
-              value={studentFullName}
-              onChange={(e) => setStudentFullName(e.target.value)}
-              placeholder="اسم الطالب الكامل"
-              required
-              className="focus:border-islamic-green"
-            />
-          </FormRow>
-
-          {/* الصف الدراسي */}
-          <FormRow label="الصف الدراسي *">
-            <Select value={studentGrade} onValueChange={setStudentGrade}>
-              <SelectTrigger className="focus:border-islamic-green">
-                <SelectValue placeholder="اختر الصف" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                <SelectGroup>
-                  <SelectLabel className="font-bold text-islamic-green">
-                    مرحلة رياض الأطفال
-                  </SelectLabel>
-                  {studentsLabels.gradeOptions.slice(0, 2).map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel className="font-bold text-islamic-green">
-                    المرحلة الابتدائية
-                  </SelectLabel>
-                  {studentsLabels.gradeOptions.slice(2, 8).map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-                <SelectGroup>
-                  <SelectLabel className="font-bold text-islamic-green">
-                    مراحل أخرى
-                  </SelectLabel>
-                  {studentsLabels.gradeOptions.slice(8).map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </FormRow>
-
-          {/* تاريخ الميلاد */}
-          <FormRow label="تاريخ الميلاد (اختياري)">
-            <Input
-              id="student_date_of_birth"
-              type="date"
-              value={studentDateOfBirth}
-              onChange={(e) => setStudentDateOfBirth(e.target.value)}
-              className="text-left focus:border-islamic-green"
-            />
-          </FormRow>
-
-          {/* مستوى الحفظ */}
-          <FormRow label="آخر ما وصل إليه في القرآن (اختياري)">
-            <Select
-              value={studentLastQuranProgress}
-              onValueChange={setStudentLastQuranProgress}
-            >
-              <SelectTrigger className="focus:border-islamic-green">
-                <SelectValue placeholder="اختر آخر ما وصل إليه" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                <SelectGroup>
-                  <SelectLabel className="font-bold text-islamic-green">
-                    الأجزاء
-                  </SelectLabel>
-                  {studentsLabels.quranPartsOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </FormRow>
-
-          {/* ولي الأمر */}
-          {isGeneralAddStudent ? (
-            <FormRow label="ولي الأمر *">
-              <div className="flex flex-col md:flex-row gap-2">
-                <div className="relative md:w-1/2">
-                  <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="البحث عن ولي أمر"
-                    value={guardianSearchTerm}
-                    onChange={(e) => setGuardianSearchTerm(e.target.value)}
-                    className="pl-3 pr-10"
-                  />
-                </div>
-                <div className="md:w-1/2">
-                  <Select
-                    value={selectedGuardianId}
-                    onValueChange={setSelectedGuardianId}
-                  >
-                    <SelectTrigger className="focus:border-islamic-green">
-                      <SelectValue placeholder="اختر ولي الأمر" />
-                    </SelectTrigger>
-                    <SelectContent align="start" side="bottom">
-                      {guardians
-                        .filter(
-                          (g) =>
-                            !guardianSearchTerm ||
-                            g.full_name.includes(guardianSearchTerm) ||
-                            (g.phone_number &&
-                              g.phone_number.includes(guardianSearchTerm))
-                        )
-                        .map((g) => (
-                          <SelectItem key={g.id} value={g.id}>
-                            <div className="flex flex-col">
-                              <span>{g.full_name}</span>
-                              {g.phone_number && (
-                                <span className="text-xs text-muted-foreground">
-                                  {g.phone_number}
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </FormRow>
-          ) : (
-            <FormRow label="ولي الأمر (تم تحديده تلقائياً)">
-              <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
-                <span className="text-islamic-green font-semibold">
-                  {(() => {
-                    const selectedGuardian = guardians.find(
-                      (g) => g.id === selectedGuardianId
-                    );
-                    return selectedGuardian
-                      ? selectedGuardian.full_name
-                      : "ولي الأمر المحدد";
-                  })()}
-                </span>
-              </div>
-            </FormRow>
-          )}
-
-          {/* رقم الهاتف */}
-          <FormRow label="رقم الهاتف (اختياري)">
-            <Input
-              id="student_phone_number"
-              value={studentPhoneNumber}
-              onChange={(e) => setStudentPhoneNumber(e.target.value)}
-              placeholder="رقم هاتف الطالب"
-              dir="ltr"
-              className="text-left focus:border-islamic-green"
-            />
-          </FormRow>
-
-          {/* البريد الإلكتروني */}
-          <FormRow label="البريد الإلكتروني (اختياري)">
-            <Input
-              id="student_email"
-              type="email"
-              value={studentEmail}
-              onChange={(e) => setStudentEmail(e.target.value)}
-              placeholder="البريد الإلكتروني للطالب"
-              dir="ltr"
-              className="text-left focus:border-islamic-green"
-            />
-          </FormRow>
-
-          {/* ملاحظات */}
-          <FormRow label="ملاحظات (اختياري)">
-            <Textarea
-              id="student_notes"
-              value={studentNotes}
-              onChange={(e) => setStudentNotes(e.target.value)}
-              placeholder="ملاحظات إضافية عن الطالب"
-              rows={3}
-              className="focus:border-islamic-green"
-            />
-          </FormRow>
-        </div>
-      </FormDialog>
-
-      <Dialog open={isStudentsListDialogOpen} onOpenChange={setIsStudentsListDialogOpen}>
+      <Dialog modal={false} open={isStudentsListDialogOpen} onOpenChange={(open) => {
+        // إذا تم إغلاق قائمة الطلاب أثناء وجود نموذج الطالب مفتوح لا نغلقه قسرياً
+        setIsStudentsListDialogOpen(open);
+        if (!open) {
+          setEditingFromStudentsList(false);
+        }
+      }}>
         <DialogContent dir="rtl" className="bg-gradient-to-r from-green-100 via-green-200 to-green-100 sm:max-w-[750px] max-h-[70vh] overflow-y-auto">
           <DialogHeader className="flex flex-col items-center border-b border-green-200">
             <DialogTitle className="text-sm text-islamic-green flex items-center gap-2">
@@ -1438,41 +1218,35 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     align: 'center' as const,
                     render: (student) => student.circle_name || "غير محدد",
                   },
-                  // {
-                  //   key: 'actions',
-                  //   header: '⚙️ الإجراءات',
-                  //   align: 'center' as const,
-                  //   render: (student) => (
-                  //     <div className="flex justify-center gap-2">
-                  //       <Button
-                  //         variant="ghost"
-                  //         size="icon"
-                  //         // TODO: Implement handleEditStudent or remove this button if not needed
-                  //         onClick={() => {
-                  //           // Example: Open a dialog or show a toast
-                  //           toast({
-                  //             title: "ميزة تعديل الطالب غير متوفرة حالياً",
-                  //             description: "يرجى التواصل مع الإدارة لتفعيل هذه الخاصية.",
-                  //             variant: "destructive",
-                  //           });
-                  //         }}
-                  //         className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                  //         title="تعديل"
-                  //       >
-                  //         <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                  //       </Button>
-                  //       {/* <Button
-                  //         variant="ghost"
-                  //         size="icon"
-                  //         onClick={() => handleDeleteStudent(student.id)}
-                  //         className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                  //         title="حذف"
-                  //       >
-                  //         <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                  //       </Button> */}
-                  //     </div>
-                  //   ),
-                  // },
+                  ...(userRole === 'superadmin' ? [
+                    {
+                      key: 'actions',
+                      header: '⚙️ الإجراءات',
+                      align: 'center' as const,
+                      render: (student: any) => (
+                        <div className="flex justify-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditStudentFromGuardianList(student)}
+                            className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                            title="تعديل"
+                          >
+                            <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => requestDeleteStudent(student.id)}
+                            className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                            title="حذف"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                          </Button>
+                        </div>
+                      ),
+                    } as const,
+                  ] : []),
                 ]}
                 emptyMessage="لا يوجد طلاب"
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
@@ -1496,6 +1270,24 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* حوار تأكيد حذف طالب (داخل قائمة طلاب ولي الأمر) */}
+      <DeleteConfirmationDialog
+        isOpen={isDeleteStudentDialogOpen}
+        onOpenChange={setIsDeleteStudentDialogOpen}
+        onConfirm={confirmDeleteStudent}
+        isLoading={isProcessingStudentDelete}
+        title="حذف الطالب"
+        description={
+          <>
+            هل أنت متأكد من رغبتك في حذف هذا الطالب؟
+            <br />
+            لا يمكن التراجع عن هذه العملية.
+          </>
+        }
+        deleteButtonText="تأكيد الحذف"
+        cancelButtonText={guardiansLabels.cancel}
+      />
 
     </div>
   );
