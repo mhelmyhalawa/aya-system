@@ -73,6 +73,11 @@ export type FormDialogProps = {
      * أزرار إضافية في الفوتر (اختياري)
      */
     extraButtons?: React.ReactNode;
+
+    /**
+     * إخفاء زر الإلغاء (مثلاً في نمط ويزارد ضيق)
+     */
+    hideCancelButton?: boolean;
 };
 
 /**
@@ -90,7 +95,8 @@ export function FormDialog({
     mode = "add",
     isLoading = false,
     maxWidth = "480px",
-    extraButtons
+    extraButtons,
+    hideCancelButton = false
 }: FormDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,15 +133,17 @@ export function FormDialog({
                         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t border-gray-200">
                             {extraButtons}
                             {/* زر إغلاق إضافي في الفوتر للأجهزة المحمولة */}
-                            <Button
-                                type="button"
-                                onClick={() => onOpenChange(false)}
-                                variant="outline"
-                                className="border-red-300 hover:bg-red-100 text-red-700 rounded-lg py-1.5 w-full sm:hidden"
-                            >
-                                <X className="h-3.5 w-3.5 mr-1" />
-                                {cancelButtonText}
-                            </Button>
+                            {!hideCancelButton && (
+                                <Button
+                                    type="button"
+                                    onClick={() => onOpenChange(false)}
+                                    variant="outline"
+                                    className="border-red-300 hover:bg-red-100 text-red-700 rounded-lg py-1.5 w-full sm:hidden"
+                                >
+                                    <X className="h-3.5 w-3.5 mr-1" />
+                                    {cancelButtonText}
+                                </Button>
+                            )}
                             <Button
                                 type="button"
                                 onClick={onSave}
