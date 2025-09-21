@@ -2,13 +2,13 @@
 // استخدم هذا الملف عندما لا يعمل عميل Supabase العادي
 
 // الحصول على مفاتيح Supabase من ملف البيئة
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ikeicbxkjgdhhofuhehr.supabase.co';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
 // المفتاح العام (anon key) - نحصل عليه من متغيرات البيئة مع قيمة احتياطية
-const ANON_KEY = import.meta.env.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrZWljYnhramdkaGhvZnVoZWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTM3ODQzNzQsImV4cCI6MjA2OTM2MDM3NH0.4Qv_Z37pH_clIOHBDnNg_e0qpJ4AAEU20YvP_ETxOGc';
+const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY || '';
 
 // مفتاح الخدمة - نحصل عليه من متغيرات البيئة مع قيمة احتياطية
-const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrZWljYnhramdkaGhvZnVoZWhyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY4NDUwMDU3MiwiZXhwIjozODM5ODU4MTcyfQ.xsNLA6IXtEUXLo5UF9q0TKoTeG1vqcM5yE7eX0sSAo0';
+const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 
 // طباعة المفاتيح المستخدمة للتأكد منها (سيتم إزالة هذا في الإنتاج)
 console.log('مفاتيح Supabase المستخدمة:', {

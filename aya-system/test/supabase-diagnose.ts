@@ -80,15 +80,16 @@ async function diagnoseSupabaseConnection() {
     
     try {
       const addResult = await addStudent(testStudent);
+      const createdId = (addResult as any)?.data?.id as string | undefined;
       
-      if (addResult.success && addResult.id) {
-        console.log('تم إنشاء الطالب الاختباري بنجاح:', addResult.id);
+      if (addResult.success && createdId) {
+        console.log('تم إنشاء الطالب الاختباري بنجاح:', createdId);
         
         // التحقق من وجود الطالب
         const { data: createdStudent, error: getError } = await supabase
           .from(STUDENTS_TABLE)
           .select('*')
-          .eq('id', addResult.id)
+          .eq('id', createdId)
           .single();
         
         if (getError) {
@@ -101,7 +102,7 @@ async function diagnoseSupabaseConnection() {
         const { error: deleteError } = await supabase
           .from(STUDENTS_TABLE)
           .delete()
-          .eq('id', addResult.id);
+          .eq('id', createdId);
         
         if (deleteError) {
           console.error('فشل في حذف الطالب الاختباري:', deleteError);
@@ -137,8 +138,8 @@ async function diagnoseSupabaseConnection() {
       console.error('خطأ أثناء التحقق من إعدادات RLS:', rlsError);
     }
     
-    console.log('\nتوصيات لحل المشاكل:');
-    console.log('1. تأكد من تكوين متغيرات البيئة VITE_SUPABASE_URL و VITE_SUPABASE_KEY بشكل صحيح في ملف .env');
+  console.log('\nتوصيات لحل المشاكل:');
+  console.log('1. تأكد من تكوين متغيرات البيئة VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY (أو VITE_SUPABASE_KEY) بشكل صحيح في ملف .env');
     console.log('2. تأكد من إنشاء جدول students في Supabase بالهيكل الصحيح');
     console.log('3. تأكد من تكوين سياسات RLS للسماح بالوصول والكتابة والتعديل');
     console.log('4. تحقق من صلاحيات المستخدم المجهول (anon) للوصول إلى الجدول');

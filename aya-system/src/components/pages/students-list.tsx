@@ -1019,9 +1019,11 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   }
 
   return (
-  <div className="w-full max-w-[1600px] mx-auto py-6" dir="rtl">
-      <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
+
+      <Card>
+        {/* الهيدر */}
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             {/* العنوان والوصف */}
             <div className="flex flex-col">

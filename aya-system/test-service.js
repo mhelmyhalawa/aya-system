@@ -5,7 +5,11 @@ import dotenv from 'dotenv';
 // تحميل المتغيرات البيئية
 dotenv.config();
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_KEY;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('⚠️ Missing environment variables. Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_KEY) are set.');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

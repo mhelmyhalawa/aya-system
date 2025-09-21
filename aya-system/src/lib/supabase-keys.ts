@@ -4,17 +4,21 @@
  */
 
 // عنوان قاعدة البيانات
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://ikeicbxkjgdhhofuhehr.supabase.co';
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
-// المفتاح العام للقراءة
-export const ANON_KEY = import.meta.env.VITE_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrZWljYnhramdkaGhvZnVoZWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2ODQ1MDA1NzIsImV4cCI6MTk5OTg3NjU3Mn0.qYgjp3kAQ1LGmLg_r4_zw1jLx0XRiZnVJCfHKo-nFUo';
+// المفتاح العام للقراءة (يدعم الاسم الجديد والقديم للتوافق)
+export const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY || '';
 
 // مفتاح الخدمة للكتابة وتجاوز RLS
-export const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrZWljYnhramdkaGhvZnVoZWhyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY4NDUwMDU3MiwiZXhwIjozODM5ODU4MTcyfQ.xsNLA6IXtEUXLo5UF9q0TKoTeG1vqcM5yE7eX0sSAo0';
+export const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 
 // طباعة المفاتيح للتصحيح
+if (!SUPABASE_URL || !ANON_KEY) {
+  console.warn('SupabaseKeys: تحذير - متغيرات البيئة غير مكتملة. تأكد من ضبط VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY (أو VITE_SUPABASE_KEY) و VITE_SUPABASE_SERVICE_ROLE_KEY في بيئة التشغيل.');
+}
+
 console.log('SupabaseKeys: تهيئة مع المفاتيح:', {
-  url: SUPABASE_URL,
+  url: SUPABASE_URL || 'غير معرف',
   anonKey: ANON_KEY ? `${ANON_KEY.substring(0, 10)}...` : 'غير معرف',
   serviceKey: SERVICE_KEY ? `${SERVICE_KEY.substring(0, 10)}...` : 'غير معرف'
 });
