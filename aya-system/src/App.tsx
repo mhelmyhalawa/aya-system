@@ -258,7 +258,7 @@ const App = () => {
 
             {/* القائمة الجانبية في جميع الشاشات إذا كان المستخدم مسجل دخول */}
             {userRole && (
-              <div className="fixed top-16 right-0 h-[calc(100vh-64px)]">
+              <div className={`fixed top-16 right-0 h-[calc(100vh-64px)] ${sidebarOpen ? 'block' : 'hidden md:block'}`}>
                 <Sidebar                 
                   onNavigate={handleNavigate} 
                   onLogout={handleLogout}

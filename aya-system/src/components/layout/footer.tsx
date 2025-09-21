@@ -16,8 +16,11 @@ export function Footer() {
             <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-pulse" />
             <span className="hidden sm:inline">من أجل خدمة كتاب الله</span>
           </div>
+
+          <p className="text-xs text-gray-400">الإصدار 1.0.0</p>
         </div>
       </div>
+
     </footer>
 
   );
