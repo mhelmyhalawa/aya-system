@@ -28,7 +28,7 @@ import {
 import { getStudyCircleCountByTeacherIds, getStudyCirclesByTeacherId, updateStudyCircle, createStudyCircle, deleteStudyCircle } from '@/lib/study-circle-service';
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from '@/lib/study-circle-schedule-service';
 import { Shield, User, UserCheck, Eye, EyeOff, Pencil, UserPlus, AlertTriangle, Trash2, KeyRound, Crown, BookOpen, Calendar, Clock, MapPin, Plus, Info, NotebookPenIcon, User2Icon, RefreshCwIcon } from "lucide-react";
-import { userManagementLabels, errorMessages, successMessages, commonLabels } from "@/lib/arabic-labels";
+import { getLabels } from '@/lib/labels';
 
 interface UserManagementProps {
   onNavigate: (path: string) => void;
@@ -38,6 +38,7 @@ interface UserManagementProps {
 }
 
 export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnly = false }: UserManagementProps) {
+  const { userManagementLabels, errorMessages, successMessages, commonLabels } = getLabels('ar');
   // List state
   const [admins, setAdmins] = useState<Profile[]>([]);
   const [teachers, setteachers] = useState<Profile[]>([]);
@@ -77,7 +78,8 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
-  const [dialogTitle, setDialogTitle] = useState(userManagementLabels.addUserForm.title);
+  // Initialized after labels to avoid use-before-init; fallback empty then set in handlers
+  const [dialogTitle, setDialogTitle] = useState<string>("");
 
   // Delete confirmation dialog
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -159,6 +161,7 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
   const [teacherCircleCounts, setTeacherCircleCounts] = useState<Record<string, number>>({});
 
   const { toast } = useToast();
+  // Labels already destructured at top
 
   // Load data
   useEffect(() => {
@@ -1216,12 +1219,12 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="username">{userManagementLabels.username}</Label>
+              <Label htmlFor="username">{userManagementLabels.usernameLabel}</Label>
               <Input
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder={userManagementLabels.username}
+                placeholder={userManagementLabels.usernameLabel}
               />
             </div>
 
@@ -2070,6 +2073,8 @@ interface UsersTableProps {
 }
 
 function UsersTable({ users, onEdit, onDelete, onChangePassword, userRole, currentUserId, userType, showOnlyChangePassword = false, teacherCircleCounts = {}, onShowCircles, onAddCircle }: UsersTableProps) {
+  // Access labels inside table component (scoped)
+  const { userManagementLabels } = getLabels('ar');
   const showCircleCount = userType === 'teacher' || userType === 'admin';
 
   if (users.length === 0) {
@@ -2120,14 +2125,14 @@ function UsersTable({ users, onEdit, onDelete, onChangePassword, userRole, curre
         <Table className="min-w-full border border-green-300 rounded-2xl overflow-hidden shadow-lg">
           <TableHeader className="bg-islamic-green">
             <TableRow>
-              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">👤 الاسم الكامل</TableHead>
-              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🆔 اسم المستخدم</TableHead>
-              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🔑 الدور</TableHead>
+              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">👤 {userManagementLabels.fullName}</TableHead>
+              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🆔 {userManagementLabels.usernameLabel}</TableHead>
+              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🔑 {userManagementLabels.role}</TableHead>
               {showCircleCount && (
-                <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">📚 عدد الحلقات</TableHead>
+                <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">📚 {userManagementLabels.teacherCircleCount || 'عدد الحلقات'}</TableHead>
               )}
-              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🗓 آخر تسجيل دخول</TableHead>
-              <TableHead className="text-center font-bold text-white py-3 px-4">⚙️ الإجراءات</TableHead>
+              <TableHead className="text-center font-bold text-white py-3 px-4 border-r border-green-700">🗓 {userManagementLabels.lastLogin || 'آخر تسجيل دخول'}</TableHead>
+              <TableHead className="text-center font-bold text-white py-3 px-4">⚙️ {userManagementLabels.actions}</TableHead>
             </TableRow>
           </TableHeader>
 
@@ -2154,7 +2159,7 @@ function UsersTable({ users, onEdit, onDelete, onChangePassword, userRole, curre
                       onClick={() => onShowCircles && onShowCircles(user)}
                       title="عرض الحلقات وإضافة جديدة"
                     >
-                      {teacherCircleCounts[user.id] ?? 0} حلقة
+                      {teacherCircleCounts[user.id] ?? 0} {userManagementLabels.circleUnit || 'حلقة'}
                     </Badge>
                   </TableCell>
                 )}

@@ -1,27 +1,24 @@
 import { Heart } from "lucide-react";
+import { getLabels } from "@/lib/labels";
 
 export function Footer() {
-  const currentYear = new Date().getFullYear();
-
+  const { footerLabels } = getLabels('ar');
+  const year = new Date().getFullYear();
   return (
-    <footer className="bg-green-900/95 text-green-100 py-6 border-t border-green-700 mt-auto shadow-inner">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col items-center justify-center text-center space-y-2">
-          <p className="text-sm md:text-base font-medium">
-            حقوق النشر &copy; {currentYear} — مكتب آية لتحفيظ القرآن الكريم
-          </p>
-
-          <div className="flex items-center gap-2 text-sm text-green-200">
-            <span>تم التطوير بكل</span>
-            <Heart className="h-4 w-4 text-red-500 fill-red-500 animate-pulse" />
-            <span className="hidden sm:inline">من أجل خدمة كتاب الله</span>
-          </div>
-
-          <p className="text-xs text-gray-400">الإصدار 1.0.0</p>
-        </div>
+    <footer className="w-full border-t border-green-200 dark:border-green-800 bg-white/80 dark:bg-green-950/70 backdrop-blur supports-[backdrop-filter]:bg-white/65 dark:supports-[backdrop-filter]:bg-green-950/60 mt-auto">
+      <div className="max-w-screen-xl mx-auto px-3 sm:px-4 py-2 flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-3 text-[11px] sm:text-xs leading-tight text-green-700 dark:text-green-200">
+        <span className="font-medium text-green-800 dark:text-green-100">{footerLabels.systemName}</span>
+        <span className="hidden sm:inline text-green-400">•</span>
+        <span className="flex items-center gap-1 text-green-600 dark:text-green-300">
+          {footerLabels.lovePrefix}
+          <Heart className="h-3.5 w-3.5 text-red-500 fill-red-500" />
+          {footerLabels.loveSuffix}
+        </span>
+        <span className="hidden sm:inline text-green-400">•</span>
+        <span className="text-green-600 dark:text-green-300">{footerLabels.version} 1.0.0</span>
+        <span className="hidden sm:inline text-green-400">•</span>
+        <span className="text-green-500 dark:text-green-400">{footerLabels.rightsReserved} © {year}</span>
       </div>
-
     </footer>
-
   );
 }

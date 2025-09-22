@@ -135,3 +135,57 @@ All colors MUST be HSL.
   flex: 0 0 66.6667%;
   max-width: 66.6667%;
 }
+
+/* Custom Scrollbar Styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #dcfce7;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #86efac;
+  border-radius: 10px;
+  border: 1px solid #bbf7d0;
+  transition: background-color 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4ade80;
+}
+
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: #dcfce7;
+}
+
+/* Dark theme scrollbar */
+.dark .custom-scrollbar::-webkit-scrollbar-track {
+  background: #14532d;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #16a34a;
+  border-color: #166534;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #22c55e;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-corner {
+  background: #14532d;
+}
+
+/* Firefox scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #86efac #dcfce7;
+}
+
+.dark .custom-scrollbar {
+  scrollbar-color: #16a34a #14532d;
+}

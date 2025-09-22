@@ -30,7 +30,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Guardian, GuardianCreate, GuardianUpdate } from "@/types/guardian";
 import { StudentCreate } from "@/types/student";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { errorMessages, successMessages, commonLabels, studentsLabels, guardiansLabels } from "@/lib/arabic-labels";
+// Unified labels system
+import { getLabels } from '@/lib/labels';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile } from "@/types/profile";
 import { useToast } from "@/hooks/use-toast";
@@ -121,6 +122,7 @@ interface GuardiansProps {
 
 export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const { toast } = useToast();
+  const { errorMessages, successMessages, commonLabels, studentsLabels, guardiansLabels } = getLabels('ar');
 
   // حالة القائمة
   const [guardians, setGuardians] = useState<Guardian[]>([]);
@@ -174,7 +176,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         }
       }
     } catch (error) {
-      console.error("خطأ في تحميل المعلمين:", error);
+      console.error(errorMessages.dataError + ':', error);
     }
   };
 
@@ -207,8 +209,10 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const [isGeneralAddStudent, setIsGeneralAddStudent] = useState(false);
   const [guardianSearchTerm, setGuardianSearchTerm] = useState<string>("");
   const [studyCircleId, setStudyCircleId] = useState<string>("");
-  const [teacherCircles, setTeacherCircles] = useState<{id: string; name: string; teacher_id?: string}[]>([]);
+  const [teacherCircles, setTeacherCircles] = useState<{ id: string; name: string; teacher_id?: string }[]>([]);
   const [isLoadingTeacherCircles, setIsLoadingTeacherCircles] = useState(false);
+  // كاش للحلقات حسب المعلم لتفادي إعادة الطلب
+  const circlesCacheRef = useState<Record<string, { id: string; name: string; teacher_id?: string }[]>>({})[0];
 
   // 1. أولاً، أضف متغيرات الحالة الجديدة لحوار عرض الطلاب
   const [isStudentsListDialogOpen, setIsStudentsListDialogOpen] = useState(false);
@@ -319,15 +323,15 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         URL.revokeObjectURL(url);
 
         toast({
-          title: "تم تصدير البيانات بنجاح",
+          title: guardiansLabels.exportSuccess,
           className: "bg-green-50 border-green-200",
         });
       } else {
-        setError("فشل تصدير البيانات: " + (result.message || "خطأ غير معروف"));
+        setError(`${guardiansLabels.exportFailed}: ${result.message || guardiansLabels.unknownError}`);
       }
     } catch (err) {
-      console.error("خطأ في تصدير البيانات:", err);
-      setError("تعذر تصدير البيانات");
+      console.error(guardiansLabels.exportFailed + ':', err);
+      setError(guardiansLabels.exportFailedDescription);
     } finally {
       setExportLoading(false);
     }
@@ -355,7 +359,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // إضافة طالب جديد
   const handleAddStudent = (guardianId?: string, isGeneral: boolean = false) => {
-  setteacherSearchTerm("");
+    setteacherSearchTerm("");
     setGuardianSearchTerm("");
     setSelectedGuardianId(guardianId || "");
     setIsGeneralAddStudent(isGeneral);
@@ -384,11 +388,11 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         };
         const result = await addStudent(newStudent);
         if (result.success) {
-          toast({ title: 'تم إضافة الطالب بنجاح', className: 'bg-green-50 border-green-200' });
+          toast({ title: studentsLabels.addSuccess, className: 'bg-green-50 border-green-200' });
           setIsStudentDialogOpen(false);
           loadStudentCounts();
         } else {
-          toast({ title: 'فشل في حفظ بيانات الطالب', description: result.message || 'حدث خطأ غير متوقع', variant: 'destructive' });
+          toast({ title: errorMessages.saveFailed, description: result.message || errorMessages.generalError || 'حدث خطأ غير متوقع', variant: 'destructive' });
         }
       } else {
         const updatedStudent: any = {
@@ -406,16 +410,16 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         const { updateStudent } = await import('@/lib/supabase-service');
         const result = await updateStudent(updatedStudent);
         if (result.success) {
-          toast({ title: 'تم تحديث بيانات الطالب', className: 'bg-green-50 border-green-200' });
+          toast({ title: studentsLabels.updateSuccess, className: 'bg-green-50 border-green-200' });
           setIsStudentDialogOpen(false);
           setSelectedGuardianStudents(prev => prev.map(s => s.id === editingStudentId ? { ...s, ...updatedStudent } : s));
         } else {
-          toast({ title: 'فشل في تحديث بيانات الطالب', description: result.message || 'حدث خطأ غير متوقع', variant: 'destructive' });
+          toast({ title: errorMessages.updateFailed, description: result.message || errorMessages.generalError || 'حدث خطأ غير متوقع', variant: 'destructive' });
         }
       }
     } catch (err) {
       console.error('خطأ في حفظ بيانات الطالب:', err);
-      toast({ title: 'خطأ', description: 'حدث خطأ غير متوقع', variant: 'destructive' });
+      toast({ title: errorMessages.generalError, description: errorMessages.generalError || 'حدث خطأ غير متوقع', variant: 'destructive' });
     }
   };
 
@@ -453,10 +457,16 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   // تحميل الحلقات بعد اختيار المعلم داخل نموذج الطالب (المكون العام)
   const loadCirclesForTeacher = async (tid: string) => {
     if (!tid) { setTeacherCircles([]); return; }
+    // تحقق من الكاش أولاً
+    if (circlesCacheRef[tid]) {
+      setTeacherCircles(circlesCacheRef[tid]);
+      return;
+    }
     setIsLoadingTeacherCircles(true);
     try {
       const circles = await getStudyCirclesByTeacherId(tid);
       setTeacherCircles(circles);
+      circlesCacheRef[tid] = circles;
     } catch (e) {
       console.error('خطأ في تحميل الحلقات للمعلم', tid, e);
       setTeacherCircles([]);
@@ -500,15 +510,15 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         loadGuardians();
       } else {
         toast({
-          title: errorMessages.deleteFailed || "فشل في الحذف",
+          title: errorMessages.deleteFailed,
           description: result.message || guardiansLabels.unexpectedError,
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error("خطأ في حذف ولي الأمر:", error);
+      console.error(errorMessages.deleteFailed + ':', error);
       toast({
-        title: errorMessages.generalError || "خطأ",
+        title: errorMessages.generalError,
         description: guardiansLabels.unexpectedError,
         variant: "destructive",
       });
@@ -556,7 +566,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           loadGuardians();
         } else {
           toast({
-            title: errorMessages.saveFailed || "فشل في الحفظ",
+            title: errorMessages.saveFailed,
             description: result.message || guardiansLabels.unexpectedError,
             variant: "destructive",
           });
@@ -577,7 +587,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
         if (result.success) {
           toast({
-            title: guardiansLabels.updateSuccess || "تم تحديث بيانات ولي الأمر بنجاح",
+            title: guardiansLabels.updateSuccess,
             description: "",
             className: "bg-green-50 border-green-200",
           });
@@ -585,16 +595,16 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           loadGuardians();
         } else {
           toast({
-            title: errorMessages.updateFailed || "فشل في التحديث",
+            title: errorMessages.updateFailed,
             description: result.message || guardiansLabels.unexpectedError,
             variant: "destructive",
           });
         }
       }
     } catch (error) {
-      console.error("خطأ في حفظ بيانات ولي أمر:", error);
+      console.error(errorMessages.saveFailed + ':', error);
       toast({
-        title: errorMessages.generalError || "خطأ",
+        title: errorMessages.generalError,
         description: guardiansLabels.unexpectedError,
         variant: "destructive",
       });
@@ -613,10 +623,10 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
       setSelectedGuardianName(guardianName);
       setIsStudentsListDialogOpen(true);
     } catch (error) {
-      console.error("خطأ في تحميل بيانات الطلاب:", error);
+      console.error(guardiansLabels.studentsLoadErrorTitle + ':', error);
       toast({
-        title: "خطأ في تحميل بيانات الطلاب",
-        description: "حدث خطأ أثناء محاولة تحميل بيانات الطلاب",
+        title: guardiansLabels.studentsLoadErrorTitle,
+        description: guardiansLabels.studentsLoadErrorDescription,
         variant: "destructive",
       });
     } finally {
@@ -646,22 +656,22 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
       const result = await deleteStudent(studentToDelete);
       if (result.success) {
         toast({
-          title: 'تم حذف الطالب بنجاح',
+          title: guardiansLabels.studentDeleteSuccess,
           className: 'bg-green-50 border-green-200'
         });
         setSelectedGuardianStudents(prev => prev.filter(s => s.id !== studentToDelete));
       } else {
         toast({
-          title: 'فشل في حذف الطالب',
-          description: result.message || 'حدث خطأ غير متوقع',
+          title: guardiansLabels.studentDeleteFailed,
+          description: result.message || guardiansLabels.studentDeleteFailedDescription,
           variant: 'destructive'
         });
       }
     } catch (error) {
-      console.error('خطأ في حذف الطالب:', error);
+      console.error(guardiansLabels.studentDeleteUnexpectedError + ':', error);
       toast({
-        title: 'خطأ',
-        description: 'حدث خطأ غير متوقع أثناء حذف الطالب',
+        title: guardiansLabels.studentDeleteFailed,
+        description: guardiansLabels.studentDeleteUnexpectedError,
         variant: 'destructive'
       });
     } finally {
@@ -842,92 +852,87 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               <Button
                 className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
                 onClick={handleAddGuardian}
-                title="إضافة ولي أمر جديد"
+                title={guardiansLabels.addGuardian}
               >
                 {/* الأيقونة */}
                 <span className="text-lg">👤</span>
                 {/* النص يظهر فقط في الديسكتوب */}
-                <span className="hidden sm:inline">إضافة ولي أمر جديد</span>
+                <span className="hidden sm:inline">{guardiansLabels.addGuardian}</span>
               </Button>
 
               <Button
                 className="flex items-center gap-2 rounded-3xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
                 onClick={() => handleAddStudent("", true)}
-                title="إضافة طالب جديد"
+                title={guardiansLabels.addStudent}
               >
                 {/* الأيقونة */}
                 <span className="text-lg">🧒</span>
                 {/* النص يظهر فقط في الديسكتوب */}
-                <span className="hidden sm:inline">إضافة طالب جديد</span>
+                <span className="hidden sm:inline">{guardiansLabels.addStudent}</span>
               </Button>
 
 
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <>
-            {error && (
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
-                <Alert variant="destructive" className="mb-4">
-                  <AlertCircle className="h-4 w-4 ml-2" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              </div>
-            )}
-
-
-
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              {/* حقل البحث */}
-              <div className="relative flex-1">
-                <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder={guardiansLabels.searchPlaceholder}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-3 pr-10 w-full"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                />
-              </div>
-
-              {/* الأزرار */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleSearch}
-                  title={guardiansLabels.search}
-                  className="shrink-0"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => loadGuardians()}
-                  title={guardiansLabels.refresh}
-                  className="shrink-0"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleExportData}
-                  title={guardiansLabels.export}
-                  className="shrink-0"
-                  disabled={exportLoading || guardians.length === 0}
-                >
-                  <FileDown className="h-4 w-4" />
-                </Button>
-              </div>
+        <CardContent className="pb-2">
+          {error && (
+            <div className="flex flex-col md:flex-row justify-between items-center 
+              gap-0 mb-1 bg-white dark:bg-gray-900 p-1 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
+              <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4 ml-2" />
+          <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
+          <div className="flex flex-col md:flex-row gap-3 mb-0">
+            {/* حقل البحث */}
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+          placeholder={guardiansLabels.searchPlaceholder}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-3 pr-10 w-full"
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              />
             </div>
 
-
-          </>
+            {/* الأزرار */}
+            <div className="flex gap-2">
+              <Button
+          variant="outline"
+          size="icon"
+          onClick={handleSearch}
+          title={guardiansLabels.search}
+          className="shrink-0"
+              >
+          <Search className="h-4 w-4" />
+              </Button>
+              <Button
+          variant="outline"
+          size="icon"
+          onClick={() => loadGuardians()}
+          title={guardiansLabels.refresh}
+          className="shrink-0"
+              >
+          <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Button
+          variant="outline"
+          size="icon"
+          onClick={handleExportData}
+          title={guardiansLabels.export}
+          className="shrink-0"
+          disabled={exportLoading || guardians.length === 0}
+              >
+          <FileDown className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
       <GenericTable
         data={paginatedGuardians}
         columns={[
@@ -987,7 +992,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   variant="ghost"
                   onClick={() => handleShowGuardianStudents(guardian.id, guardian.full_name)}
                   className="h-6 px-3 rounded-full font-bold text-white bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 shadow-lg hover:scale-105 transition-all duration-200 text-sm"
-                  title="عرض الطلاب"
+                  title={guardiansLabels.viewStudents}
                 >
                   {guardian.students_count}
                 </Button>
@@ -1015,19 +1020,19 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   size="icon"
                   onClick={() => handleAddStudent(guardian.id)}
                   className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                  title="إضافة طالب"
+                  title={guardiansLabels.addStudentTooltip}
                 >
                   <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
                 </Button>
                 {userRole === 'superadmin' && (
                   <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleDeleteGuardian(guardian)}
-                  className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                  title={guardiansLabels.deleteTooltip}
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteGuardian(guardian)}
+                    className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                    title={guardiansLabels.deleteTooltip}
                   >
-                  <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                    <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
                   </Button>
                 )}
               </div>
@@ -1043,8 +1048,8 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         onOpenChange={setIsDialogOpen}
         onSave={handleSaveGuardian}
         saveButtonText={dialogMode === "add"
-          ? "إضافة ولي أمر جديد"
-          : "تحديث بيانات ولي الأمر"}
+          ? guardiansLabels.addGuardian
+          : guardiansLabels.editGuardian}
         cancelButtonText={guardiansLabels.cancel}
         mode={dialogMode}
       >
@@ -1141,6 +1146,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         allowGuardianSelection={isGeneralAddStudent}
         fixedGuardianId={!isGeneralAddStudent ? selectedGuardianId : undefined}
         onLoadTeacherCircles={loadCirclesForTeacher}
+        isLoadingCircles={isLoadingTeacherCircles}
       />
 
       <Dialog modal={false} open={isStudentsListDialogOpen} onOpenChange={(open) => {
@@ -1156,7 +1162,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               <span className="bg-green-100 p-1.5 rounded-full">
                 <UserCircle className="h-5 w-5 text-green-600" />
               </span>
-              طلاب ولي الأمر: {selectedGuardianName}
+              {guardiansLabels.studentsListTitle}: {selectedGuardianName}
             </DialogTitle>
           </DialogHeader>
 
@@ -1172,7 +1178,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 columns={[
                   {
                     key: 'serial_full_name',
-                    header: '#️⃣👤 الطالب',
+                    header: `#️⃣👤 ${studentsLabels.name}`,
                     align: 'center' as const,
                     render: (student) => (
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-1 text-right">
@@ -1183,7 +1189,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
                   {
                     key: 'grade',
-                    header: '🏫 الدراسي',
+                    header: guardiansLabels.studentGradeHeader,
                     align: 'center' as const,
                     render: (student) =>
                       studentsLabels.gradeOptions.find(g => g.value === student.grade_level)?.label ||
@@ -1192,14 +1198,14 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   },
                   {
                     key: 'gender',
-                    header: '⚧ الجنس',
+                    header: guardiansLabels.studentGenderHeader,
                     align: 'center' as const,
                     render: (student) =>
-                      student.gender === 'male' ? 'ذكر' : student.gender === 'female' ? 'أنثى' : '-',
+                      student.gender === 'male' ? studentsLabels.genderMale : student.gender === 'female' ? studentsLabels.genderFemale : '-',
                   },
                   {
                     key: 'memorized_parts',
-                    header: '📅 آخر حفظ',
+                    header: guardiansLabels.studentLastQuranHeader,
                     align: 'center' as const,
                     render: (student) =>
                       student.memorized_parts ?
@@ -1208,20 +1214,20 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   },
                   {
                     key: 'teacher_name',
-                    header: '👨‍🏫 المعلم',
+                    header: guardiansLabels.studentTeacherHeader,
                     align: 'center' as const,
-                    render: (student) => student.teacher_name || "غير محدد",
+                    render: (student) => student.teacher_name || commonLabels.none,
                   },
                   {
                     key: 'circle_name',
-                    header: '📚 الحلقة',
+                    header: guardiansLabels.studentCircleHeader,
                     align: 'center' as const,
-                    render: (student) => student.circle_name || "غير محدد",
+                    render: (student) => student.circle_name || commonLabels.none,
                   },
                   ...(userRole === 'superadmin' ? [
                     {
                       key: 'actions',
-                      header: '⚙️ الإجراءات',
+                      header: guardiansLabels.studentActionsHeader,
                       align: 'center' as const,
                       render: (student: any) => (
                         <div className="flex justify-center gap-2">
@@ -1230,7 +1236,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                             size="icon"
                             onClick={() => handleEditStudentFromGuardianList(student)}
                             className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                            title="تعديل"
+                            title={guardiansLabels.studentEditTooltip}
                           >
                             <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
                           </Button>
@@ -1239,7 +1245,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                             size="icon"
                             onClick={() => requestDeleteStudent(student.id)}
                             className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                            title="حذف"
+                            title={guardiansLabels.studentDeleteTooltip}
                           >
                             <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
                           </Button>
@@ -1248,7 +1254,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     } as const,
                   ] : []),
                 ]}
-                emptyMessage="لا يوجد طلاب"
+                emptyMessage={guardiansLabels.noStudentsForGuardian}
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
                 getRowClassName={(_, index) =>
                   `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
@@ -1258,14 +1264,14 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             ) : (
               <div className="flex flex-col items-center justify-center py-8">
                 <Database className="h-10 w-10 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">لا يوجد طلاب مرتبطين بولي الأمر</p>
+                <p className="text-muted-foreground">{guardiansLabels.noStudentsForGuardian}</p>
               </div>
             )}
           </div>
 
           <DialogFooter dir="rtl">
             <Button variant="outline" onClick={() => setIsStudentsListDialogOpen(false)}>
-              إغلاق
+              {guardiansLabels.closeDialog}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1277,15 +1283,15 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         onOpenChange={setIsDeleteStudentDialogOpen}
         onConfirm={confirmDeleteStudent}
         isLoading={isProcessingStudentDelete}
-        title="حذف الطالب"
+        title={guardiansLabels.deleteStudentTitle}
         description={
           <>
-            هل أنت متأكد من رغبتك في حذف هذا الطالب؟
+            {guardiansLabels.deleteStudentConfirmation}
             <br />
-            لا يمكن التراجع عن هذه العملية.
+            {guardiansLabels.deleteStudentDescription}
           </>
         }
-        deleteButtonText="تأكيد الحذف"
+        deleteButtonText={guardiansLabels.confirmDeleteStudent}
         cancelButtonText={guardiansLabels.cancel}
       />
 

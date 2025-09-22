@@ -133,13 +133,10 @@ export function GenericTable<T extends { id: string }>(props: {
         return "-";
     }
 
-
     return (
-
-
         <div className={cn('w-full overflow-hidden', className)}>
             {/* العنوان وأدوات التحكم */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-0 mb-2 p-2 rounded-5xl shadow-lg bg-gradient-to-r from-green-500 via-blue to-green-200 dark:from-green-900/30 dark:via-green-800/40 dark:to-green-900/30 border border-green-200 dark:border-green-200">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-0 mb-2 p-2 rounded-5xl shadow-lg bg-gradient-to-r from-green-900 via-blue to-green-500 dark:from-green-900/30 dark:via-green-800/40 dark:to-green-900/30 border border-green-200 dark:border-green-200">
                 {/* القسم الأيسر: العنوان + العدد */}
                 <div className="flex items-center gap-3 hidden md:flex">
                     {/* العنوان للـ desktop */}
@@ -152,11 +149,15 @@ export function GenericTable<T extends { id: string }>(props: {
                 <div className="flex items-center gap-1 sm:gap-3">
                     {/* عدد السجلات */}
                     <div
-                        title="عدد السجلات"
-                        className="flex items-center gap-1 px-2 sm:px-3 py-1 rounded-full bg-gradient-to-r from-green-500 to-green-600 text-white font-bold shadow-md text-xs sm:text-sm"
+                        aria-label="عدد السجلات"
+                        className="flex items-center gap-1 h-7 sm:h-9 px-2 sm:px-3 rounded-lg 
+                                   border border-green-300 dark:border-green-700 
+                                   bg-white/80 dark:bg-green-800/40 
+                                   text-green-800 dark:text-green-100 
+                                   text-[11px] sm:text-xs font-semibold shadow-sm select-none"
                     >
-                        <Hash className="h-3 w-3 sm:h-4 sm:w-4 text-white/90" />
-                        {data.length}
+                        <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-300" />
+                        <span className="leading-none">{sortedData.length}</span>
                     </div>
 
                     {/* زر الترتيب حسب العمود الأول */}
@@ -167,8 +168,8 @@ export function GenericTable<T extends { id: string }>(props: {
                             className={cn(
                                 "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
                                 sortDirection
-                                    ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
-                                    : "bg-white dark:bg-blue-800 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-700"
+                                    ? "bg-blue-600 text-white border-green-600 hover:bg-green-700"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-500 dark:hover:bg-green-200"
                             )}
                             title={sortDirection === 'asc'
                                 ? `ترتيب تصاعدي حسب ${columns[0].header}`
@@ -206,7 +207,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
                                 viewMode === "table"
                                     ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-700"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-500 dark:hover:bg-green-700"
                             )}
                             title="عرض الجدول"
                         >
@@ -222,7 +223,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
                                 viewMode === "card"
                                     ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-100 dark:hover:bg-green-700"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-500 dark:hover:bg-green-700"
                             )}
                             title="عرض البطاقات"
                         >
@@ -265,7 +266,7 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* وضع الجدول */}
             {sortedData.length > 0 && viewMode === 'table' && (
                 <div className="border border-green-200 dark:border-green-700 rounded-2xl overflow-hidden shadow-md bg-white dark:bg-green-950/20">
-                    <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-200px)]">
+                    <div className="overflow-x-auto max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar">
                         <Table className="direction-rtl w-full border-collapse">
                             <TableHeader className="bg-gradient-to-b from-green-800 via-green-600 to-green-500 dark:from-green-900 dark:via-green-800 dark:to-green-700 sticky top-0 z-10">
                                 <TableRow>
@@ -337,7 +338,7 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (
                 <div
-                    className={`grid gap-4 w-full p-2 overflow-y-auto max-h-[calc(100vh-200px)]
+                    className={`grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
                         grid-cols-1 
                         ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
                         ${cardGridColumns.lg ? `lg:grid-cols-${cardGridColumns.lg}` : 'lg:grid-cols-3'} 

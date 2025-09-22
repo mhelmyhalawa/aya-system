@@ -84,3 +84,40 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Extra small phones */
+@media (max-width: 520px) {
+  .heroContent {
+    padding: 0 0.5rem;
+  }
+  .heroContent h1 {
+    font-size: 2.1rem;
+    line-height: 1.15;
+  }
+  .heroContent p {
+    font-size: 1rem;
+  }
+  .ctaButton {
+    padding: 0.65rem 1.2rem;
+    font-size: 0.9rem;
+  }
+  .features {
+    padding: 3rem 0.75rem;
+  }
+  .featureCard {
+    padding: 1.5rem 1.25rem;
+  }
+}
+
+/* Ultra small devices */
+@media (max-width: 380px) {
+  .heroContent h1 {
+    font-size: 1.85rem;
+  }
+  .heroContent p {
+    font-size: 0.95rem;
+  }
+  .ctaButton {
+    font-size: 0.85rem;
+  }
+}

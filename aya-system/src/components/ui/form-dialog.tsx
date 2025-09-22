@@ -96,7 +96,7 @@ export function FormDialog({
     isLoading = false,
     maxWidth = "480px",
     extraButtons,
-    hideCancelButton = false
+    hideCancelButton = true
 }: FormDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,7 +125,7 @@ export function FormDialog({
                         </DialogHeader>
 
                         {/* الجسم */}
-                        <div className="space-y-3 mt-2 pb-24 sm:pb-1 overflow-y-auto px-1 h-[calc(100vh-170px)] sm:h-auto sm:max-h-[55vh]">
+                        <div className="space-y-3 mt-2 pb-24 sm:pb-1 px-1 max-h-[calc(100vh-170px)] sm:max-h-[55vh] overflow-auto">
                             {children}
                         </div>
 

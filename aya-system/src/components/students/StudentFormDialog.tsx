@@ -51,6 +51,8 @@ export interface StudentFormDialogProps {
   allowGuardianSelection?: boolean;
   /** optional callback after successful submit to close externally or refresh */
   onAfterSubmit?: () => void;
+  /** circles loading indicator (passed from parent) */
+  isLoadingCircles?: boolean;
 }
 
 /** Compact classes reused */
@@ -62,8 +64,9 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
     open, mode, onOpenChange, initialData, onSubmit,
     guardians, teachers, studyCircles, isTeacher, currentTeacherId,
     onLoadTeacherCircles, fixedGuardianId, allowGuardianSelection,
-    onAfterSubmit
+    onAfterSubmit, isLoadingCircles
   } = props;
+  const { toast } = useToast();
 
   // wizard
   const steps = [
@@ -89,6 +92,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
   );
   const [studyCircleId, setStudyCircleId] = useState(initialData?.study_circle_id || '');
   const [teacherSearch, setTeacherSearch] = useState('');
+  const [showValidation, setShowValidation] = useState(false);
 
   // reset when opens
   useEffect(() => {
@@ -107,6 +111,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       setStudyCircleId(initialData?.study_circle_id || '');
       setGuardianSearch('');
       setTeacherSearch('');
+      setShowValidation(false);
     }
   }, [open, initialData, isTeacher, currentTeacherId, fixedGuardianId]);
 
@@ -135,7 +140,28 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
   };
 
   const handleNext = () => {
-    if (!validateStep(step)) return;
+    if (!validateStep(step)) {
+      if (!showValidation) setShowValidation(true);
+      // حدد الرسائل المفقودة
+      const missing: string[] = [];
+      if (step === 0) {
+        if (!fullName) missing.push('اسم الطالب');
+        else if (fullName.includes(' ')) missing.push('الاسم بدون مسافات');
+        if (!grade) missing.push('الصف');
+        if (!guardianId) missing.push('ولي الأمر');
+      } else if (step === 1) {
+        if (!isTeacher && !teacherId) missing.push('المعلم');
+        if (!studyCircleId) missing.push('الحلقة');
+      }
+      if (missing.length) {
+        toast({
+          title: 'يرجى استكمال الحقول المطلوبة',
+          description: missing.join('، '),
+          variant: 'destructive'
+        });
+      }
+      return;
+    }
     setStep(s => Math.min(s + 1, steps.length - 1));
   };
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
@@ -217,6 +243,8 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
             <div>
               <Label htmlFor="full_name" className="mb-1 block text-sm font-medium">اسم الطالب <span className="text-destructive">*</span></Label>
               <Input id="full_name" value={fullName} onChange={e => setFullName(e.target.value.replace(/\s+/g, ''))} placeholder="اكتب اسم الطالب دون مسافات" className={`focus:border-islamic-green ${compactFieldClass}`} />
+              {showValidation && step === 0 && !fullName && <p className="text-[11px] text-destructive mt-1">هذا الحقل مطلوب</p>}
+              {showValidation && step === 0 && !!fullName && fullName.includes(' ') && <p className="text-[11px] text-destructive mt-1">يجب أن يكون الاسم دون مسافات</p>}
             </div>
             <div>
               <Label htmlFor="guardian_id" className="mb-1 block text-sm font-medium">{studentsLabels.guardianName} <span className="text-destructive">*</span></Label>
@@ -241,6 +269,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                   <span className="text-sm">{guardians.find(g => g.id === guardianId)?.full_name || 'ولي الأمر محدد'}</span>
                 </div>
               )}
+              {showValidation && step === 0 && !guardianId && <p className="text-[11px] text-destructive mt-1">مطلوب اختيار ولي الأمر</p>}
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
@@ -289,6 +318,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                   </SelectGroup>
                 </SelectContent>
               </Select>
+              {showValidation && step === 0 && !grade && <p className="text-[11px] text-destructive mt-1">مطلوب اختيار الصف</p>}
             </div>
           </div>
         )}
@@ -315,21 +345,27 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                       ))}
                     </SelectContent>
                   </Select>
+                  {showValidation && step === 1 && !isTeacher && !teacherId && <p className="text-[11px] text-destructive mt-1">مطلوب اختيار المعلم</p>}
                 </div>
               )}
             </div>
             <div>
               <Label className="mb-2 block">{studentsLabels.studyCircleName} <span className="text-destructive">*</span></Label>
-              <Select value={studyCircleId} onValueChange={val => setStudyCircleId(val)} disabled={!teacherId && !isTeacher}>
-                <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}><SelectValue placeholder={teacherId || isTeacher ? studentsLabels.studyCirclePlaceholder : 'اختر معلم أولاً'} /></SelectTrigger>
-                <SelectContent position="item-aligned" align="start" side="bottom">
-                  {studyCircles.length > 0 ? (
-                    studyCircles.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)
-                  ) : (
-                    <div className="p-2 text-center text-muted-foreground">{teacherId || isTeacher ? 'لا توجد حلقات' : 'اختر معلم أولاً'}</div>
-                  )}
-                </SelectContent>
-              </Select>
+              {isLoadingCircles ? (
+                <div className="h-9 rounded-md bg-gray-200 animate-pulse flex items-center justify-center text-xs text-gray-500">جار التحميل...</div>
+              ) : (
+                <Select value={studyCircleId} onValueChange={val => setStudyCircleId(val)} disabled={(!teacherId && !isTeacher) || !!isLoadingCircles}>
+                  <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}><SelectValue placeholder={teacherId || isTeacher ? studentsLabels.studyCirclePlaceholder : 'اختر معلم أولاً'} /></SelectTrigger>
+                  <SelectContent position="item-aligned" align="start" side="bottom">
+                    {studyCircles.length > 0 ? (
+                      studyCircles.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)
+                    ) : (
+                      <div className="p-2 text-center text-muted-foreground">{teacherId || isTeacher ? 'لا توجد حلقات' : 'اختر معلم أولاً'}</div>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+              {showValidation && step === 1 && !studyCircleId && <p className="text-[11px] text-destructive mt-1">مطلوب اختيار الحلقة</p>}
             </div>
             <div>
               <Label className="mb-2 block">{studentsLabels.lastQuranProgress} <span className="text-muted-foreground text-xs">{studentsLabels.optionalField}</span></Label>

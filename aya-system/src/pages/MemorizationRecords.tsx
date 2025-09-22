@@ -1069,41 +1069,41 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
       <Card>
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
-                <NotebookPenIcon className="h-5 w-5 text-yellow-300" />
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
+                <NotebookPenIcon className="h-4 w-4 text-yellow-300" />
                 سجلات الحفظ والمراجعة
               </CardTitle>
-              <CardDescription className="text-sm md:text-sm text-green-100 mt-1">
+              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5">
                 إدارة سجلات حفظ ومراجعة الطلاب، مع إمكانية إضافة وتعديل السجلات الحالية.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 
-                bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
+        <CardContent className="p-0.5">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-2 
+            bg-white dark:bg-gray-900 p-2 rounded-xl shadow-sm border border-green-200 dark:border-green-700">
             {/* التابات */}
             <Tabs
               value={activeTab}
               onValueChange={setActiveTab}
-              className="w-full md:w-[420px] bg-green-50 rounded-xl shadow-inner p-1"
+              className="w-full md:w-[380px] bg-green-50 rounded-lg shadow-inner p-0.5"
             >
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-2 gap-1 rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
+              <TabsList className="grid w-full grid-cols-2 gap-0.5 rounded-lg bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
                 {/* Tab جميع السجلات */}
                 <TabsTrigger
                   value="all-records"
                   className="
-                              flex items-center justify-center gap-2 text-center text-sm font-medium
-                              rounded-lg text-green-800
-                              hover:bg-green-100 hover:text-green-900
-                              data-[state=active]:bg-islamic-green
-                              data-[state=active]:text-white
-                              transition-all duration-300
-                            "
+              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+              rounded-md text-green-800 py-1.5 px-2
+              hover:bg-green-100 hover:text-green-900
+              data-[state=active]:bg-islamic-green
+              data-[state=active]:text-white
+              transition-all duration-200
+                "
                   title='جميع السجلات'
                 >
                   📋 <span className="hidden sm:inline">جميع السجلات</span>
@@ -1111,35 +1111,33 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <TabsTrigger
                   value="my-records"
                   className="
-                              flex items-center justify-center gap-2 text-center text-sm font-medium
-                              rounded-lg text-green-800
-                              hover:bg-green-100 hover:text-green-900
-                              data-[state=active]:bg-islamic-green
-                              data-[state=active]:text-white
-                              transition-all duration-300
-                            "
+              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+              rounded-md text-green-800 py-1.5 px-2
+              hover:bg-green-100 hover:text-green-900
+              data-[state=active]:bg-islamic-green
+              data-[state=active]:text-white
+              transition-all duration-200
+                "
                   title='سجلاتي فقط'
                 >
                   👤 <span className="hidden sm:inline">سجلاتي</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <div className="flex flex-wrap gap-2 items-center">
+            <div className="flex gap-2 items-center">
               {/* زر التحديث */}
               <Button
                 variant="outline"
-                className="flex items-center gap-2 rounded-3xl 
-                          bg-green-600 hover:bg-green-700 
-                          dark:bg-green-700 dark:hover:bg-green-600 
-                          text-white shadow-lg hover:scale-105 
-                          transition-transform duration-200 
-                          px-4 py-1.5 font-semibold"
+                className="flex items-center gap-1.5 rounded-2xl 
+              bg-green-600 hover:bg-green-700 
+              dark:bg-green-700 dark:hover:bg-green-600 
+              text-white shadow-md hover:scale-105 
+              transition-transform duration-200 
+              px-3 py-1.5 text-xs font-semibold h-8"
                 onClick={refreshData}
                 title='تحديث البيانات'
               >
-                {/* أيقونة */}
-                <RefreshCwIcon className="h-4 w-4" />
-                {/* النص يظهر على الشاشات md وما فوق */}
+                <RefreshCwIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
 
@@ -1147,24 +1145,22 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               <Button
                 onClick={handleAddNewRecord}
                 variant="outline"
-                className="flex items-center gap-2 rounded-3xl 
-                          bg-green-600 hover:bg-green-700 
-                          dark:bg-green-700 dark:hover:bg-green-600 
-                          text-white shadow-lg hover:scale-105 
-                          transition-transform duration-200 
-                          px-4 py-1.5 font-semibold"
+                className="flex items-center gap-1.5 rounded-2xl 
+              bg-green-600 hover:bg-green-700 
+              dark:bg-green-700 dark:hover:bg-green-600 
+              text-white shadow-md hover:scale-105 
+              transition-transform duration-200 
+              px-3 py-1.5 text-xs font-semibold h-8"
                 title='إضافة سجل جديد'
               >
-                {/* أيقونة */}
-                <Plus className="w-4 h-4" />
-                {/* النص يظهر على الشاشات md وما فوق */}
+                <Plus className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">إضافة سجل جديد</span>
               </Button>
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 bg-white 
-                    dark:bg-gray-900 p-4 md:p-6 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white 
+                    dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700">
 
             <div className="w-full md:flex-1 min-w-0 md:min-w-[180px]">
               <Input
@@ -1252,7 +1248,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   {visibleStudents.map(student => (
                     <SelectItem key={student.id} value={student.id}>
                       <div className="flex flex-col text-sm">
-                        <span className="font-medium">{student.full_name} + {student.guardian?.full_name}</span>
+                        <span className="font-medium">{student.full_name} {student.guardian?.full_name}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -1276,140 +1272,162 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="text-center py-10">جاري التحميل...</div>
-          ) : filteredRecords.length === 0 ? (
-            <h2 className="text-lg font-semibold text-green-800 rounded-2xl shadow-sm">لا توجد سجلات حفظ متطابقة مع معايير البحث</h2>
+        </CardContent>
+      </Card>
 
-          ) :
-            <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
-              data={filteredRecords.map(record => ({
-                ...record,
-                id: record.id.toString()
-              }))}
-              columns={[
-                {
-                  key: 'student',
-                  header: '👦 الطالب',
-                  align: 'right' as const,
-                  render: (record) => (
-                    <div className="font-medium text-right">
-                      {record.student?.full_name}
-                      {record.student?.guardian && (
-                        <div className="text-xs text-red-800 dark:text-red-800">
-                          {" " + record.student.guardian.full_name}
-                        </div>
-                      )}
+
+
+      {isLoading ? (
+        <div className="text-center py-10">جاري التحميل...</div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4 bg-gradient-to-br from-green-50 to-blue-50 rounded-xl border border-green-200 shadow-md mt-4">
+          <div className="text-center">
+            <div className="mb-4">
+              <BookOpen className="h-16 w-16 text-green-300 mx-auto" />
+            </div>
+            <h2 className="text-xl font-semibold text-green-800 mb-2">
+              لا توجد سجلات حفظ متطابقة مع معايير البحث
+            </h2>
+            <p className="text-green-600 text-sm mb-4">
+              جرب تغيير معايير التصفية أو إضافة سجل جديد
+            </p>
+            <Button
+              onClick={handleAddNewRecord}
+              className="bg-islamic-green hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-all shadow-md"
+            >
+              <Plus className="w-4 h-4 ml-2" />
+              إضافة سجل جديد
+            </Button>
+          </div>
+        </div>
+
+      ) :
+        <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
+          data={filteredRecords.map(record => ({
+            ...record,
+            id: record.id.toString()
+          }))}
+          columns={[
+            {
+              key: 'student',
+              header: '👦 الطالب',
+              align: 'right' as const,
+              render: (record) => (
+                <div className="font-medium text-right">
+                  {record.student?.full_name}
+                  {record.student?.guardian && (
+                    <div className="text-xs text-red-800 dark:text-red-800">
+                      {" " + record.student.guardian.full_name}
                     </div>
-                  ),
-                },
-                ...(activeTab !== 'my-records'
-                  ? [
-                    {
-                      key: 'teacher',
-                      header: '👨‍🏫 المعلم',
-                      align: 'right' as const,
-                      render: (record) => record.recorder?.full_name || 'غير معروف',
-                    },
-                  ]
-                  : []),
+                  )}
+                </div>
+              ),
+            },
+            ...(activeTab !== 'my-records'
+              ? [
                 {
-                  key: 'study_circle',
-                  header: '📚 الحلقة',
-                  align: 'right' as const,
-                  render: (record) =>
-                    record.student?.study_circle
-                      ? record.student.study_circle.name || `حلقة ${record.student.study_circle.id}`
-                      : 'غير محدد',
-                },
-                {
-                  key: 'date',
-                  header: '📅 التاريخ',
-                  align: 'right' as const,
-                  render: (record) =>
-                    new Date(record.date).toLocaleDateString('ar-EG', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                    }),
-                },
-                {
-                  key: 'type',
-                  header: '📂 النوع',
-                  align: 'right' as const,
-                  render: (record) => (
-                    <Badge className={`${getMemorizationTypeColor(record.type)} px-2 py-1 rounded-lg`}>
-                      {getMemorizationTypeName(record.type)}
-                    </Badge>
-                  ),
-                },
-                {
-                  key: 'memorization_range',
-                  header: '🔖 نطاق الحفظ',
-                  align: 'right' as const,
-                  render: (record) => {
-                    const compatibleRecord = {
-                      ...record,
-                      id: parseInt(record.id)
-                    };
-                    return formatMemorizationRange(compatibleRecord as MemorizationRecord);
-                  },
-                },
-                {
-                  key: 'score',
-                  header: '🏆 الدرجة',
-                  align: 'right' as const,
-                  render: (record) => formatScore(record.score),
-                },
-                {
-                  key: 'tajweed_errors',
-                  header: '❌ أخطاء التجويد',
-                  align: 'right' as const,
-                  render: (record) => formatTajweedErrors(record.tajweed_errors),
-                },
-                {
-                  key: 'recorder',
-                  header: '🖊 المُسجل بواسطة',
+                  key: 'teacher',
+                  header: '👨‍🏫 المعلم',
                   align: 'right' as const,
                   render: (record) => record.recorder?.full_name || 'غير معروف',
                 },
-                {
-                  key: 'actions',
-                  header: '⚙️ الإجراءات',
-                  align: 'center' as const,
-                  render: (record) => (
-                    <div className="flex justify-center items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditRecord({ ...record, id: parseInt(record.id) })}
-                        className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                        title="تعديل"
-                      >
-                        <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteRecord(parseInt(record.id))}
-                        className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                        title="حذف"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                      </Button>
-                    </div>
-                  ),
-                },
-              ]}
-              emptyMessage="لا توجد سجلات"
-              className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-              getRowClassName={(_, index) =>
-                `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
-              }
-            />
+              ]
+              : []),
+            {
+              key: 'study_circle',
+              header: '📚 الحلقة',
+              align: 'right' as const,
+              render: (record) =>
+                record.student?.study_circle
+                  ? record.student.study_circle.name || `حلقة ${record.student.study_circle.id}`
+                  : 'غير محدد',
+            },
+            {
+              key: 'date',
+              header: '📅 التاريخ',
+              align: 'right' as const,
+              render: (record) =>
+                new Date(record.date).toLocaleDateString('ar-EG', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                }),
+            },
+            {
+              key: 'type',
+              header: '📂 النوع',
+              align: 'right' as const,
+              render: (record) => (
+                <Badge className={`${getMemorizationTypeColor(record.type)} px-2 py-1 rounded-lg`}>
+                  {getMemorizationTypeName(record.type)}
+                </Badge>
+              ),
+            },
+            {
+              key: 'memorization_range',
+              header: '🔖 نطاق الحفظ',
+              align: 'right' as const,
+              render: (record) => {
+                const compatibleRecord = {
+                  ...record,
+                  id: parseInt(record.id)
+                };
+                return formatMemorizationRange(compatibleRecord as MemorizationRecord);
+              },
+            },
+            {
+              key: 'score',
+              header: '🏆 الدرجة',
+              align: 'right' as const,
+              render: (record) => formatScore(record.score),
+            },
+            {
+              key: 'tajweed_errors',
+              header: '❌ أخطاء التجويد',
+              align: 'right' as const,
+              render: (record) => formatTajweedErrors(record.tajweed_errors),
+            },
+            {
+              key: 'recorder',
+              header: '🖊 المُسجل بواسطة',
+              align: 'right' as const,
+              render: (record) => record.recorder?.full_name || 'غير معروف',
+            },
+            {
+              key: 'actions',
+              header: '⚙️ الإجراءات',
+              align: 'center' as const,
+              render: (record) => (
+                <div className="flex justify-center items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleEditRecord({ ...record, id: parseInt(record.id) })}
+                    className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                    title="تعديل"
+                  >
+                    <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeleteRecord(parseInt(record.id))}
+                    className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                    title="حذف"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                  </Button>
+                </div>
+              ),
+            },
+          ]}
+          emptyMessage="لا توجد سجلات"
+          className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+          getRowClassName={(_, index) =>
+            `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
           }
-        </CardContent>
-      </Card>
+        />
+      }
 
       {/* معالج (Wizard) إضافة/تعديل سجل */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -1523,29 +1541,29 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     </Select>
                   </div>
 
-                    <div className="grid gap-2">
+                  <div className="grid gap-2">
                     <Label htmlFor="student" className="flex items-center gap-1">
                       الطالب <span className="text-red-500">*</span>
                     </Label>
                     <Select value={formData.student_id || ''} onValueChange={(value) => handleInputChange('student_id', value)} disabled={!formData.recorded_by}>
                       <SelectTrigger id="student" dir="rtl" className="text-right truncate max-w-full min-w-0">
-                      <SelectValue placeholder="اختر الطالب" />
+                        <SelectValue placeholder="اختر الطالب" />
                       </SelectTrigger>
                       <SelectContent position="popper" dir="rtl" className="max-h-[300px]">
-                      {formFilteredStudents.length > 0 ? (
-                        formFilteredStudents.map(student => (
-                        <SelectItem key={student.id} value={student.id}>
-                          {student.full_name || 'طالب بدون اسم'}
-                          {student.guardian?.full_name ? ` - ${student.guardian.full_name}` : ""}
-                        </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="no-students" disabled>{formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}</SelectItem>
-                      )}
+                        {formFilteredStudents.length > 0 ? (
+                          formFilteredStudents.map(student => (
+                            <SelectItem key={student.id} value={student.id}>
+                              {student.full_name || 'طالب بدون اسم'}
+                              {student.guardian?.full_name ? ` - ${student.guardian.full_name}` : ""}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-students" disabled>{formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     {formErrors.student_id && <p className="text-sm text-red-500">{formErrors.student_id}</p>}
-                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1553,40 +1571,40 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             {wizardStep === 1 && (
               <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2 text-sm">
-                        نوع السجل <span className="text-red-500">*</span>
-                        </Label>
-                        <div className="flex flex-nowrap pb-1 -mx-2 px-2 gap-1 sm:gap-2 sm:flex-wrap mt-2">
-                        {memorizationTypeOptions.map(option => (
-                          <button
+                  <div>
+                    <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2 text-sm">
+                      نوع السجل <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="flex flex-nowrap pb-1 -mx-2 px-2 gap-1 sm:gap-2 sm:flex-wrap mt-2">
+                      {memorizationTypeOptions.map(option => (
+                        <button
                           key={option.value}
                           type="button"
                           onClick={() => handleInputChange('type', option.value)}
                           className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0
-                          ${formData.type === option.value 
-                            ? 'bg-islamic-green text-white shadow-md ring-2 ring-offset-1 ring-islamic-green' 
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                          }`}
-                          >
+                          ${formData.type === option.value
+                              ? 'bg-islamic-green text-white shadow-md ring-2 ring-offset-1 ring-islamic-green'
+                              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            }`}
+                        >
                           {option.label}
-                          </button>
-                        ))}
-                        </div>
-                      {formErrors.type && <p className="text-xs text-red-500 mt-1">{formErrors.type}</p>}
+                        </button>
+                      ))}
                     </div>
+                    {formErrors.type && <p className="text-xs text-red-500 mt-1">{formErrors.type}</p>}
+                  </div>
 
                   <div>
                     <Label htmlFor="date" className="flex items-center gap-1 mb-2 text-sm">
                       التاريخ <span className="text-red-500">*</span>
                     </Label>
-                    <Input 
-                      id="date" 
-                      type="date" 
-                      dir="rtl" 
-                      className="text-right h-9" 
-                      value={formData.date || ''} 
-                      onChange={(e) => handleInputChange('date', e.target.value)} 
+                    <Input
+                      id="date"
+                      type="date"
+                      dir="rtl"
+                      className="text-right h-9"
+                      value={formData.date || ''}
+                      onChange={(e) => handleInputChange('date', e.target.value)}
                     />
                     {formErrors.date && <p className="text-xs text-red-500 mt-1">{formErrors.date}</p>}
                   </div>
@@ -1594,7 +1612,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
                 <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/50 mb-3">
                   <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">نطاق الحفظ</h4>
-                  
+
                   <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
                       <Label htmlFor="from_surah" className="flex items-center gap-1 mb-1 text-xs">
@@ -1619,14 +1637,14 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       <Label htmlFor="from_ayah" className="flex items-center gap-1 mb-1 text-xs">
                         من آية <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        id="from_ayah" 
-                        type="number" 
-                        min={1} 
-                        dir="rtl" 
-                        className="text-right h-9 text-sm" 
-                        value={formData.from_ayah || ''} 
-                        onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))} 
+                      <Input
+                        id="from_ayah"
+                        type="number"
+                        min={1}
+                        dir="rtl"
+                        className="text-right h-9 text-sm"
+                        value={formData.from_ayah || ''}
+                        onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))}
                       />
                       {formErrors.from_ayah && <p className="text-xs text-red-500 mt-1">{formErrors.from_ayah}</p>}
                     </div>
@@ -1656,14 +1674,14 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       <Label htmlFor="to_ayah" className="flex items-center gap-1 mb-1 text-xs">
                         إلى آية <span className="text-red-500">*</span>
                       </Label>
-                      <Input 
-                        id="to_ayah" 
-                        type="number" 
-                        min={1} 
-                        dir="rtl" 
-                        className="text-right h-9 text-sm" 
-                        value={formData.to_ayah || ''} 
-                        onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))} 
+                      <Input
+                        id="to_ayah"
+                        type="number"
+                        min={1}
+                        dir="rtl"
+                        className="text-right h-9 text-sm"
+                        value={formData.to_ayah || ''}
+                        onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))}
                       />
                       {formErrors.to_ayah && <p className="text-xs text-red-500 mt-1">{formErrors.to_ayah}</p>}
                     </div>
@@ -1674,12 +1692,12 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-2 rounded border border-gray-200 dark:border-gray-700">
                   <p>قم بتحديد نطاق الحفظ أو المراجعة بشكل دقيق حتى يمكن متابعة تقدم الطالب.</p>
                 </div>
-                
+
               </div>
             )}
 
             {wizardStep === 2 && (
-               <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
                   <div className="grid grid-cols-1 gap-4">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -37,7 +37,8 @@ import {
   deleteStudyCircle
 } from "@/lib/study-circle-service";
 import { getteachers } from "@/lib/profile-service";
-import { studyCirclesLabels, errorMessages, commonLabels } from "@/lib/arabic-labels";
+import { getLabels } from "@/lib/labels";
+const { studyCirclesLabels, errorMessages, commonLabels } = getLabels('ar');
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
 import { StudyCircleSchedule, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
@@ -116,8 +117,8 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
       setCircles(data);
     } catch (error) {
-      console.error("خطأ في تحميل الحلقات:", error);
-      setError("فشل في تحميل بيانات الحلقات");
+      console.error(studyCirclesLabels.circleLoadError + ':', error);
+      setError(studyCirclesLabels.circleLoadError);
     } finally {
       setLoading(false);
     }
@@ -129,7 +130,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
       const data = await getteachers();
       setTeachers(data);
     } catch (error) {
-      console.error("خطأ في تحميل المعلمين:", error);
+      console.error(errorMessages.fetchFailed + ':', error);
     }
   };
 
@@ -188,10 +189,10 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         });
       }
     } catch (error) {
-      console.error("خطأ في حذف الحلقة:", error);
+      console.error(errorMessages.deleteFailed + ':', error);
       toast({
         title: errorMessages.generalError,
-        description: "حدث خطأ غير متوقع",
+        description: errorMessages.operationFailed,
         variant: "destructive",
       });
     } finally {
@@ -221,11 +222,11 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
       const schedules = await getStudyCircleSchedules(circleId);
       setCircleSchedules(schedules);
     } catch (error) {
-      console.error("خطأ في تحميل جدولة الحلقة:", error);
+      console.error(studyCirclesLabels.schedule.loadErrorTitle + ':', error);
       toast({
-        title: "خطأ في تحميل الجدولة",
-        description: "حدث خطأ أثناء تحميل مواعيد الحلقة",
-        variant: "destructive",
+        title: studyCirclesLabels.schedule.loadErrorTitle,
+        description: studyCirclesLabels.schedule.loadErrorDescription,
+        variant: 'destructive'
       });
     } finally {
       setLoadingSchedules(false);
@@ -243,9 +244,9 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   const handleSaveNewSchedule = async () => {
     if (!addScheduleForm.start_time || !addScheduleForm.end_time) {
       toast({
-        title: "بيانات غير مكتملة",
-        description: "يرجى تحديد وقت البداية والنهاية",
-        variant: "destructive",
+        title: studyCirclesLabels.schedule.validate.incompleteTitle,
+        description: studyCirclesLabels.schedule.validate.incompleteDescription,
+        variant: 'destructive'
       });
       return;
     }
@@ -264,26 +265,26 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
       if (result.success) {
         toast({
-          title: "تمت الإضافة بنجاح",
-          description: "تم إضافة الموعد الجديد بنجاح",
-          className: "bg-green-50 border-green-200",
+          title: studyCirclesLabels.schedule.toast.addSuccessTitle,
+          description: studyCirclesLabels.schedule.toast.addSuccessDescription,
+          className: 'bg-green-50 border-green-200'
         });
         setOpenAddScheduleDialog(false);
         // إعادة تحميل الجدولة
         await loadCircleSchedules(selectedCircleForSchedule!.id);
       } else {
         toast({
-          title: "فشل في إضافة الموعد",
-          description: result.message || "حدث خطأ أثناء إضافة الموعد الجديد",
-          variant: "destructive",
+          title: studyCirclesLabels.schedule.toast.addFailedTitle,
+          description: result.message || studyCirclesLabels.schedule.toast.addFailedDescription,
+          variant: 'destructive'
         });
       }
     } catch (error) {
-      console.error("خطأ في إضافة موعد جديد:", error);
+      console.error(studyCirclesLabels.schedule.toast.unexpectedErrorTitle + ':', error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع أثناء إضافة الموعد",
-        variant: "destructive",
+        title: studyCirclesLabels.schedule.toast.unexpectedErrorTitle,
+        description: studyCirclesLabels.schedule.toast.unexpectedErrorDescription,
+        variant: 'destructive'
       });
     } finally {
       setSavingNewSchedule(false);
@@ -307,9 +308,9 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   const handleSaveScheduleEdit = async () => {
     if (!editScheduleForm.start_time || !editScheduleForm.end_time) {
       toast({
-        title: "بيانات غير مكتملة",
-        description: "يرجى تحديد وقت البداية والنهاية",
-        variant: "destructive",
+        title: studyCirclesLabels.schedule.validate.incompleteTitle,
+        description: studyCirclesLabels.schedule.validate.incompleteDescription,
+        variant: 'destructive'
       });
       return;
     }
@@ -328,26 +329,26 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
       if (result.success) {
         toast({
-          title: "تم التعديل بنجاح",
-          description: "تم تعديل الموعد بنجاح",
-          className: "bg-green-50 border-green-200",
+          title: studyCirclesLabels.schedule.toast.editSuccessTitle,
+          description: studyCirclesLabels.schedule.toast.editSuccessDescription,
+          className: 'bg-green-50 border-green-200'
         });
         setOpenEditScheduleDialog(false);
         // إعادة تحميل الجدولة
         await loadCircleSchedules(selectedCircleForSchedule!.id);
       } else {
         toast({
-          title: "فشل في تعديل الموعد",
-          description: result.message || "حدث خطأ أثناء تعديل الموعد",
-          variant: "destructive",
+          title: studyCirclesLabels.schedule.toast.editFailedTitle,
+          description: result.message || studyCirclesLabels.schedule.toast.editFailedDescription,
+          variant: 'destructive'
         });
       }
     } catch (error) {
-      console.error("خطأ في تعديل الموعد:", error);
+      console.error(studyCirclesLabels.schedule.toast.unexpectedErrorTitle + ':', error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع أثناء تعديل الموعد",
-        variant: "destructive",
+        title: studyCirclesLabels.schedule.toast.unexpectedErrorTitle,
+        description: studyCirclesLabels.schedule.toast.unexpectedErrorDescription,
+        variant: 'destructive'
       });
     } finally {
       setSavingScheduleEdit(false);
@@ -370,25 +371,25 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
       if (result.success) {
         toast({
-          title: "تم الحذف بنجاح",
-          description: "تم حذف الموعد بنجاح",
-          className: "bg-green-50 border-green-200",
+          title: studyCirclesLabels.schedule.toast.deleteSuccessTitle,
+          description: studyCirclesLabels.schedule.toast.deleteSuccessDescription,
+          className: 'bg-green-50 border-green-200'
         });
         // إعادة تحميل الجدولة
         await loadCircleSchedules(selectedCircleForSchedule!.id);
       } else {
         toast({
-          title: "فشل في حذف الموعد",
-          description: result.message || "حدث خطأ أثناء حذف الموعد",
-          variant: "destructive",
+          title: studyCirclesLabels.schedule.toast.deleteFailedTitle,
+          description: result.message || studyCirclesLabels.schedule.toast.deleteFailedDescription,
+          variant: 'destructive'
         });
       }
     } catch (error) {
-      console.error("خطأ في حذف الموعد:", error);
+      console.error(studyCirclesLabels.schedule.toast.unexpectedErrorTitle + ':', error);
       toast({
-        title: "خطأ",
-        description: "حدث خطأ غير متوقع أثناء حذف الموعد",
-        variant: "destructive",
+        title: studyCirclesLabels.schedule.toast.unexpectedErrorTitle,
+        description: studyCirclesLabels.schedule.toast.unexpectedErrorDescription,
+        variant: 'destructive'
       });
     }
   };
@@ -405,17 +406,9 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
   // دالة محسّنة للحصول على اسم اليوم من الرقم
   const getWeekdayNameFixed = (weekday: number | string): string => {
-    const weekdayMap = {
-      '0': 'الأحد',
-      '1': 'الإثنين',
-      '2': 'الثلاثاء',
-      '3': 'الأربعاء',
-      '4': 'الخميس',
-      '5': 'الجمعة',
-      '6': 'السبت'
-    };
+    const map = studyCirclesLabels.schedule.weekdayNames as Record<string, string>;
     const weekdayStr = String(weekday);
-    return weekdayMap[weekdayStr] || `غير معروف (${weekdayStr})`;
+    return map[weekdayStr] || `${studyCirclesLabels.schedule.weekdayUnknown} (${weekdayStr})`;
   };
 
   // حفظ الحلقة
@@ -507,9 +500,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             {errorMessages.accessDenied}
           </h2>
 
-          <p className="text-gray-600 dark:text-gray-300">
-            ليس لديك الصلاحيات اللازمة للوصول إلى هذه الصفحة
-          </p>
+          <p className="text-gray-600 dark:text-gray-300">{errorMessages.accessDenied}</p>
 
           <Button
             onClick={() => onNavigate('/')}
@@ -528,7 +519,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   const tableColumns: Column<StudyCircleSchedule>[] = [
     {
       key: 'weekday',
-      header: 'اليوم',
+      header: studyCirclesLabels.schedule.table.weekday,
       render: (schedule) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-green-700 dark:text-green-300" />
@@ -538,7 +529,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     },
     {
       key: 'time',
-      header: 'الوقت',
+      header: studyCirclesLabels.schedule.table.time,
       render: (schedule) => (
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-blue-700 dark:text-blue-300" />
@@ -548,17 +539,17 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     },
     {
       key: 'location',
-      header: 'الموقع',
+      header: studyCirclesLabels.schedule.table.location,
       render: (schedule) => (
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-orange-700 dark:text-orange-300" />
-          <span>{schedule.location || 'الموقع الافتراضي'}</span>
+          <span>{schedule.location || studyCirclesLabels.schedule.table.defaultLocation}</span>
         </div>
       )
     },
     ...(userRole === 'superadmin' || userRole === 'admin' ? [{
       key: 'actions',
-      header: 'الإجراءات',
+      header: studyCirclesLabels.schedule.table.actions,
       align: 'center' as const,
       render: (schedule) => (
         <div className="flex items-center justify-center gap-2">
@@ -587,196 +578,183 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   return (
     <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
 
-      <Card>
-        {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+      <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
+        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
+          <div className="space-y-0.5 sm:space-y-1">
+            <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
+              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-300" />
+              <span className="truncate max-w-[180px] sm:max-w-none">{studyCirclesLabels.title}</span>
+            </CardTitle>
+            <CardDescription className="text-[10px] sm:text-xs text-green-100 leading-relaxed">
+              {studyCirclesLabels.description}
+            </CardDescription>
+          </div>
 
-            {/* العنوان والوصف */}
-            <div className="flex flex-col">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-yellow-300" />
-                {studyCirclesLabels.title}
-              </CardTitle>
-              <CardDescription className="text-xs md:text-sm text-green-100 mt-1">
-                {studyCirclesLabels.description}
-              </CardDescription>
-            </div>
-
-            {/* الأزرار */}
-            <div className="flex flex-wrap gap-2 md:gap-3 items-center">
-              {(userRole === 'superadmin' || userRole === 'admin') && (
+          <div className="flex gap-1 sm:gap-1.5">
+            {(userRole === 'superadmin' || userRole === 'admin') && (
+              <>
                 <Button
-                  variant="outline"
-                  className="flex items-center gap-2 rounded-3xl border-2 border-green-600 text-green-900 
-                    hover:bg-green-100 hover:text-green-800 hover:scale-105 
-                    dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
-                    shadow-lg transition-all duration-200 px-3 md:px-4 py-1.5 font-semibold"
+                  size="sm"
+                  className="h-7 sm:h-8 px-2 sm:px-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm transition-colors text-[11px] sm:text-xs"
                   onClick={() => onNavigate('/study-circle-schedules')}
-                  title="الانتقال إلى صفحة جدولة الحلقات"
+                  title={studyCirclesLabels.navigateToSchedulesTooltip}
                 >
-                  <Calendar className="h-4 w-4" />
-                  <span className="hidden md:inline text-sm">{'جدولة الحلقات'}</span>
+                  <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  <span className="sr-only md:not-sr-only md:ml-1 md:text-[11px] sm:md:text-xs">
+                  {studyCirclesLabels.manageSchedules}
+                  </span>
                 </Button>
-              )}
-
-              {(userRole === 'superadmin' || userRole === 'admin') && (
                 <Button
+                  size="sm"
+                  className="h-7 sm:h-8 px-2 sm:px-2.5 rounded-full bg-white text-green-700 hover:bg-green-500 border border-green-200 shadow-sm transition-colors text-[11px] sm:text-xs"
                   onClick={handleAddCircle}
-                  className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-3 md:px-4 py-1.5 font-semibold"
-                  title="إضافة حلقة جديدة"
+                  title={studyCirclesLabels.addCircle}
                 >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden md:inline text-sm">{studyCirclesLabels.addCircle}</span>
+                  <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                  <span className="sr-only md:not-sr-only md:ml-1 md:text-[11px] sm:md:text-xs">
+                  {studyCirclesLabels.addCircle}
+                  </span>
                 </Button>
-              )}
-            </div>
-
+              </>
+            )}
           </div>
         </CardHeader>
 
-
-        {/* المحتوى */}
-        <CardContent>
+        <CardContent className="pt-2 sm:pt-3 pb-0 px-3 sm:px-4">
           {error && (
-            <Alert variant="destructive" className="mb-4 rounded-lg shadow-sm">
+            <Alert variant="destructive" className="mb-3 py-2 text-sm">
               <AlertCircle className="h-4 w-4 ml-2" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
-          {/* البحث */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-3 h-4 w-4 text-green-400 dark:text-green-300" />
-              <Input
-                placeholder="🔍 البحث في الحلقات..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-3 pr-10 w-full rounded-xl border border-green-300 dark:border-green-600 focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 transition-all"
-              />
-            </div>
+          <div className="relative mb-3 sm:mb-4">
+            <Search className="absolute right-2.5 sm:right-3 top-2 sm:top-2.5 h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
+            <Input
+              placeholder={studyCirclesLabels.searchPlaceholder}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pr-8 sm:pr-9 h-8 sm:h-9 rounded-md sm:rounded-lg border-green-200 text-[12px] sm:text-sm"
+            />
           </div>
-
-          {/* جدول الحلقات باستخدام المكون العام */}
-          {(() => {
-            const columns: Column<StudyCircle>[] = [
-              {
-                key: 'name',
-                header: `� ${studyCirclesLabels.name}`,
-                important: true,
-                render: (c) => <span className="font-medium">{c.name}</span>
-              },
-              {
-                key: 'teacher',
-                header: `👨‍🏫 ${studyCirclesLabels.teacher}`,
-                render: (c) => (
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-green-700 dark:text-green-300" />
-                    <span>{c.teacher?.full_name || 'غير محدد'}</span>
-                  </div>
-                )
-              },
-              {
-                key: 'max_students',
-                header: `👥 ${studyCirclesLabels.maxStudents}`,
-                align: 'center',
-                render: (c) => c.max_students ? (
-                  <div className="flex gap-1">
-                    <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
-                    <span>{c.max_students}</span>
-                  </div>
-                ) : <span className="text-green-500/60">-</span>
-              },
-              ...((userRole === 'superadmin' || userRole === 'admin') ? [{
-                key: 'actions',
-                header: '⚙️ الإجراءات',
-                align: 'center' as const,
-                render: (c: StudyCircle) => (
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleOpenScheduleDialog(c)}
-                      className="h-8 w-8 text-green-600 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-700 dark:hover:text-green-200 rounded-full"
-                      title="جدولة الحلقة"
-                    >
-                      <Calendar size={16} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEditCircle(c)}
-                      className="h-8 w-8 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-800 dark:hover:text-green-200 rounded-full"
-                      title={studyCirclesLabels.editTooltip}
-                    >
-                      <Pencil size={16} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteCircle(c)}
-                      className="h-8 w-8 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-800 hover:text-red-500 dark:hover:text-red-400 rounded-full"
-                      title={studyCirclesLabels.deleteTooltip}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                )
-              }] : [])
-            ];
-
-            return (
-              <GenericTable
-                data={filteredCircles}
-                columns={columns}
-                title="الحلقات"
-                emptyMessage={searchTerm ? 'لا توجد نتائج مطابقة للبحث' : studyCirclesLabels.noCircles}
-                onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddCircle : undefined}
-                onRefresh={loadCircles}
-                cardMaxFieldsCollapsed={4}
-                cardPrimaryActions={(c) => (
-                  (userRole === 'superadmin' || userRole === 'admin') ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditCircle(c)}
-                        className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700"
-                      >
-                        <Pencil className="h-3 w-3 ml-1" />
-                        <span className="hidden sm:inline">تعديل</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteCircle(c)}
-                        className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/30"
-                      >
-                        <Trash2 className="h-3 w-3 ml-1" />
-                        <span className="hidden sm:inline">حذف</span>
-                      </Button>
-                    </>
-                  ) : null
-                )}
-                cardActions={(c) => (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleOpenScheduleDialog(c)}
-                    className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700"
-                  >
-                    <Calendar className="h-3 w-3 ml-1" />
-                    <span className="hidden sm:inline">الجدولة</span>
-                  </Button>
-                )}
-              />
-            );
-          })()}
         </CardContent>
       </Card>
 
+      {/* جدول الحلقات باستخدام المكون العام */}
+      {(() => {
+        const columns: Column<StudyCircle>[] = [
+          {
+            key: 'name',
+            header: `📘 ${studyCirclesLabels.name}`,
+            important: true,
+            render: (c) => <span className="font-medium">{c.name}</span>
+          },
+          {
+            key: 'teacher',
+            header: `👨‍🏫 ${studyCirclesLabels.teacher}`,
+            render: (c) => (
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-green-700 dark:text-green-300" />
+                <span>{c.teacher?.full_name || studyCirclesLabels.unassignedTeacher}</span>
+              </div>
+            )
+          },
+          {
+            key: 'max_students',
+            header: `👥 ${studyCirclesLabels.maxStudents}`,
+            align: 'center',
+            render: (c) => c.max_students ? (
+              <div className="flex gap-1">
+                <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
+                <span>{c.max_students}</span>
+              </div>
+            ) : <span className="text-green-500/60">-</span>
+          },
+          ...((userRole === 'superadmin' || userRole === 'admin') ? [{
+            key: 'actions',
+            header: `⚙️ ${studyCirclesLabels.actions}`,
+            align: 'center' as const,
+            render: (c: StudyCircle) => (
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleOpenScheduleDialog(c)}
+                  className="h-8 w-8 text-green-600 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-700 dark:hover:text-green-200 rounded-full"
+                  title={studyCirclesLabels.scheduleTooltip}
+                >
+                  <Calendar size={16} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleEditCircle(c)}
+                  className="h-8 w-8 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-700 hover:text-green-800 dark:hover:text-green-200 rounded-full"
+                  title={studyCirclesLabels.editTooltip}
+                >
+                  <Pencil size={16} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDeleteCircle(c)}
+                  className="h-8 w-8 text-red-400 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-800 hover:text-red-500 dark:hover:text-red-400 rounded-full"
+                  title={studyCirclesLabels.deleteTooltip}
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
+            )
+          }] : [])
+        ];
 
+        return (
+          <GenericTable
+            data={filteredCircles}
+            columns={columns}
+            title={studyCirclesLabels.title}
+            emptyMessage={searchTerm ? studyCirclesLabels.searchNoResults : studyCirclesLabels.noCircles}
+            onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddCircle : undefined}
+            onRefresh={loadCircles}
+            cardMaxFieldsCollapsed={4}
+            cardPrimaryActions={(c) => (
+              (userRole === 'superadmin' || userRole === 'admin') ? (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditCircle(c)}
+                    className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700"
+                  >
+                    <Pencil className="h-3 w-3 ml-1" />
+                    <span className="hidden sm:inline">{studyCirclesLabels.editTooltip}</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteCircle(c)}
+                    className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-600 dark:text-red-400 dark:hover:bg-red-900/30"
+                  >
+                    <Trash2 className="h-3 w-3 ml-1" />
+                    <span className="hidden sm:inline">{studyCirclesLabels.deleteTooltip}</span>
+                  </Button>
+                </>
+              ) : null
+            )}
+            cardActions={(c) => (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenScheduleDialog(c)}
+                className="border-green-600 text-green-700 hover:bg-green-50 dark:border-green-500 dark:text-green-300 dark:hover:bg-green-700"
+              >
+                <Calendar className="h-3 w-3 ml-1" />
+                <span className="hidden sm:inline">{studyCirclesLabels.scheduleButtonLabel}</span>
+              </Button>
+            )}
+          />
+        );
+      })()}
 
       <FormDialog
         title={dialogTitle}
@@ -796,7 +774,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               id="name"
               value={circleName}
               onChange={(e) => setCircleName(e.target.value)}
-              placeholder="أدخل اسم الحلقة"
+              placeholder={studyCirclesLabels.name}
               className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 text-right"
             />
           </FormRow>
@@ -870,19 +848,19 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           >
             {/* العنوان في النص */}
             <h2 className="text-sm sm:text-lg font-extrabold tracking-wide drop-shadow-md text-center flex-1">
-              جدولة حلقة {selectedCircleForSchedule?.name || ""}
+              {`${studyCirclesLabels.schedule.openDialogTitlePrefix} ${selectedCircleForSchedule?.name || ""}`}
             </h2>
 
             {/* الأزرار على اليسار */}
             <div className="absolute left-3 sm:left-4 flex gap-2">
               {(userRole === "superadmin" || userRole === "admin") && (
                 <Button
-                  title="إضافة موعد جديد للحلقة"
+                  title={studyCirclesLabels.schedule.addButtonTooltip}
                   onClick={handleAddSchedule}
                   className="flex items-center gap-1 sm:gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] sm:text-sm px-2 sm:px-3 py-0.5 sm:py-1.5 rounded-lg shadow-md border border-white/30 transition-all duration-200 h-6 sm:h-8"
                 >
                   <Plus className="h-2.5 w-2.5 sm:h-4 sm:w-4" />
-                  <span className="hidden sm:inline ml-1">إضافة موعد</span>
+                  <span className="hidden sm:inline ml-1">{studyCirclesLabels.schedule.addDialog.title}</span>
                 </Button>
 
               )}
@@ -898,7 +876,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 <div className="flex flex-col items-center justify-center">
                   <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-islamic-green mb-2 sm:mb-4"></div>
                   <span className="text-xs sm:text-sm text-muted-foreground">
-                    جاري تحميل جدولة الحلقة...
+                    {studyCirclesLabels.schedule.loading}
                   </span>
                 </div>
               </div>
@@ -906,10 +884,10 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               <div className="text-center p-4 sm:p-8 bg-white/30 rounded-lg shadow-sm">
                 <Calendar className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground mb-2 sm:mb-4" />
                 <h3 className="font-medium text-sm sm:text-lg mb-1 sm:mb-2">
-                  لا توجد مواعيد محددة
+                  {studyCirclesLabels.schedule.noSchedulesTitle}
                 </h3>
                 <p className="text-muted-foreground text-xs sm:text-sm mb-2 sm:mb-4">
-                  لم يتم تسجيل أي مواعيد لهذه الحلقة بعد
+                  {studyCirclesLabels.schedule.noSchedulesDescription}
                 </p>
                 {(userRole === "superadmin" || userRole === "admin") && (
                   <Button
@@ -917,12 +895,12 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                     className="bg-islamic-green hover:bg-islamic-green/90 text-white text-xs sm:text-sm px-2 py-1 sm:px-3 sm:py-2"
                   >
                     <Plus className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-                    إضافة أول موعد
+                    {studyCirclesLabels.schedule.addFirstSchedule}
                   </Button>
                 )}
                 {userRole === "teacher" && (
                   <p className="text-muted-foreground text-[9px] sm:text-sm mt-2">
-                    لا يمكن للمعلمين إضافة مواعيد. يرجى التواصل مع الإدارة.
+                    {studyCirclesLabels.schedule.teacherCannotAdd}
                   </p>
                 )}
               </div>
@@ -942,18 +920,19 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
       {/* إضافة موعد جديد */}
       <FormDialog
-        title="إضافة موعد جديد"
-        description="قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة"
+        title={studyCirclesLabels.schedule.addDialog.title}
+        description={studyCirclesLabels.schedule.addDialog.description}
         open={openAddScheduleDialog}
         onOpenChange={setOpenAddScheduleDialog}
         onSave={handleSaveNewSchedule}
         isLoading={savingNewSchedule}
-        saveButtonText={savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
+        hideCancelButton={true}
+        saveButtonText={savingNewSchedule ? studyCirclesLabels.schedule.addDialog.saving : studyCirclesLabels.schedule.addDialog.save}
         mode="add"
       >
         <div className="space-y-4">
           {/* اليوم كأزرار عصرية */}
-          <FormRow label="اليوم *">
+          <FormRow label={studyCirclesLabels.schedule.fields.weekday}>
             <div className="flex flex-wrap gap-2 justify-center">
               {weekdayOptions.map(day => (
                 <button
@@ -977,7 +956,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
           {/* وقت البداية والنهاية */}
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="وقت البداية *">
+            <FormRow label={studyCirclesLabels.schedule.fields.startTime}>
               <Input
                 id="add-schedule-start-time"
                 type="time"
@@ -988,7 +967,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               />
             </FormRow>
 
-            <FormRow label="وقت النهاية *">
+            <FormRow label={studyCirclesLabels.schedule.fields.endTime}>
               <Input
                 id="add-schedule-end-time"
                 type="time"
@@ -1001,16 +980,16 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           </div>
 
           {/* الموقع */}
-          <FormRow label="الموقع (اختياري)">
+          <FormRow label={studyCirclesLabels.schedule.fields.locationOptional}>
             <div className="flex items-center text-xs text-gray-500 mb-1">
               <Info className="h-3 w-3 ml-1" />
-              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+              {studyCirclesLabels.schedule.fields.locationHelp}
             </div>
             <Input
               id="add-schedule-location"
               value={addScheduleForm.location}
               onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
-              placeholder="أدخل موقع الموعد (اختياري)"
+              placeholder={studyCirclesLabels.schedule.fields.locationPlaceholder}
               className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
             />
           </FormRow>
@@ -1019,18 +998,18 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
       {/* تعديل موعد */}
       <FormDialog
-        title="تعديل موعد"
-        description="قم بتعديل بيانات الموعد"
+        title={studyCirclesLabels.schedule.editDialog.title}
+        description={studyCirclesLabels.schedule.editDialog.description}
         open={openEditScheduleDialog}
         onOpenChange={setOpenEditScheduleDialog}
         onSave={handleSaveScheduleEdit}
         isLoading={savingScheduleEdit}
-        saveButtonText={savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+        saveButtonText={savingScheduleEdit ? studyCirclesLabels.schedule.editDialog.saving : studyCirclesLabels.schedule.editDialog.save}
         mode="edit"
       >
         <div className="space-y-4">
           {/* اليوم كأزرار عصرية */}
-          <FormRow label="اليوم *">
+          <FormRow label={studyCirclesLabels.schedule.fields.weekday}>
             <div className="flex flex-wrap gap-2 justify-center">
               {weekdayOptions.map(day => (
                 <button
@@ -1054,7 +1033,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
           {/* وقت البداية والنهاية */}
           <div className="grid grid-cols-2 gap-4">
-            <FormRow label="وقت البداية *">
+            <FormRow label={studyCirclesLabels.schedule.fields.startTime}>
               <Input
                 id="edit-schedule-start-time"
                 type="time"
@@ -1065,7 +1044,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               />
             </FormRow>
 
-            <FormRow label="وقت النهاية *">
+            <FormRow label={studyCirclesLabels.schedule.fields.endTime}>
               <Input
                 id="edit-schedule-end-time"
                 type="time"
@@ -1078,16 +1057,16 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           </div>
 
           {/* الموقع */}
-          <FormRow label="الموقع (اختياري)">
+          <FormRow label={studyCirclesLabels.schedule.fields.locationOptional}>
             <div className="flex items-center text-xs text-gray-500 mb-1">
               <Info className="h-3 w-3 ml-1" />
-              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+              {studyCirclesLabels.schedule.fields.locationHelp}
             </div>
             <Input
               id="edit-schedule-location"
               value={editScheduleForm.location}
               onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
-              placeholder="أدخل موقع الموعد (اختياري)"
+              placeholder={studyCirclesLabels.schedule.fields.locationPlaceholder}
               className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
             />
           </FormRow>
@@ -1100,15 +1079,15 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         onOpenChange={setIsDeleteScheduleDialogOpen}
         onConfirm={executeDeleteSchedule}
         isLoading={false}
-        title="تأكيد حذف الموعد"
-        description="هل أنت متأكد من رغبتك في حذف هذا الموعد من جدول الحلقة؟"
+        title={studyCirclesLabels.schedule.deleteDialog.title}
+        description={studyCirclesLabels.schedule.deleteDialog.description}
         itemDetails={scheduleToDelete ? {
-          "اليوم": getWeekdayNameFixed(scheduleToDelete.weekday),
-          "الوقت": `${scheduleToDelete.start_time} - ${scheduleToDelete.end_time}`,
-          "المكان": scheduleToDelete.location || "-"
+          [studyCirclesLabels.schedule.deleteDialog.weekdayLabel]: getWeekdayNameFixed(scheduleToDelete.weekday),
+          [studyCirclesLabels.schedule.deleteDialog.timeLabel]: `${scheduleToDelete.start_time} - ${scheduleToDelete.end_time}`,
+          [studyCirclesLabels.schedule.deleteDialog.locationLabel]: scheduleToDelete.location || "-"
         } : null}
-        deleteButtonText="نعم، احذف الموعد"
-        cancelButtonText="إلغاء"
+        deleteButtonText={studyCirclesLabels.schedule.deleteDialog.deleteButton}
+        cancelButtonText={studyCirclesLabels.schedule.deleteDialog.cancelButton}
       />
 
     </div>

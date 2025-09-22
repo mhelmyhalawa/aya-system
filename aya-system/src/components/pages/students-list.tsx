@@ -1,81 +1,55 @@
-// إزالة التكرارات المحتملة السابقة وإضافة FormDialog
-import { FormDialog } from "@/components/ui/form-dialog"; // still used for guardian dialog & history
+// Unified labels (multi-language)
+import { getLabels } from "@/lib/labels";
+import { FormDialog } from "@/components/ui/form-dialog";
 import { StudentFormDialog, StudentFormData } from "@/components/students/StudentFormDialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-// استخدام GenericTable لقائمة الطلاب، لكن نُبقي مكوّنات الجدول الأصلية لسجل المعلمين التاريخي في الحوار السفلي
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GenericTable, Column } from "../ui/generic-table";
 import { Input } from "@/components/ui/input";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink } from "@/components/ui/pagination";
 import { UserRole } from "@/types/profile";
+import { StudyCircle } from "@/types/study-circle";
 import { useState, useEffect, useMemo } from "react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  UserPlus,
   Search,
   FileDown,
   RefreshCw,
   AlertCircle,
-  Filter,
-  Eye,
   Pencil,
-  Phone,
-  Mail,
   GraduationCap,
-  Calendar,
   Trash2,
   BookOpen,
   Database,
   School,
   UserCircle,
-  History,
-  ChevronRight
+  History
 } from "lucide-react";
-
-// Type definition for extended UserRole
-type UserRoleExtended = UserRole | 'teacher' | null;
-
-// Type guard for user role comparison
-function isTeacher(role: UserRoleExtended): boolean {
-  return role === 'teacher' as UserRoleExtended;
-}
-
-import {
-  getAllStudents as getAllStudentsApi,
-  searchStudents as searchStudentsApi,
-  deleteStudent,
-  exportToJson as exportStudentsToJson
-} from "@/lib/supabase-service";
-import { createStudent, updateStudent as updateStudentWithHistory } from "@/lib/student-service";
-import { getteacherHistoryForStudent } from "@/lib/teacher-history-service";
-import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
-import { StudyCircle } from "@/types/study-circle";
-import { supabase } from "@/lib/supabase-client"; // Import the supabase client
-import { getAllGuardians, addGuardian } from "@/lib/guardian-service";
-import { getteachers } from "@/lib/profile-service";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Student, StudentCreate, StudentUpdate } from "@/types/student";
 import { teacherHistory } from "@/types/teacher-history";
 import { Guardian, GuardianCreate } from "@/types/guardian";
 import { Profile } from "@/types/profile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { errorMessages, successMessages, commonLabels, studentsLabels } from "@/lib/arabic-labels";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeleteConfirmationDialog } from "../ui/delete-confirmation-dialog";
-// استخدام مكونات الحوار من shadcn/ui بدلاً من الاستيراد الخاطئ من radix مباشرة
+import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
+import { getAllGuardians, addGuardian } from "@/lib/guardian-service";
+import { getteachers } from "@/lib/profile-service";
+import { createStudent, updateStudent as updateStudentWithHistory } from "@/lib/student-service";
+import { searchStudents as searchStudentsApi, getAllStudents as getAllStudentsApi, deleteStudent } from "@/lib/supabase-service";
+import { exportStudentsToJson } from "@/lib/database-service";
+import { getteacherHistoryForStudent } from "@/lib/teacher-history-service";
 
-interface StudentsListProps {
-  onNavigate: (path: string) => void;
-  userRole?: UserRoleExtended;
-  userId?: string | null;
-}
-
+interface StudentsListProps { onNavigate: (path: string) => void; userRole?: UserRole; userId?: string | null; }
 
 export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps) {
   const { toast } = useToast();
+  const { errorMessages, studentsLabels, guardiansLabels, teacherHistoryLabels, commonLabels } = getLabels('ar');
+
+  // Helper type guard to safely check teacher role
+  const isTeacherRole = (role: UserRole | undefined): role is UserRole => role === 'teacher';
 
   // صلاحيات الحذف مقتصرة على superadmin فقط
   const canDelete = userRole === 'superadmin';
@@ -106,27 +80,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   // تنفيذ استرجاع البيانات عند تحميل المكون
   useEffect(() => {
     console.log('Component mounted, fetching students...');
-    loadGuardians();
     loadteachers();
+    loadGuardians();
 
-    // تحميل الحلقات الدراسية المناسبة بناءً على دور المستخدم
     if (userRole === 'teacher' && userId) {
-      // للمعلمين، تحميل الحلقات الخاصة بهم فقط وتعيين معرف المعلم
-      setSelectedTeacherId(userId); // تعيين المعلم الحالي مباشرة
-
-      loadStudyCirclesForTeacher(userId).then((hasCircles) => {
-        if (hasCircles) {
-          // بدلاً من استخدام handleSearch، استخدم loadStudents مع معايير محددة
-          const searchCriteria = { teacher_id: userId };
-          loadStudents(searchCriteria);
-        } else {
-          // إظهار رسالة للمعلم إذا لم تكن لديه حلقات
-          setError("ليس لديك حلقات دراسية حالياً. يرجى التواصل مع الإدارة لإضافة حلقات.");
-          setLoading(false);
-        }
+      setSelectedTeacherId(userId);
+      loadStudyCirclesForTeacher(userId).then(() => {
+        const searchCriteria = { teacher_id: userId } as any;
+        loadStudents(searchCriteria);
       });
     } else {
-      // للإدارة والمشرفين، تحميل جميع الحلقات
       loadStudyCircles();
       loadStudents();
     }
@@ -135,13 +98,10 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   // تنفيذ البحث عند تغيير الحلقة الدراسية
   useEffect(() => {
     console.log('تغيير الحلقة الدراسية:', studyCircleId);
-    if (studyCircleId !== undefined) {
-      // تأخير بسيط لتجنب البحث المتكرر عند التحميل الأولي
-      const timeoutId = setTimeout(() => {
-        handleSearch();
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    }
+    const timeoutId = setTimeout(() => {
+      handleSearch();
+    }, 100);
+    return () => clearTimeout(timeoutId);
   }, [studyCircleId]);
 
   // تنفيذ البحث عند تغيير مستوى الصف
@@ -520,7 +480,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         return {
           ...student,
           id: student.id,
-          full_name: student.full_name || "بدون اسم",
+          full_name: student.full_name || studentsLabels.noName,
           guardian_id: student.guardian_id,
           study_circle_id: student.study_circle_id,
           guardian: student.guardian || null,
@@ -950,11 +910,11 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             <div className="flex flex-col">
               <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
                 <UserCircle className="h-5 w-5 text-yellow-300" />
-                {userRole === 'teacher' ? 'الطلاب المرتبطين بك' : studentsLabels.title}
+                {userRole === 'teacher' ? studentsLabels.teacherViewTitle : studentsLabels.title}
               </CardTitle>
               <CardDescription className="text-xs md:text-sm text-green-100 mt-1">
                 {userRole === 'teacher'
-                  ? 'عرض وإدارة الطلاب المرتبطين بالمعلم الحالي'
+                  ? studentsLabels.teacherViewDescription
                   : studentsLabels.description
                 }
               </CardDescription>
@@ -965,23 +925,18 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               <Button
                 className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
                 onClick={handleAddGuardian}
-                title="إضافة ولي أمر جديد"
+                title={guardiansLabels.addGuardian}
               >
-                {/* الأيقونة */}
                 <span className="text-lg">👤</span>
-                {/* النص يظهر فقط في الديسكتوب */}
-                <span className="hidden sm:inline">إضافة ولي أمر جديد</span>
+                <span className="hidden sm:inline">{guardiansLabels.addGuardian}</span>
               </Button>
-
               <Button
                 className="flex items-center gap-2 rounded-3xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
                 onClick={handleAddStudent}
-                title="إضافة طالب جديد"
+                title={studentsLabels.addStudent}
               >
-                {/* الأيقونة */}
                 <span className="text-lg">🧒</span>
-                {/* النص يظهر فقط في الديسكتوب */}
-                <span className="hidden sm:inline">إضافة طالب جديد</span>
+                <span className="hidden sm:inline">{studentsLabels.addStudent}</span>
               </Button>
             </div>
           </div>
@@ -1023,23 +978,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     }}
                   >
                     <SelectTrigger className="w-full h-9 text-sm">
-                      <SelectValue placeholder="كل الحلقات" />
+                      <SelectValue placeholder={studentsLabels.allStudyCircles} />
                     </SelectTrigger>
                     <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                      <SelectItem value="all">كل الحلقات</SelectItem>
+                      <SelectItem value="all">{studentsLabels.allStudyCircles}</SelectItem>
                       {teacherStudyCircles.length > 0 ? (
                         teacherStudyCircles.map(circle => (
                           <SelectItem key={circle.id} value={circle.id}>{circle.name}</SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="none" disabled>لا توجد حلقات متاحة</SelectItem>
+                        <SelectItem value="none" disabled>{studentsLabels.noStudyCircles}</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
                 </div>
               ) : (
                 <div className="flex flex-col md:flex-row gap-2 md:gap-2 md:w-auto flex-1">
-                  {!isTeacher(userRole) && (
+                  {!isTeacherRole(userRole) && (
                     <div className="w-full sm:w-auto md:w-[180px]">
                       <Select
                         value={selectedTeacherId || 'all'}
@@ -1049,10 +1004,10 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                         }}
                       >
                         <SelectTrigger className="w-full h-9 text-sm">
-                          <SelectValue placeholder="كل المعلمين" />
+                          <SelectValue placeholder={studentsLabels.allTeachers} />
                         </SelectTrigger>
                         <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                          <SelectItem value="all">كل المعلمين</SelectItem>
+                          <SelectItem value="all">{studentsLabels.allTeachers}</SelectItem>
                           {teachers.map(teacher => (
                             <SelectItem key={teacher.id} value={teacher.id}>{teacher.full_name}</SelectItem>
                           ))}
@@ -1061,10 +1016,10 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     </div>
                   )}
 
-                  {isTeacher(userRole) && (
+                  {isTeacherRole(userRole) && (
                     <div className="bg-gray-100 rounded-md px-3 py-2 flex items-center w-full md:w-[180px]">
                       <GraduationCap className="h-4 w-4 text-islamic-green/60 mr-2" />
-                      <span className="text-sm">المعلم الحالي</span>
+                      <span className="text-sm">{studentsLabels.currentTeacherLabel}</span>
                     </div>
                   )}
 
@@ -1079,17 +1034,17 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                       disabled={isLoadingStudyCircles}
                     >
                       <SelectTrigger className="w-full h-9 text-sm">
-                        <SelectValue placeholder="كل الحلقات" />
+                        <SelectValue placeholder={studentsLabels.allStudyCircles} />
                       </SelectTrigger>
                       <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                        <SelectItem value="all">كل الحلقات</SelectItem>
+                        <SelectItem value="all">{studentsLabels.allStudyCircles}</SelectItem>
                         {teacherStudyCircles.length > 0 ? (
                           teacherStudyCircles.map(circle => (
                             <SelectItem key={circle.id} value={circle.id}>{circle.name}</SelectItem>
                           ))
                         ) : (
                           <SelectItem value="none" disabled>
-                            {selectedTeacherId ? 'لا توجد حلقات لهذا المعلم' : 'اختر معلم أولاً'}
+                            {selectedTeacherId ? studentsLabels.noCirclesForTeacher : studentsLabels.selectTeacherFirst}
                           </SelectItem>
                         )}
                       </SelectContent>
@@ -1100,13 +1055,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
               {/* أزرار الإجراءات */}
               <div className="flex flex-row gap-1 md:gap-2 md:w-auto md:ml-2 items-stretch">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleSearch}
-                  title={studentsLabels.search}
-                  className="shrink-0 w-9 h-9"
-                >
+                <Button variant="outline" size="icon" onClick={handleSearch} title={studentsLabels.search} className="shrink-0 w-9 h-9">
                   <Search className="h-4 w-4" />
                 </Button>
                 <Button
@@ -1142,49 +1091,49 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         defaultView="table"
         columns={([
           { key: '__index', header: '#', render: (item: any) => <span className="font-medium">{item.__index}</span>, width: '50px', align: 'center' },
-          { key: 'full_name', header: 'الاسم', render: (item: any) => <span className="font-medium">{item.full_name}</span> },
+          { key: 'full_name', header: studentsLabels.name, render: (item: any) => <span className="font-medium">{item.full_name}</span> },
           {
-            key: 'guardian', header: 'ولي الأمر', render: (item: any) => item.guardian?.full_name ? (
+            key: 'guardian', header: studentsLabels.guardianColumn, render: (item: any) => item.guardian?.full_name ? (
               <div className="flex items-center gap-1"><UserCircle className="h-4 w-4 text-islamic-green/60" /><span>{item.guardian.full_name}</span></div>
             ) : <span className="text-muted-foreground">—</span>
           },
           ...(userRole !== 'teacher' ? [{
-            key: 'teacher', header: 'المعلم', render: (item: any) => item.study_circle?.teacher?.full_name ? (
+            key: 'teacher', header: studentsLabels.teacherColumn, render: (item: any) => item.study_circle?.teacher?.full_name ? (
               <div className="flex items-center gap-1"><GraduationCap className="h-4 w-4 text-islamic-green/60" /><span>{item.study_circle.teacher.full_name}</span></div>
             ) : <span className="text-muted-foreground">—</span>
           }] : []),
           {
-            key: 'study_circle', header: 'الحلقة', render: (item: any) => (
+            key: 'study_circle', header: studentsLabels.studyCircleShort, render: (item: any) => (
               <div className="flex items-center gap-1"><BookOpen className="h-4 w-4 text-islamic-green/60" /><span>{item.study_circle?.name || '-'}</span></div>
             )
           },
           {
-            key: 'memorized_parts', header: 'مستوى الحفظ', render: (item: any) => (
+            key: 'memorized_parts', header: studentsLabels.memorizeLevelHeader, render: (item: any) => (
               <span>{studentsLabels.quranPartsOptions.find(p => p.value === item.memorized_parts)?.label || item.memorized_parts}</span>
             )
           },
           {
-            key: 'grade', header: 'الصف', render: (item: any) => (
+            key: 'grade', header: studentsLabels.gradeShort, render: (item: any) => (
               <span>{studentsLabels.gradeOptions.find(g => g.value === (item.grade_level || item.grade))?.label || (item.grade_level || item.grade || '-')}</span>
             )
           },
           {
-            key: 'gender', header: 'الجنس', render: (item: any) => (
-              <span>{item.gender === 'male' ? 'ذكر' : item.gender === 'female' ? 'أنثى' : '-'}</span>
+            key: 'gender', header: studentsLabels.gender || 'الجنس', render: (item: any) => (
+              <span>{item.gender === 'male' ? studentsLabels.genderMale : item.gender === 'female' ? studentsLabels.genderFemale : '-'}</span>
             )
           },
           {
-            key: 'actions', header: 'إجراءات', render: (item: any) => (
+            key: 'actions', header: studentsLabels.actions, render: (item: any) => (
               <div className="flex justify-center items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={() => handleEditStudent(item)} className="h-8 w-8 text-islamic-green hover:bg-green-100 rounded-full" title="تعديل">
+                <Button variant="ghost" size="icon" onClick={() => handleEditStudent(item)} className="h-8 w-8 text-islamic-green hover:bg-green-100 rounded-full" title={studentsLabels.editTooltip}>
                   <Pencil size={16} />
                 </Button>
                 {canDelete && (
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteStudent(item)} className="h-8 w-8 text-red-500 hover:bg-red-100 rounded-full" title="حذف">
+                  <Button variant="ghost" size="icon" onClick={() => handleDeleteStudent(item)} className="h-8 w-8 text-red-500 hover:bg-red-100 rounded-full" title={studentsLabels.deleteTooltip}>
                     <Trash2 size={16} />
                   </Button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => handleViewteacherHistory(item)} className="h-8 w-8 text-blue-500 hover:bg-blue-100 rounded-full" title="سجل المعلمين">
+                <Button variant="ghost" size="icon" onClick={() => handleViewteacherHistory(item)} className="h-8 w-8 text-blue-500 hover:bg-blue-100 rounded-full" title={teacherHistoryLabels.title}>
                   <History size={16} />
                 </Button>
               </div>
@@ -1215,91 +1164,47 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         onOpenChange={setIsDeleteDialogOpen}
         onConfirm={confirmDeleteStudent}
         title={studentsLabels.deleteStudent}
-        description={
-          <>
-            {studentsLabels.deleteConfirmation}
-            <br />
-            {studentsLabels.deleteDescription}
-          </>
-        }
+        description={<><span>{studentsLabels.deleteConfirmation}</span><br />{studentsLabels.deleteDescription}</>}
         deleteButtonText={studentsLabels.confirm}
         cancelButtonText={studentsLabels.cancel}
       />
       {/* حوار إضافة ولي أمر جديد باستخدام FormDialog */}
       <FormDialog
-        title="إضافة ولي أمر جديد"
+        title={guardiansLabels.addGuardian}
         open={isGuardianDialogOpen}
         onOpenChange={setIsGuardianDialogOpen}
         onSave={handleSaveGuardian}
         mode="add"
-        saveButtonText="حفظ"
-        maxWidth="360px" // توحيد العرض مع ديلوج إضافة الطالب
+        saveButtonText={commonLabels.save}
+        maxWidth="360px"
       >
         <div className="flex flex-col gap-4 py-1">
           {/* اسم ولي الأمر */}
           <div>
-            <Label htmlFor="guardian_full_name" className="mb-1 block text-sm font-medium">
-              الاسم الكامل <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="guardian_full_name"
-              value={guardianFullName}
-              onChange={(e) => setGuardianFullName(e.target.value)}
-              placeholder="الاسم الكامل لولي الأمر"
-              className="focus:border-islamic-green"
-              required
-            />
+            <Label htmlFor="guardian_full_name" className="mb-1 block text-sm font-medium">{guardiansLabels.fullNameFull || guardiansLabels.fullName} <span className="text-destructive">*</span></Label>
+            <Input id="guardian_full_name" value={guardianFullName} onChange={(e) => setGuardianFullName(e.target.value)} placeholder={guardiansLabels.fullNamePlaceholder || guardiansLabels.fullName} className="focus:border-islamic-green" required />
           </div>
           {/* رقم الهاتف */}
           <div>
-            <Label htmlFor="guardian_phone_number" className="mb-1 block text-sm font-medium">
-              رقم الهاتف <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="guardian_phone_number"
-              value={guardianPhoneNumber}
-              onChange={(e) => setGuardianPhoneNumber(e.target.value)}
-              placeholder="رقم الهاتف"
-              dir="ltr"
-              className="text-left focus:border-islamic-green"
-              required
-            />
+            <Label htmlFor="guardian_phone_number" className="mb-1 block text-sm font-medium">{guardiansLabels.phoneNumber} <span className="text-destructive">*</span></Label>
+            <Input id="guardian_phone_number" value={guardianPhoneNumber} onChange={(e) => setGuardianPhoneNumber(e.target.value)} placeholder={guardiansLabels.phoneNumberPlaceholder || guardiansLabels.phoneNumber} dir="ltr" className="text-left focus:border-islamic-green" required />
           </div>
           {/* البريد الإلكتروني */}
           <div>
-            <Label htmlFor="guardian_email" className="mb-1 block text-sm font-medium">
-              البريد الإلكتروني <span className="text-muted-foreground text-xs">(اختياري)</span>
-            </Label>
-            <Input
-              id="guardian_email"
-              type="email"
-              value={guardianEmail}
-              onChange={(e) => setGuardianEmail(e.target.value)}
-              placeholder="البريد الإلكتروني"
-              dir="ltr"
-              className="text-left focus:border-islamic-green"
-            />
+            <Label htmlFor="guardian_email" className="mb-1 block text-sm font-medium">{guardiansLabels.email} <span className="text-muted-foreground text-xs">{guardiansLabels.optionalField}</span></Label>
+            <Input id="guardian_email" type="email" value={guardianEmail} onChange={(e) => setGuardianEmail(e.target.value)} placeholder={guardiansLabels.emailPlaceholder || guardiansLabels.email} dir="ltr" className="text-left focus:border-islamic-green" />
           </div>
           {/* العنوان / ملاحظات */}
           <div>
-            <Label htmlFor="guardian_address" className="mb-1 block text-sm font-medium">
-              العنوان / ملاحظات <span className="text-muted-foreground text-xs">(اختياري)</span>
-            </Label>
-            <Textarea
-              id="guardian_address"
-              value={guardianAddress}
-              onChange={(e) => setGuardianAddress(e.target.value)}
-              placeholder="العنوان أو أي ملاحظات إضافية"
-              rows={3}
-              className="focus:border-islamic-green"
-            />
+            <Label htmlFor="guardian_address" className="mb-1 block text-sm font-medium">{guardiansLabels.addressNotes || guardiansLabels.address} <span className="text-muted-foreground text-xs">{guardiansLabels.optionalField}</span></Label>
+            <Textarea id="guardian_address" value={guardianAddress} onChange={(e) => setGuardianAddress(e.target.value)} placeholder={guardiansLabels.addressPlaceholder || guardiansLabels.address} rows={3} className="focus:border-islamic-green" />
           </div>
         </div>
       </FormDialog>
 
       {/* حوار عرض سجل المعلمين باستخدام FormDialog */}
       <FormDialog
-        title="سجل المعلمين السابقين للطالب"
+        title={teacherHistoryLabels.titleLong}
         open={isteacherHistoryDialogOpen}
         onOpenChange={setIsteacherHistoryDialogOpen}
         onSave={() => setIsteacherHistoryDialogOpen(false)}
@@ -1319,13 +1224,13 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               <div className="flex items-center gap-2">
                 <School className="h-4 w-4 text-islamic-green/60" />
                 <span className="text-sm text-gray-600">
-                  الصف: {studentsLabels.gradeOptions?.find(g => g.value === currentStudentHistory.student.grade_level)?.label || currentStudentHistory.student.grade_level || '-'}
+                  {studentsLabels.gradeShort || studentsLabels.grade}: {studentsLabels.gradeOptions?.find(g => g.value === currentStudentHistory.student.grade_level)?.label || currentStudentHistory.student.grade_level || '-'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <GraduationCap className="h-4 w-4 text-islamic-green/60" />
                 <span className="text-sm text-gray-600">
-                  المعلم الحالي: {currentStudentHistory.student.study_circle?.teacher?.full_name || 'غير محدد'}
+                  {teacherHistoryLabels.currentTeacher} {currentStudentHistory.student.study_circle?.teacher?.full_name || '-'}
                 </span>
               </div>
             </div>
@@ -1338,7 +1243,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             </div>
           ) : currentStudentHistory.history.length > 0 ? (
             <GenericTable
-              title="سجل المعلمين"
+              title={teacherHistoryLabels.title}
               defaultView="table"
               data={currentStudentHistory.history.map(h => {
                 const teacher = teachers.find(t => t.id === h.teacher_id);
@@ -1347,20 +1252,19 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 const durationDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
                 let duration = '';
                 if (durationDays < 30) {
-                  duration = `${durationDays} يوم`;
+                  duration = `${durationDays} ${teacherHistoryLabels.day}`;
                 } else if (durationDays < 365) {
                   const months = Math.floor(durationDays / 30);
-                  duration = `${months} شهر`;
+                  duration = `${months} ${teacherHistoryLabels.month}`;
                 } else {
                   const years = Math.floor(durationDays / 365);
-                  const remainingMonths = Math.floor((durationDays % 365) / 30);
-                  duration = `${years} سنة${remainingMonths > 0 ? ` و ${remainingMonths} شهر` : ''}`;
+                  duration = `${years} ${teacherHistoryLabels.year}`;
                 }
                 return {
                   id: h.id,
-                  teacher_name: teacher?.full_name || 'غير معروف',
+                  teacher_name: teacher?.full_name || '-',
                   current_flag: !h.end_date,
-                  study_circle_name: h.study_circle?.name || 'غير محدد',
+                  study_circle_name: h.study_circle?.name || '-',
                   start_date: new Date(h.start_date).toLocaleDateString('ar-EG'),
                   end_date: h.end_date ? new Date(h.end_date).toLocaleDateString('ar-EG') : '-',
                   duration,
@@ -1369,20 +1273,20 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               columns={([
                 {
                   key: 'teacher_name',
-                  header: 'المعلم',
+                  header: teacherHistoryLabels.teacherHeader,
                   render: (item: any) => (
                     <div className="flex items-center gap-1">
                       <GraduationCap className="h-4 w-4 text-islamic-green/60" />
                       <span>{item.teacher_name}</span>
                       {item.current_flag && (
-                        <span className="inline-flex px-2 py-0.5 mr-2 text-xs bg-islamic-green/20 text-islamic-green/80 rounded-full">حالي</span>
+                        <span className="inline-flex px-2 py-0.5 mr-2 text-xs bg-islamic-green/20 text-islamic-green/80 rounded-full">{teacherHistoryLabels.currentTeacherTag}</span>
                       )}
                     </div>
                   )
                 },
                 {
                   key: 'study_circle_name',
-                  header: 'الحلقة',
+                  header: teacherHistoryLabels.studyCircleHeader,
                   render: (item: any) => (
                     <div className="flex items-center gap-1">
                       <BookOpen className="h-4 w-4 text-islamic-green/60" />
@@ -1390,17 +1294,17 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     </div>
                   )
                 },
-                { key: 'start_date', header: 'تاريخ البداية' },
-                { key: 'end_date', header: 'تاريخ النهاية' },
-                { key: 'duration', header: 'المدة' },
+                { key: 'start_date', header: teacherHistoryLabels.startDateHeader },
+                { key: 'end_date', header: teacherHistoryLabels.endDateHeader },
+                { key: 'duration', header: teacherHistoryLabels.durationHeader },
               ]) as Column<any>[]}
-              emptyMessage="لا يوجد سجل"
+              emptyMessage={teacherHistoryLabels.noHistoryShort}
             />
           ) : (
             <div className="flex flex-col items-center justify-center py-10 text-center">
               <Database className="h-12 w-12 text-gray-300 mb-3" />
-              <p className="text-muted-foreground mb-2">لا يوجد سجل للمعلمين السابقين</p>
-              <p className="text-sm text-gray-500">لم يتم تسجيل أي تغيير في معلمي هذا الطالب</p>
+              <p className="text-muted-foreground mb-2">{teacherHistoryLabels.noHistoryTitle}</p>
+              <p className="text-sm text-gray-500">{teacherHistoryLabels.noHistoryDescription}</p>
             </div>
           )}
         </div>
