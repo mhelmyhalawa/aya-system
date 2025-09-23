@@ -561,11 +561,11 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                               disabled={!canPrevMobileCircles}
                               className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
                                 ${canPrevMobileCircles ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label="السابق"
+                              aria-label={scsLabels.prevLabel}
                             >
                               ‹
                             </button>
-                            <div className="flex items-center gap-1" aria-label="مؤشر الصفحات">
+                            <div className="flex items-center gap-1" aria-label={scsLabels.pagesIndicatorAria}>
                               {Array.from({ length: totalMobileCirclePages }).map((_, i) => (
                                 <span
                                   key={i}
@@ -581,7 +581,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                               disabled={!canNextMobileCircles}
                               className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
                                 ${canNextMobileCircles ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label="التالي"
+                              aria-label={scsLabels.nextLabel}
                             >
                               ›
                             </button>
@@ -789,11 +789,11 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                               disabled={mobileSchedulePage === 0}
                               className={`px-2 py-1 rounded-md border text-[11px] sm:text-xs font-medium transition-all shadow-sm
                                 ${mobileSchedulePage > 0 ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label="السابق"
+                              aria-label={scsLabels.prevLabel}
                             >
                               ‹
                             </button>
-                            <div className="flex items-center gap-1" aria-label="مؤشر الصفحات">
+                            <div className="flex items-center gap-1" aria-label={scsLabels.pagesIndicatorAria}>
                               {Array.from({ length: totalMobileSchedulePages }).map((_, i) => (
                                 <span
                                   key={i}
@@ -808,7 +808,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                               disabled={mobileSchedulePage >= totalMobileSchedulePages - 1}
                               className={`px-2 py-1 rounded-md border text-[11px] sm:text-xs font-medium transition-all shadow-sm
                                 ${(mobileSchedulePage < totalMobileSchedulePages - 1) ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label="التالي"
+                              aria-label={scsLabels.nextLabel}
                             >
                               ›
                             </button>
@@ -822,7 +822,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                   {circleSchedules.length}
                                 </span>
                                 <span className="text-gray-400 text-[10px]">
-                                  ({totalMobileSchedulePages + 1} / {totalMobileSchedulePages})
+                                  ({mobileSchedulePage + 1} / {totalMobileSchedulePages})
                                 </span>
                               </div>
                               <div className="w-40 h-1.5 rounded-full bg-gray-200 overflow-hidden">
@@ -981,26 +981,26 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                 onClick={prevDesktopSchedulePage}
                                 disabled={desktopSchedulePage === 0}
                                 className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
-                                aria-label="السابق"
+                                aria-label={scsLabels.prevLabel}
                               >
                                 <ChevronRight className="w-5 h-5" />
                               </button>
-                              <div className="flex items-center gap-2" aria-label="ترقيم الصفحات">
+                                <div className="flex items-center gap-2" aria-label={scsLabels.paginationAria}>
                                 {Array.from({ length: totalDesktopSchedulePages }).map((_, i) => (
                                   <button
                                     key={i}
                                     onClick={() => setDesktopSchedulePage(i)}
                                     className={`w-2.5 h-2.5 rounded-full transition ${i === desktopSchedulePage ? 'bg-green-600 scale-110' : 'bg-green-300 hover:bg-green-400'}`}
-                                    aria-label={`صفحة ${i + 1}`}
+                                      aria-label={`${scsLabels.pageAria} ${i + 1}`}
                                   />
                                 ))}
                               </div>
-                              <button
-                                onClick={nextDesktopSchedulePage}
-                                disabled={desktopSchedulePage >= totalDesktopSchedulePages - 1}
-                                className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
-                                aria-label="التالي"
-                              >
+                                <button
+                                  onClick={nextDesktopSchedulePage}
+                                  disabled={desktopSchedulePage >= totalDesktopSchedulePages - 1}
+                                  className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
+                                  aria-label={scsLabels.nextLabel}
+                                >
                                 <ChevronLeft className="w-5 h-5" />
                               </button>
                             </div>

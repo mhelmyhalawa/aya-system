@@ -474,7 +474,14 @@ const ar = {
     deleteFailedDescription: 'حدث خطأ أثناء حذف الجدولة',
     unexpectedErrorTitle: 'خطأ غير متوقع',
     unexpectedErrorDescription: 'حدث خطأ غير متوقع أثناء العملية',
-    weekdayNames: { '0': 'الأحد', '1': 'الإثنين', '2': 'الثلاثاء', '3': 'الأربعاء', '4': 'الخميس', '5': 'الجمعة', '6': 'السبت' }
+    weekdayNames: { '0': 'الأحد', '1': 'الإثنين', '2': 'الثلاثاء', '3': 'الأربعاء', '4': 'الخميس', '5': 'الجمعة', '6': 'السبت' },
+    prevLabel: 'السابق',
+    nextLabel: 'التالي',
+    pagesIndicatorAria: 'مؤشر الصفحات',
+    paginationAria: 'ترقيم الصفحات',
+    pageAria: 'صفحة',
+    desktopSchedulesListAria: 'قائمة المواعيد في الديسكتوب',
+    mobileSchedulesListAria: 'قائمة المواعيد في الجوال'
   }
 };
 

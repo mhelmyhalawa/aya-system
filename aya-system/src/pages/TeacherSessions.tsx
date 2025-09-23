@@ -436,14 +436,10 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
   return (
     <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-
-      <Card>
-        {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-            {/* العنوان والوصف */}
-            <div className="flex flex-col">
-              <CardTitle className="text-base sm:text-xl md:text-2xl font-extrabold text-white flex items-center gap-1 sm:gap-2 drop-shadow-md">
+      <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
+        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
+          <div className="space-y-0.5 sm:space-y-1">
+            <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
                 <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
                 <span className="truncate">جلسات المعلمين</span>
               </CardTitle>
@@ -451,7 +447,6 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                 إدارة جلسات المعلمين والحلقات المستقبلية
               </CardDescription>
             </div>
-          </div>
         </CardHeader>
 
         <CardContent className="p-3 sm:p-4">
