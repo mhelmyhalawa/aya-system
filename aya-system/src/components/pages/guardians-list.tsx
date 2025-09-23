@@ -1013,8 +1013,8 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             <div className="flex flex-col md:flex-row justify-between items-center 
               gap-0 mb-1 bg-white dark:bg-gray-900 p-1 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
               <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4 ml-2" />
-          <AlertDescription>{error}</AlertDescription>
+                <AlertCircle className="h-4 w-4 ml-2" />
+                <AlertDescription>{error}</AlertDescription>
               </Alert>
             </div>
           )}
@@ -1023,43 +1023,34 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             <div className="relative flex-1">
               <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
-          placeholder={guardiansLabels.searchPlaceholder}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-3 pr-10 w-full"
-          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder={guardiansLabels.searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-3 pr-10 w-full"
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
 
             {/* الأزرار */}
-            <div className="flex gap-2">
+            <div className="hidden sm:flex gap-2">
               <Button
-          variant="outline"
-          size="icon"
-          onClick={handleSearch}
-          title={guardiansLabels.search}
-          className="shrink-0"
+              variant="outline"
+              size="icon"
+              onClick={() => loadGuardians()}
+              title={guardiansLabels.refresh}
+              className="shrink-0"
               >
-          <Search className="h-4 w-4" />
+              <RefreshCw className="h-4 w-4" />
               </Button>
               <Button
-          variant="outline"
-          size="icon"
-          onClick={() => loadGuardians()}
-          title={guardiansLabels.refresh}
-          className="shrink-0"
+              variant="outline"
+              size="icon"
+              onClick={handleExportData}
+              title={guardiansLabels.export}
+              className="shrink-0"
+              disabled={exportLoading || guardians.length === 0}
               >
-          <RefreshCw className="h-4 w-4" />
-              </Button>
-              <Button
-          variant="outline"
-          size="icon"
-          onClick={handleExportData}
-          title={guardiansLabels.export}
-          className="shrink-0"
-          disabled={exportLoading || guardians.length === 0}
-              >
-          <FileDown className="h-4 w-4" />
+              <FileDown className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -1117,49 +1108,54 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   </span>
                 </div>
               ) : (
-                <span className="text-muted-foreground">—</span>
+                <div className="w-full flex items-center justify-center">
+                  <span className="text-muted-foreground">—</span>
+                </div>
               ),
           },
           {
             key: 'students_count',
             header: `👶 ${guardiansLabels.studentCount}`,
             align: 'center' as const,
-            render: (guardian) =>
-              guardian.students_count > 0 ? (
-                <button
-                  type="button"
-                  data-stop="true"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (!(isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id)) {
-                      handleShowGuardianStudents(guardian.id, guardian.full_name);
-                    }
-                  }}
-                  disabled={isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id}
-                  className={`h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed`}
-                  title={guardiansLabels.viewStudents}
-                >
-                  {isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? (
-                    <span className="flex items-center gap-1">
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                      <span>...</span>
-                    </span>
-                  ) : (
-                    guardian.students_count
-                  )}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  data-stop="true"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAddStudent(guardian.id); }}
-                  className="h-6 px-3 rounded-full font-semibold text-green-700 border border-green-300 dark:text-green-200 dark:border-green-600 text-xs bg-white dark:bg-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  title={guardiansLabels.addStudent}
-                >
-                  + {guardiansLabels.addStudent}
-                </button>
-              ),
+            render: (guardian) => (
+              <div className="w-full flex items-center justify-center">
+                {guardian.students_count > 0 ? (
+                  <Button
+                    type="button"
+                    data-stop="true"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!(isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id)) {
+                        handleShowGuardianStudents(guardian.id, guardian.full_name);
+                      }
+                    }}
+                    disabled={isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id}
+                    className="h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed"
+                    title={guardiansLabels.viewStudents}
+                  >
+                    {isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        <span>...</span>
+                      </span>
+                    ) : (
+                      guardian.students_count
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    data-stop="true"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAddStudent(guardian.id); }}
+                    className="h-6 px-3 rounded-full font-semibold text-green-700 border border-green-300 dark:text-green-200 dark:border-green-600 text-xs bg-white dark:bg-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    title={guardiansLabels.addStudent}
+                  >
+                    + {guardiansLabels.addStudent}
+                  </Button>
+                )}
+              </div>
+            ),
           },
           {
             key: 'actions',
@@ -1167,34 +1163,34 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             align: 'center' as const,
             render: (guardian) => (
               <div className="flex justify-center items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <button
+                  type="button"
                   onClick={() => handleEditGuardian(guardian)}
-                  className="h-8 w-8 p-0 rounded-lg"
                   title={guardiansLabels.editTooltip}
+                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  data-stop="true"
                 >
                   <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
+                </button>
+                <button
+                  type="button"
                   onClick={() => handleAddStudent(guardian.id)}
-                  className="h-8 w-8 p-0 rounded-lg"
                   title={guardiansLabels.addStudentTooltip}
+                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  data-stop="true"
                 >
                   <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
-                </Button>
+                </button>
                 {userRole === 'superadmin' && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
+                  <button
+                    type="button"
                     onClick={() => handleDeleteGuardian(guardian)}
-                    className="h-8 w-8 p-0 rounded-lg"
                     title={guardiansLabels.deleteTooltip}
+                    className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    data-stop="true"
                   >
                     <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                  </Button>
+                  </button>
                 )}
               </div>
             ),
@@ -1358,6 +1354,9 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   id: student.id.toString(),
                   serial: index + 1
                 }))}
+                defaultView="card"
+                cardPageSize={2}
+                showCardNavInHeader
                 columns={[
                   {
                     key: 'row_index',
@@ -1417,24 +1416,24 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                         align: 'center' as const,
                         render: (student: any) => (
                           <div className="flex justify-center gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
+                            <button
+                              type="button"
                               onClick={() => handleEditStudentFromGuardianList(student)}
-                              className="h-6 w-6 p-0 rounded-lg"
                               title={guardiansLabels.studentEditTooltip}
+                              className="h-6 w-6 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              data-stop="true"
                             >
                               <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => requestDeleteStudent(student.id)}
-                              className="h-6 w-6 p-0 rounded-lg"
                               title={guardiansLabels.studentDeleteTooltip}
+                              className="h-6 w-6 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              data-stop="true"
                             >
                               <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                            </Button>
+                            </button>
                           </div>
                         ),
                       } as const,

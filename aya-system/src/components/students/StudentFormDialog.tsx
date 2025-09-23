@@ -84,8 +84,6 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
   const [gender, setGender] = useState<("male" | "female" | '')>((initialData?.gender as any) || '');
   const [dateOfBirth, setDateOfBirth] = useState(initialData?.date_of_birth || '');
   const [memorizedParts, setMemorizedParts] = useState(initialData?.memorized_parts || '');
-  const [customMemorizedParts, setCustomMemorizedParts] = useState('');
-  const [useCustomMemorized, setUseCustomMemorized] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(initialData?.phone_number || '');
   const [email, setEmail] = useState(initialData?.email || '');
   const [notes, setNotes] = useState(initialData?.notes || '');
@@ -105,9 +103,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       setGrade(initialData?.grade_level || '');
       setGender((initialData?.gender as any) || '');
       setDateOfBirth(initialData?.date_of_birth || '');
-      setMemorizedParts(initialData?.memorized_parts || '');
-      setCustomMemorizedParts('');
-      setUseCustomMemorized(false);
+  setMemorizedParts(initialData?.memorized_parts || '');
       setPhoneNumber(initialData?.phone_number || '');
       setEmail(initialData?.email || '');
       setNotes(initialData?.notes || '');
@@ -178,7 +174,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       grade_level: grade || undefined,
       gender: gender || undefined,
       date_of_birth: dateOfBirth || undefined,
-      memorized_parts: (useCustomMemorized ? (customMemorizedParts.trim() || undefined) : (memorizedParts || undefined)),
+  memorized_parts: (memorizedParts || undefined),
       phone_number: phoneNumber || undefined,
       email: email || undefined,
       notes: notes || undefined,
@@ -373,64 +369,67 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
             </div>
             <div>
               <Label className="mb-2 block">{studentsLabels.lastQuranProgress} <span className="text-muted-foreground text-xs">{studentsLabels.optionalField}</span></Label>
-              {/* توليد قائمة فريدة بدون تكرار */}
               {(() => {
-                const uniqueOptions = Array.from(new Map((studentsLabels.quranPartsOptions || []).map(o => [String(o.value).trim(), o])).values());
+                /**
+                 * نعالج التكرار مثل: value = '1' و value = 'part_1' ولهما نفس الملصق "الجزء الأول"
+                 * وكذلك القيم: complete / completed / full => نعرض خياراً واحداً.
+                 * المنطق: استخراج رقم الجزء (1-30) إن وُجد من value أو من الملصق، ثم نوحده كمفتاح.
+                 */
+                const raw = studentsLabels.quranPartsOptions || [];
+
+                const getCanonicalKey = (o: { value: string | number; label: string }) => {
+                  const v = String(o.value).toLowerCase();
+                  // 1) إكمال المصحف
+                  if (/^(complete|completed|full)$/.test(v)) return 'complete';
+                  // 2) رقم مباشر
+                  if (/^\d+$/.test(v)) {
+                    const n = parseInt(v, 10);
+                    if (n >= 1 && n <= 30) return `juz_${n}`;
+                  }
+                  // 3) part_10 ، part_1 ...
+                  const mPart = v.match(/^part_(\d{1,2})$/);
+                  if (mPart) {
+                    const n = parseInt(mPart[1], 10);
+                    if (n >= 1 && n <= 30) return `juz_${n}`;
+                  }
+                  // 4) محاولة استخراج رقم من الملصق نفسه
+                  const digits = (o.label || '').match(/(\d{1,2})/);
+                  if (digits) {
+                    const n = parseInt(digits[1], 10);
+                    if (n >= 1 && n <= 30) return `juz_${n}`;
+                  }
+                  // 5) fallback: قيمة منخفضة و مٌنقّاة
+                  return `raw_${v.replace(/\s+/g, '')}`;
+                };
+
+                const map = new Map<string, { value: string; label: string }>();
+                for (const o of raw) {
+                  const key = getCanonicalKey({ value: o.value, label: o.label });
+                  if (!map.has(key)) {
+                    if (key === 'complete') {
+                      // نوحد التسمية لرسالة الإكمال الرسمية
+                      map.set(key, { value: 'complete', label: studentsLabels.quranComplete });
+                    } else if (key.startsWith('juz_')) {
+                      // نستعمل أول عنصر كما هو (يحمل label العربي الصحيح)
+                      map.set(key, { value: String(o.value), label: o.label });
+                    } else {
+                      map.set(key, { value: String(o.value), label: o.label });
+                    }
+                  }
+                }
+                const uniqueOptions = Array.from(map.values());
                 return (
-                  <div className="space-y-2">
-                    <Select
-                      value={useCustomMemorized ? 'custom' : memorizedParts}
-                      onValueChange={val => {
-                        if (val === 'custom') {
-                          setUseCustomMemorized(true);
-                        } else {
-                          setUseCustomMemorized(false);
-                          setMemorizedParts(val);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}>
-                        <SelectValue placeholder={studentsLabels.quranProgressPlaceholder} />
-                      </SelectTrigger>
-                      <SelectContent position="item-aligned" align="start" side="bottom" className="max-h-[300px] text-sm">
-                        <SelectGroup>
-                          <SelectLabel className="font-bold text-islamic-green">الأجزاء</SelectLabel>
-                          {uniqueOptions.map(o => <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>)}
-                          <SelectItem value="custom">أخرى...</SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                    {useCustomMemorized && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          value={customMemorizedParts}
-                          onChange={e => setCustomMemorizedParts(e.target.value)}
-                          placeholder="اكتب آخر ما تم حفظه (مثال: بداية سورة البقرة)"
-                          className={`focus:border-islamic-green flex-1 ${compactFieldClass}`}
-                          dir="rtl"
-                        />
-                        {customMemorizedParts && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => {
-                              // إذا كانت القيمة المكتوبة تطابق خيار موجود نستخدمه
-                              const norm = customMemorizedParts.trim();
-                              const match = uniqueOptions.find(o => String(o.value) === norm || o.label === norm);
-                              if (match) {
-                                setMemorizedParts(String(match.value));
-                                setUseCustomMemorized(false);
-                                setCustomMemorizedParts('');
-                              }
-                            }}
-                            className="h-8 text-xs"
-                          >
-                            تطابق
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <Select value={memorizedParts} onValueChange={val => setMemorizedParts(val)}>
+                    <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}>
+                      <SelectValue placeholder={studentsLabels.quranProgressPlaceholder} />
+                    </SelectTrigger>
+                    <SelectContent position="item-aligned" align="start" side="bottom" className="max-h-[300px] text-sm">
+                      <SelectGroup>
+                        <SelectLabel className="font-bold text-islamic-green">الأجزاء</SelectLabel>
+                        {uniqueOptions.map(o => <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>)}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                 );
               })()}
             </div>

@@ -62,11 +62,16 @@ export const getAllGuardians = async (): Promise<(Guardian & { students_count: n
       console.log('Available tables:', tables);
     }
     
-    // إضافة عدد الطلاب لكل ولي أمر
-    return data.map(guardian => ({
+    // إضافة عدد الطلاب لكل ولي أمر + إزالة التكرار حسب المعرف (في حال رجع الاستعلام بسجلات مكررة)
+    const mapped = data.map(guardian => ({
       ...guardian,
       students_count: guardian.students ? guardian.students.length : 0
     }));
+    const uniqueById = Array.from(new Map(mapped.map(g => [g.id, g])).values());
+    if (mapped.length !== uniqueById.length) {
+      console.warn('تمت إزالة تكرارات في أولياء الأمور:', mapped.length - uniqueById.length);
+    }
+    return uniqueById;
   } catch (error) {
     console.error('خطأ في استرجاع أولياء الأمور:', error);
     return [];

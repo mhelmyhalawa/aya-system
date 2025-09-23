@@ -47,6 +47,10 @@ export function GenericTable<T extends { id: string }>(props: {
         xl?: number; // عدد الأعمدة في الشاشات الكبيرة جدًا
     };
     cardWidth?: string; // عرض البطاقة المخصص (مثل: "300px", "100%", إلخ)
+    /** حد أقصى لعدد البطاقات المعروضة في آن واحد (مثلاً 1 أو 2) */
+    cardPageSize?: number;
+    /** إظهار أزرار التالي/السابق في الهيدر حتى في الشاشات الكبيرة عند نمط البطاقات */
+    showCardNavInHeader?: boolean;
 }) {
     const {
         data,
@@ -67,6 +71,8 @@ export function GenericTable<T extends { id: string }>(props: {
         title = '',
         cardGridColumns = { sm: 1, md: 2, lg: 3, xl: 4 },
         cardWidth,
+        cardPageSize,
+        showCardNavInHeader = false,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -85,10 +91,10 @@ export function GenericTable<T extends { id: string }>(props: {
         }
     }, [isMobile]);
 
-    const goNextMobile = () => {
+    const goNext = () => {
         setMobileCardIndex(i => (i < sortedData.length - 1 ? i + 1 : i));
     };
-    const goPrevMobile = () => {
+    const goPrev = () => {
         setMobileCardIndex(i => (i > 0 ? i - 1 : i));
     };
 
@@ -163,18 +169,56 @@ export function GenericTable<T extends { id: string }>(props: {
 
                 {/* أزرار العرض */}
                 <div className="flex items-center gap-1 sm:gap-3">
-                    {/* عدد السجلات */}
-                    <div
-                        aria-label="عدد السجلات"
-                        className="flex items-center gap-1 h-7 sm:h-9 px-2 sm:px-3 rounded-lg 
-                                   border border-green-300 dark:border-green-700 
-                                   bg-white/80 dark:bg-green-800/40 
-                                   text-green-800 dark:text-green-100 
-                                   text-[11px] sm:text-xs font-semibold shadow-sm select-none"
-                    >
-                        <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-300" />
-                        <span className="leading-none">{sortedData.length}</span>
-                    </div>
+                    {/* في الديسكتوب: عدد السجلات | في الموبايل: أزرار التنقل */}
+                    {/* إخفاء عداد السجلات إذا كانت أزرار التنقل معروضة في نمط البطاقات */}
+                    {!isMobile && !((isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1) && (
+                        <div
+                            aria-label="عدد السجلات"
+                            className="flex items-center gap-1 h-7 sm:h-9 px-2 sm:px-3 rounded-lg 
+                                       border border-green-300 dark:border-green-700 
+                                       bg-white/80 dark:bg-green-800/40 
+                                       text-green-800 dark:text-green-100 
+                                       text-[11px] sm:text-xs font-semibold shadow-sm select-none"
+                        >
+                            <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-300" />
+                            <span className="leading-none">{sortedData.length}</span>
+                        </div>
+                    )}
+                    {(isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1 && (
+                        <div className="flex items-center gap-1" aria-label="التنقل بين البطاقات">
+                            <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); goPrev(); }}
+                                disabled={mobileCardIndex === 0}
+                                className={cn(
+                                    'px-2 py-1 text-[10px] font-semibold rounded-md border flex items-center gap-1 h-7',
+                                    mobileCardIndex === 0
+                                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                        : 'bg-white dark:bg-green-900/40 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700'
+                                )}
+                                data-stop="true"
+                            >
+                                السابق
+                            </button>
+                            <span className="text-[11px] font-semibold text-white dark:text-white select-none min-w-[50px] text-center px-1 drop-shadow-sm">
+                                {mobileCardIndex + 1} / {sortedData.length}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); goNext(); }}
+                                disabled={mobileCardIndex === sortedData.length - 1}
+                                className={cn(
+                                    'px-2 py-1 text-[10px] font-semibold rounded-md border flex items-center gap-1 h-7',
+                                    mobileCardIndex === sortedData.length - 1
+                                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                        : 'bg-white dark:bg-green-900/40 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700'
+                                )}
+                                data-stop="true"
+                            >
+                                التالي
+                            </button>
+                        </div>
+                    )}
 
                     {/* زر الترتيب حسب العمود الأول */}
                     {columns.length > 0 && (
@@ -353,17 +397,19 @@ export function GenericTable<T extends { id: string }>(props: {
 
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (() => {
-                const smallSet = sortedData.length <= 2; // مجموعة صغيرة (1 أو 2)
-                // في الموبايل نعرض بطاقة واحدة فقط مع تنقل
+                const smallSet = sortedData.length <= (cardPageSize ?? 2);
+                // حساب نطاق البطاقات المعروضة إذا كان هناك حد cardPageSize
+                const pageSize = cardPageSize || (isMobile ? 1 : sortedData.length);
+                const startIndex = cardPageSize ? mobileCardIndex : (isMobile ? mobileCardIndex : 0);
+                const endIndexExclusive = cardPageSize ? Math.min(startIndex + pageSize, sortedData.length) : (isMobile ? mobileCardIndex + 1 : sortedData.length);
+                const visibleSlice = sortedData.slice(startIndex, endIndexExclusive);
+
                 const containerClass = isMobile
                     ? 'w-full p-2'
                     : smallSet
                         ? 'flex flex-col md:flex-row gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar justify-center items-stretch'
                         : `grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
-                            grid-cols-1 
-                            ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
-                            ${cardGridColumns.lg ? `lg:grid-cols-${cardGridColumns.lg}` : 'lg:grid-cols-3'} 
-                            ${cardGridColumns.xl ? `xl:grid-cols-${cardGridColumns.xl}` : 'xl:grid-cols-4'}`;
+                            grid-cols-${Math.min(pageSize, 2)} md:grid-cols-${Math.min(pageSize, cardGridColumns.md || pageSize)} lg:grid-cols-${Math.min(pageSize, cardGridColumns.lg || pageSize)} xl:grid-cols-${Math.min(pageSize, cardGridColumns.xl || pageSize)}`;
 
                 return (
                     <div className={containerClass}>
@@ -371,11 +417,17 @@ export function GenericTable<T extends { id: string }>(props: {
                             const CardItem = ({ item }: { item: T }) => {
                             const [expanded, setExpanded] = useState(false);
                             const importantColumn = columns.find((c) => c.important);
-                            const titleColumn = importantColumn || columns[0];
-                            const indexColumn = columns.find(c => c.key === 'row_index');
+                            // دعم كل من row_index و __index كأعمدة فهرس
+                            const indexColumn = columns.find(c => c.key === 'row_index' || c.key === '__index');
+                            // اختيار عمود العنوان: العمود المهم ثم الأول، مع تخطي عمود الفهرس إذا كان هو الأول
+                            let titleColumn = importantColumn || columns[0];
+                            if (indexColumn && titleColumn && titleColumn.key === indexColumn.key) {
+                                const alternative = columns.find(c => c.key !== indexColumn.key);
+                                if (alternative) titleColumn = alternative;
+                            }
                             const titleValue = (item as any)[titleColumn.key] || 'بيانات';
                             // استثناء عمود العنوان وعمود الفهرس من تفاصيل البطاقة
-                            const allDetailColumns = columns.filter((c) => c.key !== titleColumn.key && c.key !== (indexColumn && indexColumn.key));
+                            const allDetailColumns = columns.filter((c) => c.key !== titleColumn.key && (!indexColumn || c.key !== indexColumn.key));
                             // على الموبايل نظهر كل الحقول دائماً ونلغي خاصية الطي
                             const visibleColumns = isMobile ? allDetailColumns : (enableCardExpand && !expanded ? allDetailColumns.slice(0, cardMaxFieldsCollapsed) : allDetailColumns);
                             const hasMore = !isMobile && enableCardExpand && allDetailColumns.length > cardMaxFieldsCollapsed;
@@ -527,51 +579,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 </div>
                             );
                             };
-                            if (isMobile) {
-                                const current = sortedData[mobileCardIndex];
-                                return (
-                                    <div className="flex flex-col gap-3">
-                                        <CardItem key={current.id} item={current} />
-                                        {/* أدوات التنقل للموبايل */}
-                                        {sortedData.length > 1 && (
-                                            <div className="flex items-center justify-center gap-4 mt-1 mb-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); goPrevMobile(); }}
-                                                    disabled={mobileCardIndex === 0}
-                                                    className={cn(
-                                                        'px-3 py-2 text-xs font-semibold rounded-md border flex items-center gap-1',
-                                                        mobileCardIndex === 0
-                                                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                                                            : 'bg-white dark:bg-green-900/40 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700'
-                                                    )}
-                                                    data-stop="true"
-                                                >
-                                                    السابق
-                                                </button>
-                                                <span className="text-[11px] font-medium text-green-700 dark:text-green-200 select-none">
-                                                    {mobileCardIndex + 1} / {sortedData.length}
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); goNextMobile(); }}
-                                                    disabled={mobileCardIndex === sortedData.length - 1}
-                                                    className={cn(
-                                                        'px-3 py-2 text-xs font-semibold rounded-md border flex items-center gap-1',
-                                                        mobileCardIndex === sortedData.length - 1
-                                                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-                                                            : 'bg-white dark:bg-green-900/40 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700'
-                                                    )}
-                                                    data-stop="true"
-                                                >
-                                                    التالي
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            }
-                            return sortedData.map((d) => <CardItem key={d.id} item={d} />);
+                            return visibleSlice.map((d) => <CardItem key={d.id} item={d} />);
                         })()}
                     </div>
                 );

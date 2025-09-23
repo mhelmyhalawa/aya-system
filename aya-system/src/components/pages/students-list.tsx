@@ -741,7 +741,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
       } else {
         const updatedStudent: StudentUpdate = {
           id: data.id!,
-            full_name: data.full_name,
+          full_name: data.full_name,
           guardian_id: data.guardian_id,
           study_circle_id: data.study_circle_id,
           grade_level: data.grade_level!,
@@ -942,16 +942,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
           </div>
         </CardHeader>
 
-     <CardContent>
+        <CardContent>
           {error && (
-            <Alert variant="destructive" className="mb-4">
+            <Alert variant="destructive" className="mb-2">
               <AlertCircle className="h-4 w-4 ml-2" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
 
           {/* شريط البحث والتصفية (نسخة مضغوطة) */}
-          <div className="flex flex-col md:flex-row md:items-stretch gap-2 md:gap-3 mb-4 md:mb-3">
+          <div className="flex flex-col md:flex-row md:items-stretch gap-0 md:gap-0 mb-1 md:mb-0">
             {/* حقل البحث */}
             <div className="relative md:w-[220px] lg:w-[260px]">
               <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -965,7 +965,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             </div>
 
             {/* الفلاتر + أزرار الإجراءات */}
-            <div className="flex flex-col md:flex-row md:items-stretch gap-2 md:gap-2 md:w-auto flex-1">
+            <div className="flex flex-col md:flex-row md:items-stretch gap-0 md:gap-0 md:w-auto flex-1">
               {/* فلتر ديناميكي: معلم أو حلقة */}
               {userRole === 'teacher' ? (
                 <div className="w-full sm:w-auto md:w-[200px]">
@@ -1054,10 +1054,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               )}
 
               {/* أزرار الإجراءات */}
-              <div className="flex flex-row gap-1 md:gap-2 md:w-auto md:ml-2 items-stretch">
-                <Button variant="outline" size="icon" onClick={handleSearch} title={studentsLabels.search} className="shrink-0 w-9 h-9">
-                  <Search className="h-4 w-4" />
-                </Button>
+              <div className="hidden sm:flex gap-2">
                 <Button
                   variant="outline"
                   size="icon"
@@ -1081,7 +1078,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             </div>
           </div>
         </CardContent>
-   
+
       </Card>
 
       {/* الجدول عبر المكون العام GenericTable */}
@@ -1091,13 +1088,9 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         defaultView="table"
         columns={([
           { key: '__index', header: '#', render: (item: any) => <span className="font-medium">{item.__index}</span>, width: '50px', align: 'center' },
-          { key: 'full_name', header: studentsLabels.name, render: (item: any) => <span className="font-medium">{item.full_name}</span> },
-          {
-            key: 'guardian', header: studentsLabels.guardianColumn, render: (item: any) => item.guardian?.full_name ? (
-              <div className="flex items-center gap-1"><UserCircle className="h-4 w-4 text-islamic-green/60" /><span>{item.guardian.full_name}</span></div>
-            ) : <span className="text-muted-foreground">—</span>
-          },
-          ...(userRole !== 'teacher' ? [{
+          // عمود اسم الطالب (يُستخدم في رأس البطاقة مع الفهرس)
+          { key: 'full_name', header: studentsLabels.name, render: (item: any) => <span className="font-medium">{item.full_name} {item.guardian?.full_name}</span> },
+           ...(userRole !== 'teacher' ? [{
             key: 'teacher', header: studentsLabels.teacherColumn, render: (item: any) => item.study_circle?.teacher?.full_name ? (
               <div className="flex items-center gap-1"><GraduationCap className="h-4 w-4 text-islamic-green/60" /><span>{item.study_circle.teacher.full_name}</span></div>
             ) : <span className="text-muted-foreground">—</span>
