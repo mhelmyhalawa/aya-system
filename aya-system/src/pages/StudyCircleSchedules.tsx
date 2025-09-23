@@ -147,6 +147,60 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       (circle.teacher?.full_name && circle.teacher.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // === Mobile circles pagination (show only 3 at a time) ===
+  const MOBILE_CIRCLES_PAGE_SIZE = 2 // كان 3 - طلب التعديل ليصبح 2
+  const [mobileCirclesPage, setMobileCirclesPage] = useState(0);
+  const totalMobileCirclePages = Math.ceil(filteredCircles.length / MOBILE_CIRCLES_PAGE_SIZE) || 1;
+  const pagedMobileCircles = filteredCircles.slice(
+    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE,
+    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE + MOBILE_CIRCLES_PAGE_SIZE
+  );
+
+  const canPrevMobileCircles = mobileCirclesPage > 0;
+  const canNextMobileCircles = mobileCirclesPage < totalMobileCirclePages - 1;
+
+  const goPrevMobileCircles = () => {
+    setMobileCirclesPage(p => (p > 0 ? p - 1 : p));
+  };
+  const goNextMobileCircles = () => {
+    setMobileCirclesPage(p => (p < totalMobileCirclePages - 1 ? p + 1 : p));
+  };
+
+  // Reset page to 0 when filters (search) change or count shrinks
+  useEffect(() => {
+    setMobileCirclesPage(0);
+  }, [searchTerm, allCircles.length]);
+
+  // === Schedules pagination (separate mobile vs desktop) ===
+  const MOBILE_SCHEDULES_PAGE_SIZE = 2; // المطلوب للموبايل
+  const DESKTOP_SCHEDULES_PAGE_SIZE = 4; // يمكن تغييره بسهولة لاحقاً دون التأثير على الموبايل
+  const sortedSchedules = [...circleSchedules].sort(
+    (a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time)
+  );
+
+  // Mobile schedule pagination state
+  const [mobileSchedulePage, setMobileSchedulePage] = useState(0);
+  const totalMobileSchedulePages = Math.ceil(sortedSchedules.length / MOBILE_SCHEDULES_PAGE_SIZE) || 1;
+  const pagedMobileSchedules = sortedSchedules.slice(
+    mobileSchedulePage * MOBILE_SCHEDULES_PAGE_SIZE,
+    mobileSchedulePage * MOBILE_SCHEDULES_PAGE_SIZE + MOBILE_SCHEDULES_PAGE_SIZE
+  );
+  const prevMobileSchedulePage = () => setMobileSchedulePage(p => (p > 0 ? p - 1 : p));
+  const nextMobileSchedulePage = () => setMobileSchedulePage(p => (p < totalMobileSchedulePages - 1 ? p + 1 : p));
+
+  // Desktop schedule pagination state
+  const [desktopSchedulePage, setDesktopSchedulePage] = useState(0);
+  const totalDesktopSchedulePages = Math.ceil(sortedSchedules.length / DESKTOP_SCHEDULES_PAGE_SIZE) || 1;
+  const pagedDesktopSchedules = sortedSchedules.slice(
+    desktopSchedulePage * DESKTOP_SCHEDULES_PAGE_SIZE,
+    desktopSchedulePage * DESKTOP_SCHEDULES_PAGE_SIZE + DESKTOP_SCHEDULES_PAGE_SIZE
+  );
+  const prevDesktopSchedulePage = () => setDesktopSchedulePage(p => (p > 0 ? p - 1 : p));
+  const nextDesktopSchedulePage = () => setDesktopSchedulePage(p => (p < totalDesktopSchedulePages - 1 ? p + 1 : p));
+
+  // Reset both when circle or schedules change
+  useEffect(() => { setMobileSchedulePage(0); setDesktopSchedulePage(0); }, [selectedCircle?.id, sortedSchedules.length]);
+
   // Add schedule
   const handleAddSchedule = () => {
     // Reset add schedule form
@@ -169,90 +223,74 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     }));
   };
 
-  // Save new schedule
+  // Open edit schedule dialog for a specific schedule
+  const handleEditSchedule = (schedule: StudyCircleSchedule) => {
+    setEditingSchedule(schedule);
+    setEditScheduleForm({
+      weekday: schedule.weekday.toString(),
+      start_time: schedule.start_time,
+      end_time: schedule.end_time,
+      location: schedule.location || ''
+    });
+    setOpenEditScheduleDialog(true);
+  };
+
+  // Save new schedule (create)
   const handleSaveNewSchedule = async () => {
     if (!selectedCircle || savingNewSchedule) return;
-
     try {
       setSavingNewSchedule(true);
 
-      // Validate form data
       if (!addScheduleForm.start_time || !addScheduleForm.end_time) {
         toast({
           title: scsLabels.validationDataError,
           description: scsLabels.validationMissingTimes,
-          variant: "destructive",
+          variant: 'destructive'
         });
-        setSavingNewSchedule(false);
         return;
       }
-
-      // Check if end time is after start time
       if (addScheduleForm.start_time >= addScheduleForm.end_time) {
         toast({
           title: scsLabels.validationTimesError,
           description: scsLabels.validationTimesMessage,
-          variant: "destructive",
+          variant: 'destructive'
         });
-        setSavingNewSchedule(false);
         return;
       }
 
-      // Prepare new schedule data
-      const newScheduleData: StudyCircleScheduleCreate = {
+      const payload: StudyCircleScheduleCreate = {
         study_circle_id: selectedCircle.id,
         weekday: parseInt(addScheduleForm.weekday),
         start_time: addScheduleForm.start_time,
         end_time: addScheduleForm.end_time,
         location: addScheduleForm.location.trim() || null
       };
-
-      console.log('💾 Creating new schedule:', newScheduleData);
-
-      // Call API to add the schedule
-      const result = await createStudyCircleSchedule(newScheduleData);
-
+      const result = await createStudyCircleSchedule(payload);
       if (result.success) {
         toast({
           title: scsLabels.createSuccessTitle,
           description: scsLabels.createSuccessDescription(selectedCircle.name),
-          variant: "default",
+          variant: 'default'
         });
-
-        // Reload schedules to show the new one
         await loadCircleSchedules(selectedCircle.id);
-
-        // Close add dialog
         setOpenAddScheduleDialog(false);
       } else {
         toast({
           title: scsLabels.createFailedTitle,
           description: result.message || scsLabels.createFailedDescription,
-          variant: "destructive",
+          variant: 'destructive'
         });
       }
-    } catch (error) {
-      console.error('❌ Error creating new schedule:', error);
+    } catch (e) {
+      console.error('Error creating schedule', e);
       toast({
         title: scsLabels.unexpectedErrorTitle,
         description: scsLabels.unexpectedErrorDescription,
-        variant: "destructive",
+        variant: 'destructive'
       });
     } finally {
       setSavingNewSchedule(false);
     }
-  };
-
-  // Edit schedule
-  const handleEditSchedule = (schedule: StudyCircleSchedule) => {
-    setEditingSchedule(schedule);
-    setEditScheduleForm({
-      weekday: schedule.weekday.toString(),
-      start_time: schedule.start_time.substring(0, 5), // HH:MM format
-      end_time: schedule.end_time.substring(0, 5), // HH:MM format
-      location: schedule.location || ''
-    });
-    setOpenEditScheduleDialog(true);
   };
 
   // Handle edit schedule form changes
@@ -421,24 +459,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     return set;
   })();
 
-  const groupedSchedules = (() => {
-    const groups: Record<number, StudyCircleSchedule[]> = {};
-    circleSchedules.forEach(s => { (groups[s.weekday] ||= []).push(s); });
-    Object.values(groups).forEach(list => list.sort((a, b) => a.start_time.localeCompare(b.start_time)));
-    return weekdayOptions
-      .map(o => parseInt(o.value, 10))
-      .filter(day => groups[day]?.length)
-      .map(day => ({ weekday: day, items: groups[day] }));
-  })();
+  // لم نعد نحتاج groupedSchedules بعد تحويل العرض إلى بطاقات أفقية
 
   return (
-   <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
+    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
       <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
         <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
           <div className="space-y-0.5 sm:space-y-1">
             <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
-                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
-                <span className="line-clamp-1">{scsLabels.pageTitle} </span>
+              <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
+              <span className="line-clamp-1">{scsLabels.pageTitle} </span>
             </CardTitle>
             <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
               {scsLabels.pageDescription}
@@ -447,7 +477,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
         </CardHeader>
 
         <CardContent className="space-y-3 sm:space-y-6 px-2 sm:px-4 pt-3 pb-4">
-          <div className="grid md:grid-cols-3 gap-2 sm:gap-6">
+          <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
             {/* قائمة الجوال */}
             <div className="md:hidden">
               <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
@@ -493,7 +523,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                     <div className="w-full py-6 text-center text-green-600 text-[12px]">{scsLabels.noResults}</div>
                   ) : (
                     <div className="flex flex-col gap-1">
-                      {filteredCircles.map(circle => {
+                      {pagedMobileCircles.map(circle => {
                         const active = selectedCircle?.id === circle.id;
                         return (
                           <button
@@ -521,6 +551,43 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                           </button>
                         );
                       })}
+                      {/* Pagination controls */}
+                      {totalMobileCirclePages > 1 && (
+                        <div className="mt-2 flex flex-col items-center gap-1 py-1">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={goPrevMobileCircles}
+                              disabled={!canPrevMobileCircles}
+                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
+                                ${canPrevMobileCircles ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                              aria-label="السابق"
+                            >
+                              ‹
+                            </button>
+                            <div className="flex items-center gap-1" aria-label="مؤشر الصفحات">
+                              {Array.from({ length: totalMobileCirclePages }).map((_, i) => (
+                                <span
+                                  key={i}
+                                  className={`w-2 h-2 rounded-full transition-all ${i === mobileCirclesPage ? 'bg-green-600 scale-110' : 'bg-green-300'
+                                    }`}
+                                  aria-label={`صفحة ${i + 1}`}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={goNextMobileCircles}
+                              disabled={!canNextMobileCircles}
+                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
+                                ${canNextMobileCircles ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                              aria-label="التالي"
+                            >
+                              ›
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -609,7 +676,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
             </div>
 
             {/* جانب الجدولة - ثلثين الصفحة */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-3">
               <div className="bg-green-50 border border-green-200 rounded-none md:rounded-xl shadow-sm overflow-hidden">
 
                 {/* هيدر ديناميكي حسب الشاشة */}
@@ -659,12 +726,12 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-green-700" />
-                      {selectedCircle ? `${scsLabels.pageTitle.replace('الحلقات الدراسية','حلقة')}: ${selectedCircle.name}` : scsLabels.pageTitle} | 👨‍🏫
+                      {selectedCircle ? `${scsLabels.pageTitle.replace('الحلقات الدراسية', 'حلقة')}: ${selectedCircle.name}` : scsLabels.pageTitle} | 👨‍🏫
                     </div>
 
                     {selectedCircle?.teacher && (
                       <CardDescription className="text-gray-700 text-xs sm:text-[10px]">
-                        {scsLabels.teacherShort.replace(':','')}: {selectedCircle.teacher.full_name}
+                        {scsLabels.teacherShort.replace(':', '')}: {selectedCircle.teacher.full_name}
                       </CardDescription>
                     )}
                   </CardTitle>
@@ -712,13 +779,62 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   ) : (
                     <div className="space-y-4">
 
-                      {/* ملخص المواعيد */}
-                      <div className="flex items-center gap-2 p-2.5 sm:p-3 bg-green-100 rounded-none md:rounded-lg border border-green-200 text-xs sm:text-sm">
-                        <span className="text-sm text-green-700">{scsLabels.totalSchedules}</span>
-                        <Badge variant="outline" className="text-green-800 border-green-400">
-                          {circleSchedules.length} {scsLabels.scheduleWord}
-                        </Badge>
-                      </div>
+                      {/* ترقيم المواعيد (استبدال إجمالي المواعيد) */}
+                      {circleSchedules.length > 0 && (
+                        <div className="flex flex-col items-center gap-1 p-2.5 sm:p-3 bg-green-100 rounded-none md:rounded-lg border border-green-200 text-xs sm:text-sm md:hidden">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={prevMobileSchedulePage}
+                              disabled={mobileSchedulePage === 0}
+                              className={`px-2 py-1 rounded-md border text-[11px] sm:text-xs font-medium transition-all shadow-sm
+                                ${mobileSchedulePage > 0 ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                              aria-label="السابق"
+                            >
+                              ‹
+                            </button>
+                            <div className="flex items-center gap-1" aria-label="مؤشر الصفحات">
+                              {Array.from({ length: totalMobileSchedulePages }).map((_, i) => (
+                                <span
+                                  key={i}
+                                  className={`w-2 h-2 rounded-full transition-all ${i === mobileSchedulePage ? 'bg-green-600 scale-110' : 'bg-green-300'}`}
+                                  aria-label={`صفحة ${i + 1}`}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={nextMobileSchedulePage}
+                              disabled={mobileSchedulePage >= totalMobileSchedulePages - 1}
+                              className={`px-2 py-1 rounded-md border text-[11px] sm:text-xs font-medium transition-all shadow-sm
+                                ${(mobileSchedulePage < totalMobileSchedulePages - 1) ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                              aria-label="التالي"
+                            >
+                              ›
+                            </button>
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            <div className="flex flex-col items-center gap-1 w-full">
+                              <div className="flex items-center gap-2 font-medium text-green-700">
+                                <Calendar className="w-3.5 h-3.5 text-green-600" />
+                                <span>{scsLabels.totalSchedules}</span>
+                                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
+                                  {circleSchedules.length}
+                                </span>
+                                <span className="text-gray-400 text-[10px]">
+                                  ({totalMobileSchedulePages + 1} / {totalMobileSchedulePages})
+                                </span>
+                              </div>
+                              <div className="w-40 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-green-500 via-green-600 to-green-700 transition-all duration-500"
+                                  style={{ width: `${((mobileSchedulePage + 1) / totalMobileSchedulePages) * 100}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* عرض الموبايل */}
                       <div className="md:hidden space-y-2.5 px-2" role="list" aria-label="قائمة المواعيد">
@@ -726,144 +842,191 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                           <div className="text-center text-[13px] text-green-600 py-5">{scsLabels.noSchedules}</div>
                         )}
 
-                        {[...circleSchedules]
-                          .sort((a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time))
-                          .map(schedule => {
-                            const isConflict = conflictIds.has(schedule.id);
+                        {pagedMobileSchedules.map(schedule => {
+                          const isConflict = conflictIds.has(schedule.id);
 
-                            return (
-                              <div
-                                key={schedule.id}
-                                role="listitem"
-                                className={`rounded-lg border shadow-sm p-2.5 flex flex-col gap-2 text-[12px] relative transition-colors`}
-                                aria-label={`موعد يوم ${getWeekdayName(schedule.weekday)}`}
-                              >
-
-                                <div className="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-green-400 to-green-600 rounded-xl shadow-md border border-green-300">
-                                  <h3 className="font-bold flex items-center gap-2 text-sm text-white">
-                                    <span>📅 {getWeekdayName(schedule.weekday)}</span>
-                                  </h3>
-                                </div>
-
-
-                                <div className="flex items-center gap-2 text-[11px]">
-                                  <div className="flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center bg-blue-100 text-blue-800">
-                                    <Clock className="h-3 w-3 text-blue-600" /> {formatTime(schedule.start_time)}
-                                  </div>
-                                  <span className="text-gray-400 font-bold">—</span>
-                                  <div className="flex items-center gap-1 px-2 py-1 rounded-md flex-1 justify-center bg-purple-100 text-purple-800">
-                                    <Clock className="h-3 w-3 text-purple-600" /> {formatTime(schedule.end_time)}
-                                  </div>
-                                </div>
-
-                                <div className="flex items-center gap-1 text-green-700">
-                                  {schedule.location ? (
-                                    <span className="flex items-center gap-1 text-[12px]">
-                                      <MapPin className="h-3 w-3 text-green-600" /> {schedule.location}
-                                    </span>
-                                  ) : (
-                                    <span className="text-[11px] italic text-green-500">{scsLabels.defaultLocation}</span>
-                                  )}
-                                </div>
-
-                                {canEditSchedules && (
-                                  <div className="flex gap-2 pt-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditSchedule(schedule)}
-                                      className="flex-1 rounded-md h-7 bg-green-200 hover:bg-green-300 text-green-900"
-                                      title={scsLabels.editDialogTitle}
-                                    >
-                                      <Pencil className="h-3.5 w-3.5 mx-auto" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleDeleteSchedule(schedule)}
-                                      className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-md h-7"
-                                      title={scsLabels.deleteFailedTitle}
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 mx-auto" />
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                      </div>
-
-                      {/* عرض الديسكتوب */}
-                      <div className="hidden md:flex flex-col gap-5" aria-label="المواعيد المجمعة">
-                        {groupedSchedules.length === 0 && (
-                          <div className="text-center text-sm text-green-600 py-8 border rounded-xl bg-white">{scsLabels.noSchedules}</div>
-                        )}
-                        {groupedSchedules.map(group => {
-                          const dayName = getWeekdayName(group.weekday);
                           return (
-                            <div key={group.weekday} className="border border-green-200 rounded-xl overflow-hidden bg-white shadow-sm">
-                              <div className="px-4 py-2 flex items-center justify-between bg-gradient-to-r from-green-400 to-green-600 rounded-xl shadow-md border border-green-300">
-                                <h3 className="font-bold flex items-center gap-2 text-sm text-white">
-                                  <span>📅 {dayName}</span>
+                            <div
+                              key={schedule.id}
+                              role="listitem"
+                              className={`rounded-md border shadow-sm p-2 flex flex-col gap-1.5 text-[11px] relative transition-colors`}
+                              aria-label={`موعد يوم ${getWeekdayName(schedule.weekday)}`}
+                            >
+
+                              <div className="px-3 py-1.5 flex items-center justify-between bg-gradient-to-r from-green-500 to-green-600 rounded-lg shadow border border-green-300">
+                                <h3 className="font-bold flex items-center gap-1.5 text-[11px] text-white">
+                                  <span>📅 {getWeekdayName(schedule.weekday)}</span>
                                 </h3>
                               </div>
-                              <div className="divide-y divide-green-100">
-                                {group.items.map(item => {
-                                  const isConflict = conflictIds.has(item.id);
-                                  return (
-                                    <div key={item.id} className={`p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-[13px] ${isConflict ? 'bg-red-50/70' : 'hover:bg-green-50'} transition-colors`}>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <div className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 shadow-sm">
-                                          <Clock className="h-3 w-3 text-blue-600" /> <span className="font-bold">{scsLabels.presence}</span> {formatTime(item.start_time)}
-                                        </div>
-                                        <span className="mx-1 text-gray-400">—</span>
-                                        <div className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 shadow-sm">
-                                          <Clock className="h-3 w-3 text-purple-600" /> <span className="font-bold">{scsLabels.leaving}</span> {formatTime(item.end_time)}
-                                        </div>
-                                        {item.location ? (
-                                          <span className="flex items-center gap-1 text-[11px] md:text-xs text-green-700">
-                                            <MapPin className="h-3 w-3 text-green-600" /> {item.location}
-                                          </span>
-                                        ) : (
-                                          <span className="text-[11px] italic text-green-500">{scsLabels.virtualLocation}</span>
-                                        )}
-                                        {isConflict && (
-                                          <span className="flex items-center gap-1 text-[11px] text-red-700 font-semibold bg-red-100 px-2 py-0.5 rounded-full border border-red-300 shadow-sm">
-                                            <AlertTriangle className="h-3 w-3" /> {scsLabels.conflict}
-                                          </span>
-                                        )}
-                                      </div>
-                                      {canEditSchedules && (
-                                        <div className="flex items-center gap-2 mt-1 md:mt-0">
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleEditSchedule(item)}
-                                            className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 h-8"
-                                            title={scsLabels.editDialogTitle}
-                                          >
-                                            <Pencil className="h-4 w-4" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => handleDeleteSchedule(item)}
-                                            className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 h-8"
-                                            title={scsLabels.deleteFailedTitle}
-                                          >
-                                            <Trash2 className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
+
+
+                              <div className="flex items-center gap-1.5 text-[10px]">
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md flex-1 justify-center bg-blue-100 text-blue-800">
+                                  <Clock className="h-3 w-3 text-blue-600" /> {formatTime(schedule.start_time)}
+                                </div>
+                                <span className="text-gray-400 font-bold text-[10px]">—</span>
+                                <div className="flex items-center gap-1 px-2 py-0.5 rounded-md flex-1 justify-center bg-purple-100 text-purple-800">
+                                  <Clock className="h-3 w-3 text-purple-600" /> {formatTime(schedule.end_time)}
+                                </div>
                               </div>
+
+                              <div className="flex items-center gap-1 text-green-700 min-h-[16px]">
+                                {schedule.location ? (
+                                  <span className="flex items-center gap-1 text-[10px]">
+                                    <MapPin className="h-3 w-3 text-green-600" /> {schedule.location}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] italic text-green-500">{scsLabels.defaultLocation}</span>
+                                )}
+                              </div>
+
+                              {canEditSchedules && (
+                                <div className="flex gap-1.5 pt-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEditSchedule(schedule)}
+                                    className="flex-1 rounded-md h-6 bg-green-200 hover:bg-green-300 text-green-900 px-0"
+                                    title={scsLabels.editDialogTitle}
+                                  >
+                                    <Pencil className="h-3 w-3 mx-auto" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteSchedule(schedule)}
+                                    className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-md h-6 px-0"
+                                    title={scsLabels.deleteFailedTitle}
+                                  >
+                                    <Trash2 className="h-3 w-3 mx-auto" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
                       </div>
 
+                      {/* عرض الديسكتوب بترقيم (بدون سكرول) */}
+                      <div className="hidden md:flex flex-col gap-3" aria-label="المواعيد (ديسكتوب)">
+                        {pagedDesktopSchedules.length === 0 ? (
+                          <div className="text-center text-sm text-green-600 py-6 border rounded-xl bg-white w-full">{scsLabels.noSchedules}</div>
+                        ) : (
+                          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3" role="list">
+                            {pagedDesktopSchedules.map(item => {
+                              const isConflict = conflictIds.has(item.id);
+                              return (
+                                <div
+                                  key={item.id}
+                                  role="listitem"
+                                  className={`min-w-[230px] max-w-[240px] border border-green-200 rounded-lg bg-white shadow-sm flex flex-col text-[11px] p-2 relative transition-all hover:shadow-md ${isConflict ? 'ring-1 ring-red-300 bg-red-50/70' : 'hover:border-green-400'}`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[12px] font-bold text-green-700">📅 {getWeekdayName(item.weekday)}</span>
+                                    {isConflict && (
+                                      <span className="flex items-center gap-0.5 text-[10px] text-red-700 font-semibold bg-red-100 px-1.5 py-0.5 rounded-full border border-red-300">
+                                        <AlertTriangle className="h-3 w-3" />
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 border border-blue-200 text-[10px] font-medium flex-1 justify-center">
+                                      <Clock className="h-3 w-3 text-blue-600" /> {formatTime(item.start_time)}
+                                    </div>
+                                    <span className="text-gray-400 text-[10px] font-bold">—</span>
+                                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 text-[10px] font-medium flex-1 justify-center">
+                                      <Clock className="h-3 w-3 text-purple-600" /> {formatTime(item.end_time)}
+                                    </div>
+                                  </div>
+                                  <div className="mb-1 min-h-[18px]">
+                                    {item.location ? (
+                                      <span className="flex items-center gap-1 text-[10px] text-green-700">
+                                        <MapPin className="h-3 w-3 text-green-600" /> {item.location}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] italic text-green-500">{scsLabels.virtualLocation}</span>
+                                    )}
+                                  </div>
+                                  {canEditSchedules && (
+                                    <div className="flex items-center gap-1 mt-auto">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEditSchedule(item)}
+                                        className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-1 h-7 w-1/2"
+                                        title={scsLabels.editDialogTitle}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5 mx-auto" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteSchedule(item)}
+                                        className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-1 h-7 w-1/2"
+                                        title={scsLabels.deleteFailedTitle}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 mx-auto" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {totalDesktopSchedulePages > 1 && (
+                          <div className="flex flex-col items-center gap-1 mt-1" aria-label="ترقيم المواعيد ديسكتوب">
+                            <div className="flex items-center justify-center gap-4">
+                              <button
+                                onClick={prevDesktopSchedulePage}
+                                disabled={desktopSchedulePage === 0}
+                                className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
+                                aria-label="السابق"
+                              >
+                                <ChevronRight className="w-5 h-5" />
+                              </button>
+                              <div className="flex items-center gap-2" aria-label="ترقيم الصفحات">
+                                {Array.from({ length: totalDesktopSchedulePages }).map((_, i) => (
+                                  <button
+                                    key={i}
+                                    onClick={() => setDesktopSchedulePage(i)}
+                                    className={`w-2.5 h-2.5 rounded-full transition ${i === desktopSchedulePage ? 'bg-green-600 scale-110' : 'bg-green-300 hover:bg-green-400'}`}
+                                    aria-label={`صفحة ${i + 1}`}
+                                  />
+                                ))}
+                              </div>
+                              <button
+                                onClick={nextDesktopSchedulePage}
+                                disabled={desktopSchedulePage >= totalDesktopSchedulePages - 1}
+                                className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
+                                aria-label="التالي"
+                              >
+                                <ChevronLeft className="w-5 h-5" />
+                              </button>
+                            </div>
+                            <div className="text-[11px] text-gray-500">
+                              <div className="flex flex-col items-center gap-1 w-full">
+                                <div className="flex items-center gap-2 font-medium text-green-700">
+                                  <Calendar className="w-3.5 h-3.5 text-green-600" />
+                                  <span>{scsLabels.totalSchedules}</span>
+                                  <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">
+                                    {circleSchedules.length}
+                                  </span>
+                                  <span className="text-gray-400 text-[10px]">
+                                    ({desktopSchedulePage + 1} / {totalDesktopSchedulePages})
+                                  </span>
+                                </div>
+                                <div className="w-40 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-green-500 via-green-600 to-green-700 transition-all duration-500"
+                                    style={{ width: `${((desktopSchedulePage + 1) / totalDesktopSchedulePages) * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -874,9 +1037,6 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           </div>
         </CardContent>
       </Card>
-
-
-
       {/* Add Schedule Dialog */}
       <FormDialog
         title={scsLabels.addDialogTitle}
