@@ -336,21 +336,27 @@ export function GenericTable<T extends { id: string }>(props: {
             )}
 
             {/* وضع البطاقات */}
-            {sortedData.length > 0 && viewMode === 'card' && (
-                <div
-                    className={`grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
+            {sortedData.length > 0 && viewMode === 'card' && (() => {
+                const smallSet = sortedData.length <= 2; // مجموعة صغيرة (1 أو 2)
+                const containerClass = smallSet
+                    ? 'flex flex-col md:flex-row gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar justify-center items-stretch'
+                    : `grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
                         grid-cols-1 
                         ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
                         ${cardGridColumns.lg ? `lg:grid-cols-${cardGridColumns.lg}` : 'lg:grid-cols-3'} 
-                        ${cardGridColumns.xl ? `xl:grid-cols-${cardGridColumns.xl}` : 'xl:grid-cols-4'}`}
-                >
-                    {(() => {
-                        const CardItem = ({ item }: { item: T }) => {
+                        ${cardGridColumns.xl ? `xl:grid-cols-${cardGridColumns.xl}` : 'xl:grid-cols-4'}`;
+
+                return (
+                    <div className={containerClass}>
+                        {(() => {
+                            const CardItem = ({ item }: { item: T }) => {
                             const [expanded, setExpanded] = useState(false);
                             const importantColumn = columns.find((c) => c.important);
                             const titleColumn = importantColumn || columns[0];
+                            const indexColumn = columns.find(c => c.key === 'row_index');
                             const titleValue = (item as any)[titleColumn.key] || 'بيانات';
-                            const allDetailColumns = columns.filter((c) => c.key !== titleColumn.key);
+                            // استثناء عمود العنوان وعمود الفهرس من تفاصيل البطاقة
+                            const allDetailColumns = columns.filter((c) => c.key !== titleColumn.key && c.key !== (indexColumn && indexColumn.key));
                             const visibleColumns = enableCardExpand && !expanded ? allDetailColumns.slice(0, cardMaxFieldsCollapsed) : allDetailColumns;
                             const hasMore = enableCardExpand && allDetailColumns.length > cardMaxFieldsCollapsed;
 
@@ -371,9 +377,10 @@ export function GenericTable<T extends { id: string }>(props: {
                                         }
                                     }}
                                     className={cn(
-                                        'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm transition-all duration-200 overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 md:h-full',
+                                        'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 md:h-full',
                                         cardWidth ? '' : 'w-full',
-                                        highlightOnHover && 'hover:shadow-md hover:border-green-400/60 dark:hover:border-green-600/60'
+                                        smallSet && 'md:max-w-[520px] mx-auto'
+                                        // تمت إزالة تأثير hover (الظل وتغيير الحد) لمنع الوميض
                                     )}
                                     style={cardWidth ? { width: cardWidth } : undefined}
                                 >
@@ -381,8 +388,15 @@ export function GenericTable<T extends { id: string }>(props: {
                                     <div className="px-3 py-2 sm:py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
                                                     dark:from-green-800 dark:via-green-700 dark:to-green-600 
                                                     text-white rounded-t-lg shadow-md flex items-center justify-between">
-                                        <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1">
-                                            {titleColumn.render ? titleColumn.render(item) : titleValue}
+                                        <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1 flex items-center gap-2">
+                                            {indexColumn && (
+                                                <span className="inline-flex items-center justify-center min-w-[26px] h-[26px] rounded-full bg-white/15 border border-white/30 text-xs font-semibold shadow-inner backdrop-blur-sm">
+                                                    {indexColumn.render ? indexColumn.render(item) : (item as any)[indexColumn.key]}
+                                                </span>
+                                            )}
+                                            <span className="truncate">
+                                                {titleColumn.render ? titleColumn.render(item) : titleValue}
+                                            </span>
                                         </h3>
                                     </div>
 
@@ -495,11 +509,12 @@ export function GenericTable<T extends { id: string }>(props: {
 
                                 </div>
                             );
-                        };
-                        return sortedData.map((d) => <CardItem key={d.id} item={d} />);
-                    })()}
-                </div>
-            )}
+                            };
+                            return sortedData.map((d) => <CardItem key={d.id} item={d} />);
+                        })()}
+                    </div>
+                );
+            })()}
         </div>
     );
 }

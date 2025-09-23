@@ -220,6 +220,11 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const [selectedGuardianName, setSelectedGuardianName] = useState("");
   // عند تحرير طالب من قائمة طلاب ولي الأمر نحتاج معرفة السياق لإبقاء القائمة مفتوحة
   const [editingFromStudentsList, setEditingFromStudentsList] = useState(false);
+  // حالة تحميل طلاب ولي الأمر (لزر العدد والحوار)
+  const [isLoadingGuardianStudents, setIsLoadingGuardianStudents] = useState(false);
+  const [studentsListLoadingGuardianId, setStudentsListLoadingGuardianId] = useState<string | null>(null);
+  // معرف ولي الأمر الحالي المعروض طلابه (لأجل إعادة التحميل)
+  const [studentsListGuardianId, setStudentsListGuardianId] = useState<string | null>(null);
 
   // Pagination config
   const itemsPerPage = 10;
@@ -613,15 +618,24 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // وظيفة لتحميل وعرض الطلاب لولي أمر محدد
   const handleShowGuardianStudents = async (guardianId: string, guardianName: string) => {
+    // افتح الحوار فوراً مع حالة تحميل
+    setSelectedGuardianName(guardianName);
+    setSelectedGuardianStudents([]);
+    setIsStudentsListDialogOpen(true);
+    setIsLoadingGuardianStudents(true);
+    setStudentsListLoadingGuardianId(guardianId);
+    setStudentsListGuardianId(guardianId);
     try {
-      setLoading(true);
       console.log('[handleShowGuardianStudents] guardianId:', guardianId, 'guardianName:', guardianName);
       const students = await getStudentsByGuardianId(guardianId);
       console.log('[handleShowGuardianStudents] students fetched:', students);
-      // تعيين البيانات لعرضها في الحوار
       setSelectedGuardianStudents(students);
-      setSelectedGuardianName(guardianName);
-      setIsStudentsListDialogOpen(true);
+      if (students.length === 0) {
+        toast({
+          title: guardiansLabels.noStudentsForGuardian,
+          duration: 2500
+        });
+      }
     } catch (error) {
       console.error(guardiansLabels.studentsLoadErrorTitle + ':', error);
       toast({
@@ -630,7 +644,29 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setIsLoadingGuardianStudents(false);
+      setStudentsListLoadingGuardianId(null);
+    }
+  };
+
+  // إعادة تحميل قائمة الطلاب لنفس ولي الأمر بدون إغلاق الحوار
+  const reloadGuardianStudents = async () => {
+    if (!studentsListGuardianId) return;
+    setIsLoadingGuardianStudents(true);
+    setStudentsListLoadingGuardianId(studentsListGuardianId);
+    try {
+      const students = await getStudentsByGuardianId(studentsListGuardianId);
+      setSelectedGuardianStudents(students);
+      if (students.length === 0) {
+        toast({ title: guardiansLabels.noStudentsForGuardian, duration: 2500 });
+      } else {
+        toast({ title: guardiansLabels.refresh, className: 'bg-green-50 border-green-200', duration: 1500 });
+      }
+    } catch (e) {
+      toast({ title: guardiansLabels.studentsLoadErrorTitle, description: guardiansLabels.studentsLoadErrorDescription, variant: 'destructive' });
+    } finally {
+      setIsLoadingGuardianStudents(false);
+      setStudentsListLoadingGuardianId(null);
     }
   };
 
@@ -748,6 +784,84 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // Calculate total pages
   const totalPages = Math.max(1, Math.ceil(filteredGuardians.length / itemsPerPage));
+
+  // ===== Helpers: تطبيع قيم المرحلة الدراسية والأجزاء المحفوظة =====
+  const normalizeKey = (v: string) => v.toString().toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+  const getGradeLabel = (raw: any) => {
+    if (raw === null || raw === undefined || raw === '') return '-';
+    const rawStr = String(raw).trim();
+    const options = studentsLabels.gradeOptions || [];
+    // محاولة مطابقة مباشرة
+    let direct = options.find(o => String(o.value) === rawStr);
+    if (direct) return direct.label;
+    // تطبيع ومقارنة بدون فواصل / شرطات
+    const norm = normalizeKey(rawStr);
+    const normMatch = options.find(o => normalizeKey(String(o.value)) === norm);
+    if (normMatch) return normMatch.label;
+    // محاولات خاصة لرياض الأطفال (kg, kg1, kg2 إلخ)
+    if (/^kg0?1$/.test(norm)) {
+      const kg1 = options.find(o => /kg.?0?1/i.test(String(o.value)));
+      if (kg1) return kg1.label;
+    }
+    if (/^kg0?2$/.test(norm)) {
+      const kg2 = options.find(o => /kg.?0?2/i.test(String(o.value)));
+      if (kg2) return kg2.label;
+    }
+    // نمط m1 أو m01 يعتبر الصف الأول (m قد ترمز mix/مرحلة مختصرة)
+    const mMatch = norm.match(/^m0*(\d{1,2})$/);
+    if (mMatch) {
+      const gradeNum = mMatch[1];
+      const gradeOption = options.find(o => String(o.value) === gradeNum || normalizeKey(String(o.value)) === gradeNum);
+      if (gradeOption) return gradeOption.label;
+    }
+    // نمط u3 / u01 (قد يأتي من export خارجي) نعامله كرقم الصف
+    const uMatch = norm.match(/^u0*(\d{1,2})$/);
+    if (uMatch) {
+      const gradeNum = uMatch[1];
+      const gradeOption = options.find(o => String(o.value) === gradeNum || normalizeKey(String(o.value)) === gradeNum);
+      if (gradeOption) return gradeOption.label;
+    }
+    // دعم أنماط مثل p1 أو primary1 أو g1 أو grade1
+    const primaryMatch = norm.match(/^(?:p|primary|g|gr|grade)0*(\d{1,2})$/);
+    if (primaryMatch) {
+      const gradeNum = primaryMatch[1];
+      const gradeOption = options.find(o => String(o.value) === gradeNum || normalizeKey(String(o.value)) === gradeNum);
+      if (gradeOption) return gradeOption.label;
+    }
+    return rawStr; // fallback raw
+  };
+
+  const getMemorizedPartsLabel = (raw: any) => {
+    if (raw === null || raw === undefined || raw === '') return '-';
+    const rawStr = String(raw).trim();
+    const options = studentsLabels.quranPartsOptions || [];
+    // مطابقة مباشرة
+    let direct = options.find(o => String(o.value) === rawStr);
+    if (direct) return direct.label;
+    const norm = normalizeKey(rawStr);
+    const normMatch = options.find(o => normalizeKey(String(o.value)) === norm);
+    if (normMatch) return normMatch.label;
+    // إذا كانت القيمة part_1 أو part-1 نحاول استخراج الرقم
+    const m = norm.match(/^part(\d+)$/);
+    if (m) {
+      const num = m[1];
+      const byNum = options.find(o => normalizeKey(String(o.value)) === num);
+      if (byNum) return byNum.label;
+      const n = parseInt(num, 10);
+      if (!isNaN(n) && n >= 1 && n <= 30) return `${studentsLabels.quranJuzWord} ${studentsLabels.quranJuzOrdinals[n]}`;
+    }
+    // حالة complete / completed / full / all => ختم القرآن
+    if (/^(complete|completed|full|all|khatm|khatam|khatem)$/.test(norm)) {
+      return studentsLabels.quranComplete || 'ختم القرآن';
+    }
+    // fallback إذا كانت القيمة رقم فقط (مثلاً 1 أو 12)
+    const numeric = parseInt(rawStr, 10);
+    if (!isNaN(numeric) && numeric >= 1 && numeric <= 30) {
+      return `${studentsLabels.quranJuzWord} ${studentsLabels.quranJuzOrdinals[numeric]}`;
+    }
+    return rawStr;
+  };
 
   // Render page numbers for pagination
   const renderPageNumbers = () => {
@@ -937,19 +1051,24 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         data={paginatedGuardians}
         columns={[
           {
-            key: 'index_full_name',
-            header: '#️⃣👤',
+            key: 'row_index',
+            header: '#',
             align: 'center' as const,
             render: (item) => {
-              // نجيب ترتيب العنصر
-              const itemIndex = paginatedGuardians.findIndex(
-                (guardian) => guardian.id === item.id
-              );
-              const index = (currentPage - 1) * itemsPerPage + itemIndex + 1;
-
-              // نعرض الرقم مع الاسم
-              return `${index} - ${item.full_name}`;
-            },
+              const itemIndex = paginatedGuardians.findIndex(g => g.id === item.id);
+              return (currentPage - 1) * itemsPerPage + itemIndex + 1;
+            }
+          },
+          {
+            key: 'full_name',
+            header: `👤 ${guardiansLabels.fullName}`,
+            align: 'center' as const,
+            important: true,
+            render: (item) => (
+              <span className="font-medium whitespace-pre-line leading-snug">
+                {item.full_name}
+              </span>
+            )
           },
 
           {
@@ -991,13 +1110,28 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 <Button
                   variant="ghost"
                   onClick={() => handleShowGuardianStudents(guardian.id, guardian.full_name)}
-                  className="h-6 px-3 rounded-full font-bold text-white bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 shadow-lg hover:scale-105 transition-all duration-200 text-sm"
+                  disabled={isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id}
+                  className={`h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm ${isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? 'opacity-80 cursor-wait' : ''}`}
                   title={guardiansLabels.viewStudents}
                 >
-                  {guardian.students_count}
+                  {isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? (
+                    <span className="flex items-center gap-1">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>...</span>
+                    </span>
+                  ) : (
+                    guardian.students_count
+                  )}
                 </Button>
               ) : (
-                <span className="text-muted-foreground">0</span>
+                <Button
+                  variant="outline"
+                  onClick={() => handleAddStudent(guardian.id)}
+                  className="h-6 px-3 rounded-full font-semibold text-green-700 border-green-300 dark:text-green-200 dark:border-green-600 text-xs"
+                  title={guardiansLabels.addStudent}
+                >
+                  + {guardiansLabels.addStudent}
+                </Button>
               ),
           },
           {
@@ -1157,18 +1291,37 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         }
       }}>
         <DialogContent dir="rtl" className="bg-gradient-to-r from-green-100 via-green-200 to-green-100 sm:max-w-[750px] max-h-[70vh] overflow-y-auto">
-          <DialogHeader className="flex flex-col items-center border-b border-green-200">
-            <DialogTitle className="text-sm text-islamic-green flex items-center gap-2">
-              <span className="bg-green-100 p-1.5 rounded-full">
-                <UserCircle className="h-5 w-5 text-green-600" />
-              </span>
-              {guardiansLabels.studentsListTitle}: {selectedGuardianName}
-            </DialogTitle>
+          <DialogHeader className="border-b border-green-200">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm text-islamic-green flex items-center gap-2">
+                <span className="bg-green-100 p-1.5 rounded-full">
+                  <UserCircle className="h-5 w-5 text-green-600" />
+                </span>
+                {guardiansLabels.studentsListTitle}: {selectedGuardianName}
+              </DialogTitle>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={reloadGuardianStudents}
+                  disabled={isLoadingGuardianStudents}
+                  className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-700 rounded-lg"
+                  title={guardiansLabels.refresh}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingGuardianStudents ? 'animate-spin text-green-500' : 'text-green-600 dark:text-green-300'}`} />
+                </Button>
+              </div>
+            </div>
           </DialogHeader>
 
 
           <div className="py-2">
-            {selectedGuardianStudents.length > 0 ? (
+            {isLoadingGuardianStudents ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <RefreshCw className="h-8 w-8 animate-spin text-green-600 mb-3" />
+                <p className="text-sm text-muted-foreground">{commonLabels.loading || '...'} </p>
+              </div>
+            ) : selectedGuardianStudents.length > 0 ? (
               <GenericTable<typeof selectedGuardianStudents[0] & { id: string }>
                 data={selectedGuardianStudents.map((student, index) => ({
                   ...student,
@@ -1177,40 +1330,42 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 }))}
                 columns={[
                   {
-                    key: 'serial_full_name',
-                    header: `#️⃣👤 ${studentsLabels.name}`,
+                    key: 'row_index',
+                    header: '#',
                     align: 'center' as const,
+                    render: (student) => student.serial,
+                  },
+                  {
+                    key: 'full_name',
+                    header: `👤 ${studentsLabels.name}`,
+                    align: 'center' as const,
+                    important: true,
                     render: (student) => (
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-1 text-right">
-                        <span className="font-medium">{student.serial + " - " + student.full_name}</span>
-                      </div>
+                      <span className="font-medium whitespace-pre-line leading-snug">{student.full_name}</span>
                     ),
                   },
-
                   {
                     key: 'grade',
                     header: guardiansLabels.studentGradeHeader,
                     align: 'center' as const,
-                    render: (student) =>
-                      studentsLabels.gradeOptions.find(g => g.value === student.grade_level)?.label ||
-                      studentsLabels.gradeOptions.find(g => g.value === student.grade)?.label ||
-                      "-",
+                    render: (student) => getGradeLabel(student.grade_level ?? student.grade ?? null),
                   },
                   {
                     key: 'gender',
                     header: guardiansLabels.studentGenderHeader,
                     align: 'center' as const,
                     render: (student) =>
-                      student.gender === 'male' ? studentsLabels.genderMale : student.gender === 'female' ? studentsLabels.genderFemale : '-',
+                      student.gender === 'male'
+                        ? studentsLabels.genderMale
+                        : student.gender === 'female'
+                          ? studentsLabels.genderFemale
+                          : '-',
                   },
                   {
                     key: 'memorized_parts',
                     header: guardiansLabels.studentLastQuranHeader,
                     align: 'center' as const,
-                    render: (student) =>
-                      student.memorized_parts ?
-                        studentsLabels.quranPartsOptions.find(part => part.value === student.memorized_parts)?.label ||
-                        student.memorized_parts : "-",
+                    render: (student) => getMemorizedPartsLabel(student.memorized_parts),
                   },
                   {
                     key: 'teacher_name',
@@ -1224,41 +1379,45 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     align: 'center' as const,
                     render: (student) => student.circle_name || commonLabels.none,
                   },
-                  ...(userRole === 'superadmin' ? [
-                    {
-                      key: 'actions',
-                      header: guardiansLabels.studentActionsHeader,
-                      align: 'center' as const,
-                      render: (student: any) => (
-                        <div className="flex justify-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditStudentFromGuardianList(student)}
-                            className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
-                            title={guardiansLabels.studentEditTooltip}
-                          >
-                            <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => requestDeleteStudent(student.id)}
-                            className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                            title={guardiansLabels.studentDeleteTooltip}
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                          </Button>
-                        </div>
-                      ),
-                    } as const,
-                  ] : []),
+                  ...(userRole === 'superadmin'
+                    ? [
+                      {
+                        key: 'actions',
+                        header: guardiansLabels.studentActionsHeader,
+                        align: 'center' as const,
+                        render: (student: any) => (
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditStudentFromGuardianList(student)}
+                              className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                              title={guardiansLabels.studentEditTooltip}
+                            >
+                              <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => requestDeleteStudent(student.id)}
+                              className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                              title={guardiansLabels.studentDeleteTooltip}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                            </Button>
+                          </div>
+                        ),
+                      } as const,
+                    ]
+                    : []),
                 ]}
                 emptyMessage={guardiansLabels.noStudentsForGuardian}
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
                 getRowClassName={(_, index) =>
                   `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
                 }
+                // تعطيل التوسيع لإلغاء زر "عرض المزيد" ومنع الوميض وإظهار جميع الحقول دائماً
+                enableCardExpand={false}
               />
 
             ) : (
