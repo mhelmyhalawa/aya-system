@@ -26,6 +26,8 @@ import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSc
 import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle, AlertTriangle, X, ChevronRight } from "lucide-react";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { GenericTable } from "@/components/ui/generic-table";
+import { getLabels } from '@/lib/labels';
+const { studyCircleSchedulesLabels: scsLabels } = getLabels('ar');
 
 interface StudyCircleSchedulesPageProps {
   onNavigate: (path: string) => void;
@@ -177,8 +179,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       // Validate form data
       if (!addScheduleForm.start_time || !addScheduleForm.end_time) {
         toast({
-          title: "خطأ في البيانات",
-          description: "الرجاء تحديد وقت البداية والنهاية",
+          title: scsLabels.validationDataError,
+          description: scsLabels.validationMissingTimes,
           variant: "destructive",
         });
         setSavingNewSchedule(false);
@@ -188,8 +190,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       // Check if end time is after start time
       if (addScheduleForm.start_time >= addScheduleForm.end_time) {
         toast({
-          title: "خطأ في الأوقات",
-          description: "يجب أن يكون وقت النهاية بعد وقت البداية",
+          title: scsLabels.validationTimesError,
+          description: scsLabels.validationTimesMessage,
           variant: "destructive",
         });
         setSavingNewSchedule(false);
@@ -212,8 +214,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
       if (result.success) {
         toast({
-          title: "✅ تمت الإضافة بنجاح",
-          description: `تم إضافة جدولة جديدة للحلقة "${selectedCircle.name}" بنجاح`,
+          title: scsLabels.createSuccessTitle,
+          description: scsLabels.createSuccessDescription(selectedCircle.name),
           variant: "default",
         });
 
@@ -224,16 +226,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
         setOpenAddScheduleDialog(false);
       } else {
         toast({
-          title: "خطأ في الإضافة",
-          description: result.message || "حدث خطأ أثناء إضافة الجدولة الجديدة",
+          title: scsLabels.createFailedTitle,
+          description: result.message || scsLabels.createFailedDescription,
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('❌ Error creating new schedule:', error);
       toast({
-        title: "خطأ غير متوقع",
-        description: "حدث خطأ غير متوقع أثناء إضافة الجدولة الجديدة",
+        title: scsLabels.unexpectedErrorTitle,
+        description: scsLabels.unexpectedErrorDescription,
         variant: "destructive",
       });
     } finally {
@@ -271,8 +273,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       // Validate form data
       if (!editScheduleForm.start_time || !editScheduleForm.end_time) {
         toast({
-          title: "خطأ في البيانات",
-          description: "الرجاء تحديد وقت البداية والنهاية",
+          title: scsLabels.validationDataError,
+          description: scsLabels.validationMissingTimes,
           variant: "destructive",
         });
         return;
@@ -281,8 +283,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       // Check if end time is after start time
       if (editScheduleForm.start_time >= editScheduleForm.end_time) {
         toast({
-          title: "خطأ في الأوقات",
-          description: "يجب أن يكون وقت النهاية بعد وقت البداية",
+          title: scsLabels.validationTimesError,
+          description: scsLabels.validationTimesMessage,
           variant: "destructive",
         });
         return;
@@ -304,8 +306,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
       if (result.success) {
         toast({
-          title: "✅ تم التحديث بنجاح",
-          description: `تم تحديث بيانات الجدولة بنجاح`,
+          title: scsLabels.updateSuccessTitle,
+          description: scsLabels.updateSuccessDescription,
           variant: "default",
         });
 
@@ -319,16 +321,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
         setEditingSchedule(null);
       } else {
         toast({
-          title: "خطأ في التحديث",
-          description: result.message || "حدث خطأ أثناء تحديث بيانات الجدولة",
+          title: scsLabels.updateFailedTitle,
+          description: result.message || scsLabels.updateFailedDescription,
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('❌ Error updating schedule:', error);
       toast({
-        title: "خطأ غير متوقع",
-        description: "حدث خطأ غير متوقع أثناء تحديث بيانات الجدولة",
+        title: scsLabels.unexpectedErrorTitle,
+        description: scsLabels.unexpectedErrorDescription,
         variant: "destructive",
       });
     } finally {
@@ -354,8 +356,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
       if (result.success) {
         toast({
-          title: "✅ تم الحذف بنجاح",
-          description: `تم حذف الجدولة بنجاح`,
+          title: scsLabels.deleteSuccessTitle,
+          description: scsLabels.deleteSuccessDescription,
           variant: "default",
         });
 
@@ -367,16 +369,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
         }
       } else {
         toast({
-          title: "خطأ في الحذف",
-          description: result.message || "حدث خطأ أثناء حذف الجدولة",
+          title: scsLabels.deleteFailedTitle,
+          description: result.message || scsLabels.deleteFailedDescription,
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('❌ Error deleting schedule:', error);
       toast({
-        title: "خطأ غير متوقع",
-        description: "حدث خطأ غير متوقع أثناء حذف الجدولة",
+        title: scsLabels.unexpectedErrorTitle,
+        description: scsLabels.unexpectedErrorDescription,
         variant: "destructive",
       });
     } finally {
@@ -430,27 +432,17 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
   })();
 
   return (
-    // جعل العرض يملأ الشاشة في الموبايل بإزالة قيود container
-    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-
-      <Card>
-        {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-            {/* العنوان والوصف */}
-            <div className="flex flex-col">
-              <CardTitle className="text-base sm:text-xl md:text-2xl font-extrabold text-white flex items-center justify-between gap-2 drop-shadow-md">
-
-                <div className="flex items-center gap-1 sm:gap-2 justify-end">
-                  <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
-                  <span className="line-clamp-1">جدولة الحلقات الدراسية </span>
-                </div>
-              </CardTitle>
-              <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
-                إدارة مواعيد وجدولة الحلقات الدراسية .
-              </CardDescription>
-            </div>
-
+   <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
+      <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
+        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
+          <div className="space-y-0.5 sm:space-y-1">
+            <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
+                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
+                <span className="line-clamp-1">{scsLabels.pageTitle} </span>
+            </CardTitle>
+            <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
+              {scsLabels.pageDescription}
+            </CardDescription>
           </div>
         </CardHeader>
 
@@ -463,13 +455,13 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
                   <div className="flex items-center gap-1">
                     <BookOpen className="h-3.5 w-3.5 text-white" />
-                    <h2 className="text-[12px] font-semibold text-white">قائمة الحلقات</h2>
+                    <h2 className="text-[12px] font-semibold text-white">{scsLabels.circlesListTitle}</h2>
                   </div>
                   {selectedCircle && (
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-white/80">المعلم:</span>
+                      <span className="text-[10px] text-white/80">{scsLabels.teacherShort}</span>
                       <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                        {selectedCircle.teacher?.full_name?.split(" ")[0] || 'غير محدد'}
+                        {selectedCircle.teacher?.full_name?.split(" ")[0] || scsLabels.teacherUnknown}
                       </Badge>
                     </div>
                   )}
@@ -481,7 +473,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                     <div className="relative">
                       <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
                       <Input
-                        placeholder="بحث..."
+                        placeholder={scsLabels.searchPlaceholder}
                         className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
@@ -491,14 +483,14 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 )}
 
                 {/* العناصر */}
-                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 scrollbar-thin scrollbar-thumb-green-400 scrollbar-track-transparent">
+                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar">
                   {loading ? (
                     <div className="w-full py-6 text-center flex flex-col items-center">
                       <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                      <span className="text-green-700 text-[12px] font-medium">جاري التحميل...</span>
+                      <span className="text-green-700 text-[12px] font-medium">{scsLabels.loading}</span>
                     </div>
                   ) : filteredCircles.length === 0 ? (
-                    <div className="w-full py-6 text-center text-green-600 text-[12px]">لا توجد نتائج</div>
+                    <div className="w-full py-6 text-center text-green-600 text-[12px]">{scsLabels.noResults}</div>
                   ) : (
                     <div className="flex flex-col gap-1">
                       {filteredCircles.map(circle => {
@@ -541,7 +533,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3">
                   <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2">
                     <BookOpen className="h-5 w-5" />
-                    الحلقات الدراسية
+                    {scsLabels.circlesHeading}
                   </h2>
                 </div>
 
@@ -553,7 +545,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                       <div className="relative mt-1">
                         <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
                         <Input
-                          placeholder="بحث عن حلقة..."
+                          placeholder={scsLabels.searchPlaceholder}
                           className="pr-10 pl-3 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm text-sm"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
@@ -564,14 +556,14 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   {loading ? (
                     <div className="flex flex-col items-center justify-center p-8 gap-2">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-                      <span className="text-sm text-green-600">جاري تحميل الحلقات...</span>
+                      <span className="text-sm text-green-600">{scsLabels.loadingCircles}</span>
                     </div>
                   ) : filteredCircles.length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-8 text-center gap-2">
                       <BookOpen className="h-12 w-12 text-green-200" />
-                      <h3 className="text-lg font-semibold text-green-800">لا توجد حلقات</h3>
+                      <h3 className="text-lg font-semibold text-green-800">{scsLabels.noCircles}</h3>
                       <p className="text-sm text-green-600">
-                        لم يتم العثور على حلقات تطابق معايير البحث
+                        {scsLabels.noCirclesSearch}
                       </p>
                     </div>
                   ) : (
@@ -604,7 +596,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                 className={`${selectedCircle?.id === circle.id ? 'text-white border-white' : 'text-green-800 border-green-400'
                                   } text-xs`}
                               >
-                                محدد
+                                {scsLabels.selectedBadge}
                               </Badge>
                             )}
                           </div>
@@ -637,12 +629,12 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   <div className="flex items-center gap-1">
                     {canEditSchedules && selectedCircle && (
                       <Button
-                      onClick={handleAddSchedule}
-                      size="sm"
-                      className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none"
-                      title="إضافة موعد"
+                        onClick={handleAddSchedule}
+                        size="sm"
+                        className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none"
+                        title={scsLabels.addScheduleTooltip}
                       >
-                      <Plus className="h-2.5 w-2.5" />
+                        <Plus className="h-2.5 w-2.5" />
                       </Button>
                     )}
 
@@ -652,7 +644,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                         size="sm"
                         onClick={handleClearSelection}
                         className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none border border-green-200"
-                        title="إلغاء التحديد"
+                        title={scsLabels.clearSelection}
                       >
                         <X className="h-2.5 w-2.5" />
                       </Button>
@@ -667,12 +659,12 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-5 w-5 text-green-700" />
-                      {selectedCircle ? `جدولة حلقة: ${selectedCircle.name}` : 'جدولة الحلقات'} | 👨‍🏫
+                      {selectedCircle ? `${scsLabels.pageTitle.replace('الحلقات الدراسية','حلقة')}: ${selectedCircle.name}` : scsLabels.pageTitle} | 👨‍🏫
                     </div>
 
                     {selectedCircle?.teacher && (
                       <CardDescription className="text-gray-700 text-xs sm:text-[10px]">
-                        المعلم: {selectedCircle.teacher.full_name}
+                        {scsLabels.teacherShort.replace(':','')}: {selectedCircle.teacher.full_name}
                       </CardDescription>
                     )}
                   </CardTitle>
@@ -688,7 +680,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                   shadow-lg transition-all duration-200 px-5 py-2 font-semibold"
                         onClick={handleClearSelection}
                       >
-                        إلغاء التحديد
+                        {scsLabels.clearSelection}
                       </Button>
 
                       {canEditSchedules && (
@@ -699,7 +691,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                      dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-5 py-2 font-semibold"
                         >
                           <Plus className="h-4 w-4" />
-                          إضافة موعد
+                          {scsLabels.scheduleAdd}
                         </Button>
                       )}
                     </div>
@@ -712,9 +704,9 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   {!selectedCircle ? (
                     <div className="flex flex-col items-center justify-center p-10 sm:p-12 text-center gap-3 text-sm sm:text-base">
                       <Calendar className="h-16 w-16 text-green-200" />
-                      <h3 className="text-xl font-semibold text-green-800">اختر حلقة للبدء</h3>
+                      <h3 className="text-xl font-semibold text-green-800">{scsLabels.chooseCircleTitle}</h3>
                       <p className="text-green-600 max-w-md">
-                        يرجى اختيار حلقة من القائمة على اليسار لعرض وإدارة مواعيد جدولتها
+                        {scsLabels.chooseCircleHelp}
                       </p>
                     </div>
                   ) : (
@@ -722,16 +714,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
                       {/* ملخص المواعيد */}
                       <div className="flex items-center gap-2 p-2.5 sm:p-3 bg-green-100 rounded-none md:rounded-lg border border-green-200 text-xs sm:text-sm">
-                        <span className="text-sm text-green-700">إجمالي المواعيد</span>
+                        <span className="text-sm text-green-700">{scsLabels.totalSchedules}</span>
                         <Badge variant="outline" className="text-green-800 border-green-400">
-                          {circleSchedules.length} موعد
+                          {circleSchedules.length} {scsLabels.scheduleWord}
                         </Badge>
                       </div>
 
                       {/* عرض الموبايل */}
                       <div className="md:hidden space-y-2.5 px-2" role="list" aria-label="قائمة المواعيد">
                         {circleSchedules.length === 0 && (
-                          <div className="text-center text-[13px] text-green-600 py-5">لا توجد مواعيد</div>
+                          <div className="text-center text-[13px] text-green-600 py-5">{scsLabels.noSchedules}</div>
                         )}
 
                         {[...circleSchedules]
@@ -770,7 +762,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                       <MapPin className="h-3 w-3 text-green-600" /> {schedule.location}
                                     </span>
                                   ) : (
-                                    <span className="text-[11px] italic text-green-500">موقع الحلقة الافتراضي</span>
+                                    <span className="text-[11px] italic text-green-500">{scsLabels.defaultLocation}</span>
                                   )}
                                 </div>
 
@@ -781,7 +773,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                       size="sm"
                                       onClick={() => handleEditSchedule(schedule)}
                                       className="flex-1 rounded-md h-7 bg-green-200 hover:bg-green-300 text-green-900"
-                                      title="تعديل الموعد"
+                                      title={scsLabels.editDialogTitle}
                                     >
                                       <Pencil className="h-3.5 w-3.5 mx-auto" />
                                     </Button>
@@ -790,7 +782,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                       size="sm"
                                       onClick={() => handleDeleteSchedule(schedule)}
                                       className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-md h-7"
-                                      title="حذف الموعد"
+                                      title={scsLabels.deleteFailedTitle}
                                     >
                                       <Trash2 className="h-3.5 w-3.5 mx-auto" />
                                     </Button>
@@ -804,7 +796,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                       {/* عرض الديسكتوب */}
                       <div className="hidden md:flex flex-col gap-5" aria-label="المواعيد المجمعة">
                         {groupedSchedules.length === 0 && (
-                          <div className="text-center text-sm text-green-600 py-8 border rounded-xl bg-white">لا توجد مواعيد</div>
+                          <div className="text-center text-sm text-green-600 py-8 border rounded-xl bg-white">{scsLabels.noSchedules}</div>
                         )}
                         {groupedSchedules.map(group => {
                           const dayName = getWeekdayName(group.weekday);
@@ -822,22 +814,22 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                     <div key={item.id} className={`p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-[13px] ${isConflict ? 'bg-red-50/70' : 'hover:bg-green-50'} transition-colors`}>
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <div className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 shadow-sm">
-                                          <Clock className="h-3 w-3 text-blue-600" /> <span className="font-bold">الحضور:</span> {formatTime(item.start_time)}
+                                          <Clock className="h-3 w-3 text-blue-600" /> <span className="font-bold">{scsLabels.presence}</span> {formatTime(item.start_time)}
                                         </div>
                                         <span className="mx-1 text-gray-400">—</span>
                                         <div className="flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200 shadow-sm">
-                                          <Clock className="h-3 w-3 text-purple-600" /> <span className="font-bold">الانصراف:</span> {formatTime(item.end_time)}
+                                          <Clock className="h-3 w-3 text-purple-600" /> <span className="font-bold">{scsLabels.leaving}</span> {formatTime(item.end_time)}
                                         </div>
                                         {item.location ? (
                                           <span className="flex items-center gap-1 text-[11px] md:text-xs text-green-700">
                                             <MapPin className="h-3 w-3 text-green-600" /> {item.location}
                                           </span>
                                         ) : (
-                                          <span className="text-[11px] italic text-green-500">موقع افتراضي</span>
+                                          <span className="text-[11px] italic text-green-500">{scsLabels.virtualLocation}</span>
                                         )}
                                         {isConflict && (
                                           <span className="flex items-center gap-1 text-[11px] text-red-700 font-semibold bg-red-100 px-2 py-0.5 rounded-full border border-red-300 shadow-sm">
-                                            <AlertTriangle className="h-3 w-3" /> تعارض في المواعيد
+                                            <AlertTriangle className="h-3 w-3" /> {scsLabels.conflict}
                                           </span>
                                         )}
                                       </div>
@@ -848,7 +840,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                             size="sm"
                                             onClick={() => handleEditSchedule(item)}
                                             className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 h-8"
-                                            title="تعديل الموعد"
+                                            title={scsLabels.editDialogTitle}
                                           >
                                             <Pencil className="h-4 w-4" />
                                           </Button>
@@ -857,7 +849,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                                             size="sm"
                                             onClick={() => handleDeleteSchedule(item)}
                                             className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 h-8"
-                                            title="حذف الموعد"
+                                            title={scsLabels.deleteFailedTitle}
                                           >
                                             <Trash2 className="h-4 w-4" />
                                           </Button>
@@ -887,19 +879,19 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
       {/* Add Schedule Dialog */}
       <FormDialog
-        title="إضافة موعد جديد"
-        description="قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة"
+        title={scsLabels.addDialogTitle}
+        description={scsLabels.addDialogDescription}
         open={openAddScheduleDialog}
         onOpenChange={setOpenAddScheduleDialog}
         onSave={handleSaveNewSchedule}
         isLoading={savingNewSchedule}
-        saveButtonText={savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
+        saveButtonText={savingNewSchedule ? scsLabels.addDialogSaving : scsLabels.addDialogSave}
         mode="add"
       >
         <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
           {/* اليوم كأزرار عصرية */}
           <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
-            <Label className="text-right text-gray-800 text-sm mb-2">اليوم *</Label>
+            <Label className="text-right text-gray-800 text-sm mb-2">{scsLabels.fieldDay}</Label>
             <div className="flex flex-wrap gap-2 justify-center">
               {weekdayOptions.map(day => (
                 <button
@@ -922,7 +914,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           </div>
 
           {/* الوقت */}
-          <FormRow label="وقت البداية *">
+          <FormRow label={scsLabels.fieldStart}>
             <Input
               id="add-schedule-start-time"
               type="time"
@@ -933,7 +925,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
             />
           </FormRow>
 
-          <FormRow label="وقت النهاية *">
+          <FormRow label={scsLabels.fieldEnd}>
             <Input
               id="add-schedule-end-time"
               type="time"
@@ -945,16 +937,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           </FormRow>
 
           {/* الموقع */}
-          <FormRow label="الموقع (اختياري)">
+          <FormRow label={scsLabels.fieldLocation}>
             <div className="flex items-center text-xs text-gray-500 mb-1">
               <Info className="h-3 w-3 ml-1" />
-              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+              {scsLabels.fieldLocationHelp}
             </div>
             <Input
               id="add-schedule-location"
               value={addScheduleForm.location}
               onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
-              placeholder="أدخل موقع الموعد (اختياري)"
+              placeholder={scsLabels.fieldLocationPlaceholder}
               className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
             />
           </FormRow>
@@ -962,18 +954,18 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       </FormDialog>
       {/* Edit Schedule Dialog */}
       <FormDialog
-        title="تعديل موعد"
-        description="قم بتعديل بيانات الموعد"
+        title={scsLabels.editDialogTitle}
+        description={scsLabels.editDialogDescription}
         open={openEditScheduleDialog}
         onOpenChange={setOpenEditScheduleDialog}
         onSave={handleSaveScheduleEdit}
         isLoading={savingScheduleEdit}
-        saveButtonText={savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+        saveButtonText={savingScheduleEdit ? scsLabels.editDialogSaving : scsLabels.editDialogSave}
         mode="edit"
       >
         <div className="border border-gray-200 rounded-md shadow-sm p-3 bg-white">
           {/* اليوم كأزرار عصرية */}
-          <Label className="text-right text-gray-800 text-sm mb-2 block">اليوم *</Label>
+          <Label className="text-right text-gray-800 text-sm mb-2 block">{scsLabels.fieldDay}</Label>
           <div className="flex flex-wrap gap-2 justify-center">
             {weekdayOptions.map(day => (
               <button
@@ -996,7 +988,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
           {/* الوقت */}
           <div className="grid grid-cols-2 gap-2 mt-2">
-            <FormRow label="وقت البداية *">
+            <FormRow label={scsLabels.fieldStart}>
               <Input
                 id="edit-schedule-start-time"
                 type="time"
@@ -1006,7 +998,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 className="bg-blue-50 border-blue-200 text-blue-900 rounded-md text-sm py-1 px-2 font-medium"
               />
             </FormRow>
-            <FormRow label="وقت النهاية *">
+            <FormRow label={scsLabels.fieldEnd}>
               <Input
                 id="edit-schedule-end-time"
                 type="time"
@@ -1019,16 +1011,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           </div>
 
           {/* الموقع */}
-          <FormRow label="الموقع (اختياري)">
+          <FormRow label={scsLabels.fieldLocation}>
             <div className="flex items-center text-xs text-gray-500 mb-1">
               <Info className="h-3 w-3 ml-1" />
-              اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
+              {scsLabels.fieldLocationHelp}
             </div>
             <Input
               id="edit-schedule-location"
               value={editScheduleForm.location}
               onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
-              placeholder="أدخل موقع الموعد (اختياري)"
+              placeholder={scsLabels.fieldLocationPlaceholder}
               className="bg-gray-50 border-gray-300 rounded-md text-sm py-1 px-2"
             />
           </FormRow>
@@ -1042,15 +1034,15 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
         onOpenChange={setOpenDeleteDialog}
         onConfirm={confirmDeleteSchedule}
         isLoading={deletingSchedule}
-        title="تأكيد حذف الموعد"
-        description="هل أنت متأكد من رغبتك في حذف هذا الموعد من جدول الحلقة؟"
+        title={scsLabels.deleteDialogTitle}
+        description={scsLabels.deleteDialogDescription}
         itemDetails={scheduleToDelete ? {
-          "اليوم": getWeekdayName(scheduleToDelete.weekday),
-          "الوقت": `${formatTime(scheduleToDelete.start_time)} - ${formatTime(scheduleToDelete.end_time)}`,
-          "المكان": scheduleToDelete.location || "-"
+          [scsLabels.deleteDialogWeekday]: getWeekdayName(scheduleToDelete.weekday),
+          [scsLabels.deleteDialogTime]: `${formatTime(scheduleToDelete.start_time)} - ${formatTime(scheduleToDelete.end_time)}`,
+          [scsLabels.deleteDialogLocation]: scheduleToDelete.location || "-"
         } : null}
-        deleteButtonText="نعم، احذف الموعد"
-        cancelButtonText="إلغاء"
+        deleteButtonText={scsLabels.deleteDialogConfirm}
+        cancelButtonText={scsLabels.cancel}
       />
 
     </div>

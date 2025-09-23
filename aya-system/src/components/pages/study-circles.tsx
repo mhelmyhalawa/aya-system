@@ -577,7 +577,6 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   // عرض الواجهة
   return (
     <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-
       <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
         <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
           <div className="space-y-0.5 sm:space-y-1">
@@ -644,6 +643,15 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
       {(() => {
         const columns: Column<StudyCircle>[] = [
           {
+            key: 'row_index',
+            header: '#',
+            align: 'center',
+            render: (c) => {
+              const idx = filteredCircles.findIndex(circle => circle.id === c.id);
+              return idx >= 0 ? idx + 1 : '-';
+            }
+          },
+          {
             key: 'name',
             header: `📘 ${studyCirclesLabels.name}`,
             important: true,
@@ -664,7 +672,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             header: `👥 ${studyCirclesLabels.maxStudents}`,
             align: 'center',
             render: (c) => c.max_students ? (
-              <div className="flex gap-1">
+              <div className="flex gap-1 justify-center">
                 <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
                 <span>{c.max_students}</span>
               </div>
@@ -675,7 +683,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             header: `⚙️ ${studyCirclesLabels.actions}`,
             align: 'center' as const,
             render: (c: StudyCircle) => (
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-center">
                 <Button
                   variant="ghost"
                   size="icon"

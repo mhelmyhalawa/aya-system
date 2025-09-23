@@ -1352,17 +1352,21 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 data={selectedGuardianStudents.map((student, index) => ({
                   ...student,
                   id: student.id.toString(),
-                  serial: index + 1
+                  // serial kept for backward compatibility; new explicit index field added
+                  serial: index + 1,
+                  index: index + 1
                 }))}
                 defaultView="card"
                 cardPageSize={2}
                 showCardNavInHeader
+                cardMobilePageSize={1}
                 columns={[
                   {
                     key: 'row_index',
                     header: '#',
                     align: 'center' as const,
-                    render: (student) => student.serial,
+                    // Prefer the explicit index field; fallback to serial if needed
+                    render: (student) => (student.index ?? student.serial),
                   },
                   {
                     key: 'full_name',

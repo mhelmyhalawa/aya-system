@@ -51,6 +51,8 @@ export function GenericTable<T extends { id: string }>(props: {
     cardPageSize?: number;
     /** إظهار أزرار التالي/السابق في الهيدر حتى في الشاشات الكبيرة عند نمط البطاقات */
     showCardNavInHeader?: boolean;
+    /** حد خاص لعدد البطاقات في الموبايل (يفوق أي قيمة افتراضية)، إذا لم يحدد يستخدم 1 عند استخدام cardPageSize */
+    cardMobilePageSize?: number;
 }) {
     const {
         data,
@@ -73,6 +75,7 @@ export function GenericTable<T extends { id: string }>(props: {
         cardWidth,
         cardPageSize,
         showCardNavInHeader = false,
+        cardMobilePageSize,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -92,10 +95,24 @@ export function GenericTable<T extends { id: string }>(props: {
     }, [isMobile]);
 
     const goNext = () => {
-        setMobileCardIndex(i => (i < sortedData.length - 1 ? i + 1 : i));
+        // حساب حجم الصفحة الحالي اعتماداً على السياق (موبايل أو سطح مكتب)
+        const currentPageSize = isMobile
+            ? (cardMobilePageSize ?? 1)
+            : (cardPageSize ?? sortedData.length);
+        setMobileCardIndex(i => {
+            const maxStart = Math.max(sortedData.length - currentPageSize, 0);
+            const next = i + currentPageSize;
+            return next > maxStart ? maxStart : next;
+        });
     };
     const goPrev = () => {
-        setMobileCardIndex(i => (i > 0 ? i - 1 : i));
+        const currentPageSize = isMobile
+            ? (cardMobilePageSize ?? 1)
+            : (cardPageSize ?? sortedData.length);
+        setMobileCardIndex(i => {
+            const prev = i - currentPageSize;
+            return prev < 0 ? 0 : prev;
+        });
     };
 
     // دالة لترتيب البيانات حسب العمود الأول
@@ -398,11 +415,57 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (() => {
                 const smallSet = sortedData.length <= (cardPageSize ?? 2);
-                // حساب نطاق البطاقات المعروضة إذا كان هناك حد cardPageSize
-                const pageSize = cardPageSize || (isMobile ? 1 : sortedData.length);
-                const startIndex = cardPageSize ? mobileCardIndex : (isMobile ? mobileCardIndex : 0);
-                const endIndexExclusive = cardPageSize ? Math.min(startIndex + pageSize, sortedData.length) : (isMobile ? mobileCardIndex + 1 : sortedData.length);
+                // حجم الصفحة حسب نوع الجهاز
+                const pageSize = isMobile
+                    ? (cardMobilePageSize ?? 1)
+                    : (cardPageSize ?? sortedData.length);
+                // في حالة وجود حد للبطاقات أو كنا على الموبايل نستخدم mobileCardIndex كبداية
+                const startIndex = (pageSize < sortedData.length) ? mobileCardIndex : 0;
+                const endIndexExclusive = Math.min(startIndex + pageSize, sortedData.length);
                 const visibleSlice = sortedData.slice(startIndex, endIndexExclusive);
+                // النقاط الآن بعدد جميع السجلات وليس الصفحات، مع تظليل السجلات الظاهرة حالياً
+                const totalItems = sortedData.length;
+                const Dots = () => {
+                    const primaryLabelColumn = columns.find(c => c.important) || columns[0];
+                    return (
+                        <div
+                            className="flex flex-wrap items-center justify-center gap-1 py-2 select-none w-full"
+                            aria-label={`التنقل بين البطاقات، إجمالي ${totalItems} بطاقة`}
+                        >
+                            {sortedData.map((record, idx) => {
+                                const isVisible = idx >= startIndex && idx < endIndexExclusive; // ضمن الشريحة الحالية
+                                let rawVal: any = undefined;
+                                if (primaryLabelColumn) {
+                                    rawVal = (record as any)[primaryLabelColumn.key];
+                                }
+                                const displayVal = rawVal !== undefined && rawVal !== null ? getDisplayValue(rawVal) : '';
+                                const tooltip = `بطاقة ${idx + 1} / ${totalItems}${displayVal ? ' – ' + displayVal : ''}`;
+                                return (
+                                    <button
+                                        key={idx}
+                                        type="button"
+                                        aria-label={tooltip}
+                                        title={tooltip}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            const maxStart = Math.max(totalItems - pageSize, 0);
+                                            const newStart = Math.min(idx, maxStart);
+                                            setMobileCardIndex(newStart);
+                                        }}
+                                        className={cn(
+                                            'h-2.5 w-2.5 rounded-full transition-all outline-none ring-offset-1 focus:ring-2 focus:ring-green-500',
+                                            isVisible
+                                                ? 'bg-green-600 dark:bg-green-400 scale-110 shadow'
+                                                : 'bg-green-300 dark:bg-green-700 hover:bg-green-400 dark:hover:bg-green-500'
+                                        )}
+                                        data-stop="true"
+                                    />
+                                );
+                            })}
+                        </div>
+                    );
+                };
 
                 const containerClass = isMobile
                     ? 'w-full p-2'
@@ -412,7 +475,10 @@ export function GenericTable<T extends { id: string }>(props: {
                             grid-cols-${Math.min(pageSize, 2)} md:grid-cols-${Math.min(pageSize, cardGridColumns.md || pageSize)} lg:grid-cols-${Math.min(pageSize, cardGridColumns.lg || pageSize)} xl:grid-cols-${Math.min(pageSize, cardGridColumns.xl || pageSize)}`;
 
                 return (
-                    <div className={containerClass}>
+                    <div className="w-full flex flex-col items-stretch">
+                        {/* النقاط (متمركزة) فوق الشبكة عند وجود صفحات متعددة */}
+                        {totalItems > 1 && <Dots />}
+                        <div className={containerClass}>
                         {(() => {
                             const CardItem = ({ item }: { item: T }) => {
                             const [expanded, setExpanded] = useState(false);
@@ -581,6 +647,9 @@ export function GenericTable<T extends { id: string }>(props: {
                             };
                             return visibleSlice.map((d) => <CardItem key={d.id} item={d} />);
                         })()}
+                        </div>
+                        {/* النقاط أسفل الشبكة أيضاً (اختياري يمكن الإبقاء على واحدة فقط، سنترك نسخة سفلية للتوازن على الشاشات الكبيرة) */}
+                        {totalItems > 1 && !isMobile && <Dots />}
                     </div>
                 );
             })()}
