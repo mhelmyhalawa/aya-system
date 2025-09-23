@@ -437,7 +437,28 @@ const en: typeof ar = {
 export const labelsByLang: Record<SupportedLang, typeof ar> = { ar, en };
 
 export function getLabels(lang: SupportedLang = 'ar') {
-  return labelsByLang[lang];
+  // Ensure quranPartsOptions is populated once (idempotent)
+  const lbl = labelsByLang[lang];
+  const partsArr = lbl.studentsLabels.quranPartsOptions;
+  if (!partsArr || partsArr.length === 0) {
+    const ordinals = lbl.studentsLabels.quranJuzOrdinals;
+    const word = lbl.studentsLabels.quranJuzWord;
+    const generated = [] as { value: string; label: string }[];
+    for (let i = 1; i <= 30; i++) {
+      const ordinal = ordinals?.[i] || i.toString();
+      generated.push({ value: String(i), label: `${word} ${ordinal}` });
+      generated.push({ value: `part_${i}`, label: `${word} ${ordinal}` }); // support raw part_i storage/reference
+    }
+    // Unique by value
+    const seen = new Set<string>();
+    const unique = generated.filter(p => (seen.has(p.value) ? false : (seen.add(p.value), true)));
+    // Append completion options variants
+    unique.push({ value: 'complete', label: lbl.studentsLabels.quranComplete });
+    unique.push({ value: 'completed', label: lbl.studentsLabels.quranComplete });
+    unique.push({ value: 'full', label: lbl.studentsLabels.quranComplete });
+    lbl.studentsLabels.quranPartsOptions = unique;
+  }
+  return lbl;
 }
 
 export type AllLabels = ReturnType<typeof getLabels>;

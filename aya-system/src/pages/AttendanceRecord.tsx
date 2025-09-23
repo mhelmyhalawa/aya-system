@@ -491,7 +491,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                         <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
                         <Input
                           placeholder="بحث عن حلقة..."
-                          className="pr-10 pl-4 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm"
+                          className="pr-10 pl-4 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 shadow-sm"
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -511,8 +511,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                       {(isAdminOrSuperadmin ? allCircles : teacherCircles).map((circle) => (
                         <div
                           key={circle.id}
-                          className={`group relative rounded-xl border border-green-200 bg-white shadow-md transition-all duration-300 cursor-pointer overflow-hidden hover:shadow-xl hover:scale-102 ${selectedCircle === circle.id ? "bg-green-50 border-green-500 shadow-lg ring-2 ring-green-300" : ""
-                            }`}
+                          className={`group relative rounded-xl border border-green-200 bg-white shadow-md cursor-pointer overflow-hidden ${selectedCircle === circle.id ? "bg-green-50 border-green-500 shadow-lg ring-2 ring-green-300" : ""}`}
                           onClick={() => handleCircleChange(circle.id)}
                         >
                           {/* تدرج خلفية عند hover */}
@@ -521,7 +520,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                           <div className="p-3 relative z-10">
                             {/* رأس البطاقة */}
                             <div className="border-b border-green-200 pb-1 mb-2 flex items-center justify-between">
-                              <div className="flex items-center gap-1 text-sm font-semibold text-green-700 group-hover:scale-105 transition-transform duration-300">
+                              <div className="flex items-center gap-1 text-sm font-semibold text-green-700">
                                 <Calendar className="h-3.5 w-3.5 text-yellow-400 group-hover:animate-bounce" />
                                 {circle.name}
                               </div>
@@ -533,7 +532,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                               {isAdminOrSuperadmin && (
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-1">
-                                    <UserRound className="h-2.5 w-2.5 text-green-600 group-hover:scale-125 transition-transform" />
+                                    <UserRound className="h-2.5 w-2.5 text-green-600" />
                                     <span>المعلم:</span>
                                   </div>
                                   <span className="truncate max-w-[100px]">{circle.teacher?.full_name || "غير محدد"}</span>
@@ -543,7 +542,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                               {/* عدد الطلاب */}
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1">
-                                  <BookOpen className="h-2.5 w-2.5 text-green-600 group-hover:scale-125 transition-transform" />
+                                  <BookOpen className="h-2.5 w-2.5 text-green-600" />
                                   <span>عدد الطلاب:</span>
                                 </div>
                                 <Badge className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 border border-green-200 rounded-md">
@@ -555,7 +554,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                               {circle.max_students && (
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-1">
-                                    <Users className="h-2.5 w-2.5 text-green-600 group-hover:scale-125 transition-transform" />
+                                    <Users className="h-2.5 w-2.5 text-green-600" />
                                     <span>الحد الأقصى:</span>
                                   </div>
                                   <span className="font-medium">{circle.max_students} طالب</span>
@@ -614,11 +613,10 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                         return (
                           <div
                             key={`${session.study_circle_id}-${session.session_date}`}
-                            className={`relative rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden p-3
+                            className={`relative rounded-2xl border cursor-pointer overflow-hidden p-3
                                     ${isSelected
-                                ? "bg-green-50 border-green-500 shadow-lg ring-1 ring-green-300 animate-pulse"
-                                : "bg-white border-gray-300 hover:bg-green-50 hover:shadow-md hover:scale-102"
-                              }`}
+                                ? "bg-green-50 border-green-500 shadow-lg ring-1 ring-green-300"
+                                : "bg-white border-gray-300"}`}
                             onClick={() => handleSessionChange(session)}
                           >
                             {/* تدرج خلفية عند hover */}
@@ -628,7 +626,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
                             <div className="relative z-10 flex flex-col gap-1 text-gray-700 text-xs md:text-sm">
                               {/* التاريخ */}
-                              <div className="flex items-center gap-2 font-medium group-hover:scale-105 transition-transform duration-200">
+                              <div className="flex items-center gap-2 font-medium">
                                 <CalendarCheck className={`h-4 w-4 text-green-700 ${isSelected ? "animate-bounce" : ""}`} />
                                 {formatDateDisplay(session.session_date)}
                                 
@@ -704,8 +702,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                           variant="outline"
                           size="sm"
                           onClick={() => setAllStudentsStatus('present')}
-                          className="flex items-center gap-2 rounded-3xl border-2 border-green-500 text-green-800 
-          hover:bg-green-100 hover:text-green-900 hover:scale-105 transition-all duration-200 px-4 py-2 font-semibold"
+                          className="flex items-center gap-2 rounded-3xl border-2 border-green-500 text-green-800 px-4 py-2 font-semibold"
                         >
                           <Check className="h-4 w-4" />
                           تحديد الكل حاضر
@@ -715,8 +712,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                           variant="outline"
                           size="sm"
                           onClick={() => setAllStudentsStatus('absent')}
-                          className="flex items-center gap-2 rounded-3xl border-2 border-red-400 text-red-800 
-          hover:bg-red-100 hover:text-red-900 hover:scale-105 transition-all duration-200 px-4 py-2 font-semibold"
+                          className="flex items-center gap-2 rounded-3xl border-2 border-red-400 text-red-800 px-4 py-2 font-semibold"
                         >
                           <X className="h-4 w-4" />
                           تحديد الكل غائب

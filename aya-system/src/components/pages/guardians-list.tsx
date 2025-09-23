@@ -40,6 +40,7 @@ import { DeleteConfirmationDialog } from "../ui/delete-confirmation-dialog";
 import { GenericTable } from "../ui/generic-table";
 import { FormDialog, FormRow } from "../ui/form-dialog";
 import { StudentFormDialog, StudentFormData } from "@/components/students/StudentFormDialog";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 /**
  * Fetches students associated with a specific guardian
@@ -123,6 +124,8 @@ interface GuardiansProps {
 export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const { toast } = useToast();
   const { errorMessages, successMessages, commonLabels, studentsLabels, guardiansLabels } = getLabels('ar');
+  // كاشف حالة الموبايل لإدارة عرض البطاقات وعدد الحقول (استخدام هوك مباشرة)
+  const isMobile = useIsMobile();
 
   // حالة القائمة
   const [guardians, setGuardians] = useState<Guardian[]>([]);
@@ -225,6 +228,22 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const [studentsListLoadingGuardianId, setStudentsListLoadingGuardianId] = useState<string | null>(null);
   // معرف ولي الأمر الحالي المعروض طلابه (لأجل إعادة التحميل)
   const [studentsListGuardianId, setStudentsListGuardianId] = useState<string | null>(null);
+  // عدد الحقول المبدئية في بطاقات الطلاب على الموبايل (يُضبط حسب عرض الشاشة)
+  const [mobileCollapsedFields, setMobileCollapsedFields] = useState(3);
+
+  useEffect(() => {
+    // تحديث العدد بناءً على عرض الشاشة الفعلي
+    const updateCollapsed = () => {
+      if (typeof window === 'undefined') return;
+      const w = window.innerWidth;
+      if (w < 360) setMobileCollapsedFields(2); // شاشات صغيرة جداً
+      else if (w < 420) setMobileCollapsedFields(3); // موبايل صغير
+      else setMobileCollapsedFields(4); // موبايل أوسع
+    };
+    updateCollapsed();
+    window.addEventListener('resize', updateCollapsed);
+    return () => window.removeEventListener('resize', updateCollapsed);
+  }, []);
 
   // Pagination config
   const itemsPerPage = 10;
@@ -964,7 +983,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             <div className="flex gap-2">
 
               <Button
-                className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
+                className="flex items-center gap-2 rounded-3xl bg-green-600 dark:bg-green-700 text-white shadow-lg px-4 py-1.5 font-semibold"
                 onClick={handleAddGuardian}
                 title={guardiansLabels.addGuardian}
               >
@@ -975,7 +994,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               </Button>
 
               <Button
-                className="flex items-center gap-2 rounded-3xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
+                className="flex items-center gap-2 rounded-3xl bg-blue-600 dark:bg-blue-700 text-white shadow-lg px-4 py-1.5 font-semibold"
                 onClick={() => handleAddStudent("", true)}
                 title={guardiansLabels.addStudent}
               >
@@ -1107,11 +1126,18 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             align: 'center' as const,
             render: (guardian) =>
               guardian.students_count > 0 ? (
-                <Button
-                  variant="ghost"
-                  onClick={() => handleShowGuardianStudents(guardian.id, guardian.full_name)}
+                <button
+                  type="button"
+                  data-stop="true"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!(isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id)) {
+                      handleShowGuardianStudents(guardian.id, guardian.full_name);
+                    }
+                  }}
                   disabled={isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id}
-                  className={`h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm ${isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? 'opacity-80 cursor-wait' : ''}`}
+                  className={`h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed`}
                   title={guardiansLabels.viewStudents}
                 >
                   {isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? (
@@ -1122,16 +1148,17 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   ) : (
                     guardian.students_count
                   )}
-                </Button>
+                </button>
               ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => handleAddStudent(guardian.id)}
-                  className="h-6 px-3 rounded-full font-semibold text-green-700 border-green-300 dark:text-green-200 dark:border-green-600 text-xs"
+                <button
+                  type="button"
+                  data-stop="true"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAddStudent(guardian.id); }}
+                  className="h-6 px-3 rounded-full font-semibold text-green-700 border border-green-300 dark:text-green-200 dark:border-green-600 text-xs bg-white dark:bg-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500"
                   title={guardiansLabels.addStudent}
                 >
                   + {guardiansLabels.addStudent}
-                </Button>
+                </button>
               ),
           },
           {
@@ -1144,7 +1171,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleEditGuardian(guardian)}
-                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                  className="h-8 w-8 p-0 rounded-lg"
                   title={guardiansLabels.editTooltip}
                 >
                   <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
@@ -1153,7 +1180,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => handleAddStudent(guardian.id)}
-                  className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                  className="h-8 w-8 p-0 rounded-lg"
                   title={guardiansLabels.addStudentTooltip}
                 >
                   <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
@@ -1163,7 +1190,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     variant="ghost"
                     size="icon"
                     onClick={() => handleDeleteGuardian(guardian)}
-                    className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                    className="h-8 w-8 p-0 rounded-lg"
                     title={guardiansLabels.deleteTooltip}
                   >
                     <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
@@ -1174,6 +1201,9 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           },
         ]}
         emptyMessage={searchTerm ? guardiansLabels.noSearchResults : guardiansLabels.noGuardians}
+        // تفعيل طي الحقول وعرض زر "عرض المزيد" على الموبايل فقط
+        enableCardExpand={isMobile}
+        cardMaxFieldsCollapsed={isMobile ? Math.max(2, mobileCollapsedFields) : undefined}
       />
       {/* حوار إضافة ولي أمر */}
       <FormDialog
@@ -1305,7 +1335,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   size="icon"
                   onClick={reloadGuardianStudents}
                   disabled={isLoadingGuardianStudents}
-                  className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-700 rounded-lg"
+                  className="h-7 w-7 p-0 rounded-lg"
                   title={guardiansLabels.refresh}
                 >
                   <RefreshCw className={`h-4 w-4 ${isLoadingGuardianStudents ? 'animate-spin text-green-500' : 'text-green-600 dark:text-green-300'}`} />
@@ -1391,7 +1421,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                               variant="ghost"
                               size="icon"
                               onClick={() => handleEditStudentFromGuardianList(student)}
-                              className="h-6 w-6 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                              className="h-6 w-6 p-0 rounded-lg"
                               title={guardiansLabels.studentEditTooltip}
                             >
                               <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
@@ -1400,7 +1430,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                               variant="ghost"
                               size="icon"
                               onClick={() => requestDeleteStudent(student.id)}
-                              className="h-6 w-6 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                              className="h-6 w-6 p-0 rounded-lg"
                               title={guardiansLabels.studentDeleteTooltip}
                             >
                               <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
@@ -1413,11 +1443,10 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 ]}
                 emptyMessage={guardiansLabels.noStudentsForGuardian}
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-                getRowClassName={(_, index) =>
-                  `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
-                }
-                // تعطيل التوسيع لإلغاء زر "عرض المزيد" ومنع الوميض وإظهار جميع الحقول دائماً
-                enableCardExpand={false}
+                getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50' : 'bg-white'} cursor-pointer`}
+                // تمكين زر "عرض المزيد" على الموبايل فقط وعرض عدد حقول يعتمد على عرض الشاشة
+                enableCardExpand={isMobile}
+                cardMaxFieldsCollapsed={isMobile ? mobileCollapsedFields : undefined}
               />
 
             ) : (

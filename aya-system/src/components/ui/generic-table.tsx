@@ -73,6 +73,8 @@ export function GenericTable<T extends { id: string }>(props: {
     const isMobile = useIsMobile();
     // إضافة حالة للترتيب
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
+    // فهرس البطاقة الحالية على الموبايل (نعرض بطاقة واحدة مع تنقل)
+    const [mobileCardIndex, setMobileCardIndex] = useState(0);
 
     // فرض نمط البطاقات على الموبايل
     useEffect(() => {
@@ -82,6 +84,13 @@ export function GenericTable<T extends { id: string }>(props: {
             setViewMode('table');
         }
     }, [isMobile]);
+
+    const goNextMobile = () => {
+        setMobileCardIndex(i => (i < sortedData.length - 1 ? i + 1 : i));
+    };
+    const goPrevMobile = () => {
+        setMobileCardIndex(i => (i > 0 ? i - 1 : i));
+    };
 
     // دالة لترتيب البيانات حسب العمود الأول
     const toggleSort = () => {
@@ -119,6 +128,13 @@ export function GenericTable<T extends { id: string }>(props: {
                 : (bValue > aValue ? 1 : -1);
         });
     }, [data, columns, sortDirection]);
+
+    // إعادة ضبط فهرس البطاقة للموبايل بعد حساب sortedData
+    useEffect(() => {
+        if (mobileCardIndex >= sortedData.length) {
+            setMobileCardIndex(0);
+        }
+    }, [sortedData.length, mobileCardIndex]);
 
     function getDisplayValue(value: any): string {
         if (value === null || value === undefined) return "-";
@@ -166,10 +182,10 @@ export function GenericTable<T extends { id: string }>(props: {
                             onClick={toggleSort}
                             size="icon"
                             className={cn(
-                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
+                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md",
                                 sortDirection
-                                    ? "bg-blue-600 text-white border-green-600 hover:bg-green-700"
-                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-500 dark:hover:bg-green-200"
+                                    ? "bg-blue-600 text-white border-green-600"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700"
                             )}
                             title={sortDirection === 'asc'
                                 ? `ترتيب تصاعدي حسب ${columns[0].header}`
@@ -204,10 +220,10 @@ export function GenericTable<T extends { id: string }>(props: {
                             onClick={() => setViewMode("table")}
                             size="icon"
                             className={cn(
-                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
+                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md",
                                 viewMode === "table"
-                                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-500 dark:hover:bg-green-700"
+                                    ? "bg-green-600 text-white border-green-600"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700"
                             )}
                             title="عرض الجدول"
                         >
@@ -220,10 +236,10 @@ export function GenericTable<T extends { id: string }>(props: {
                             onClick={() => setViewMode("card")}
                             size="icon"
                             className={cn(
-                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md transition-all duration-200",
+                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md",
                                 viewMode === "card"
-                                    ? "bg-green-600 text-white border-green-600 hover:bg-green-700"
-                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700 hover:bg-green-500 dark:hover:bg-green-700"
+                                    ? "bg-green-600 text-white border-green-600"
+                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700"
                             )}
                             title="عرض البطاقات"
                         >
@@ -253,7 +269,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 variant="default"
                                 size="sm"
                                 onClick={onAddNew}
-                                className="mt-6 bg-green-600 hover:bg-green-700 text-white"
+                                className="mt-6 bg-green-600 text-white"
                             >
                                 <Plus className="h-4 w-4 ml-1" />
                                 <span>إضافة جديد</span>
@@ -297,7 +313,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                     <TableRow
                                         key={item.id}
                                         className={cn(
-                                            'odd:bg-green-50 even:bg-white dark:odd:bg-green-900/20 dark:even:bg-green-950/10 hover:bg-green-100 dark:hover:bg-green-800/30 transition-colors duration-200 border-b border-green-200 dark:border-green-800/30',
+                                            'odd:bg-green-50 even:bg-white dark:odd:bg-green-900/20 dark:even:bg-green-950/10 border-b border-green-200 dark:border-green-800/30',
                                             getRowClassName ? getRowClassName(item, index) : '',
                                             rowClassName
                                         )}
@@ -338,13 +354,16 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* وضع البطاقات */}
             {sortedData.length > 0 && viewMode === 'card' && (() => {
                 const smallSet = sortedData.length <= 2; // مجموعة صغيرة (1 أو 2)
-                const containerClass = smallSet
-                    ? 'flex flex-col md:flex-row gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar justify-center items-stretch'
-                    : `grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
-                        grid-cols-1 
-                        ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
-                        ${cardGridColumns.lg ? `lg:grid-cols-${cardGridColumns.lg}` : 'lg:grid-cols-3'} 
-                        ${cardGridColumns.xl ? `xl:grid-cols-${cardGridColumns.xl}` : 'xl:grid-cols-4'}`;
+                // في الموبايل نعرض بطاقة واحدة فقط مع تنقل
+                const containerClass = isMobile
+                    ? 'w-full p-2'
+                    : smallSet
+                        ? 'flex flex-col md:flex-row gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar justify-center items-stretch'
+                        : `grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
+                            grid-cols-1 
+                            ${cardGridColumns.md ? `md:grid-cols-${cardGridColumns.md}` : 'md:grid-cols-2'} 
+                            ${cardGridColumns.lg ? `lg:grid-cols-${cardGridColumns.lg}` : 'lg:grid-cols-3'} 
+                            ${cardGridColumns.xl ? `xl:grid-cols-${cardGridColumns.xl}` : 'xl:grid-cols-4'}`;
 
                 return (
                     <div className={containerClass}>
@@ -357,8 +376,9 @@ export function GenericTable<T extends { id: string }>(props: {
                             const titleValue = (item as any)[titleColumn.key] || 'بيانات';
                             // استثناء عمود العنوان وعمود الفهرس من تفاصيل البطاقة
                             const allDetailColumns = columns.filter((c) => c.key !== titleColumn.key && c.key !== (indexColumn && indexColumn.key));
-                            const visibleColumns = enableCardExpand && !expanded ? allDetailColumns.slice(0, cardMaxFieldsCollapsed) : allDetailColumns;
-                            const hasMore = enableCardExpand && allDetailColumns.length > cardMaxFieldsCollapsed;
+                            // على الموبايل نظهر كل الحقول دائماً ونلغي خاصية الطي
+                            const visibleColumns = isMobile ? allDetailColumns : (enableCardExpand && !expanded ? allDetailColumns.slice(0, cardMaxFieldsCollapsed) : allDetailColumns);
+                            const hasMore = !isMobile && enableCardExpand && allDetailColumns.length > cardMaxFieldsCollapsed;
 
                             return (
                                 <div
@@ -412,7 +432,6 @@ export function GenericTable<T extends { id: string }>(props: {
                                                     return (
                                                         <tr
                                                             key={`${item.id}-${column.key}-row`}
-                                                            className="hover:bg-green-50 dark:hover:bg-green-900/25"
                                                         >
                                                             <td className="w-[30%] border border-green-300 dark:border-green-700 px-2 py-1 font-medium text-green-700 dark:text-green-300 text-right">
                                                                 {column.header}
@@ -485,31 +504,73 @@ export function GenericTable<T extends { id: string }>(props: {
                                     </div>
                                     {/* زر إظهار المزيد إذا كان هناك المزيد من الحقول */}
 
-                                    {hasMore && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
+                                    {!isMobile && hasMore && (
+                                        <button
+                                            type="button"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 e.stopPropagation();
-                                                // @ts-ignore
-                                                e.target.setAttribute('data-stop', 'true');
                                                 setExpanded(!expanded);
                                             }}
-                                            className="mt-1 mb-2 mx-auto text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-xs"
+                                            data-stop="true"
+                                            className="mt-1 mb-2 mx-auto px-4 py-2 text-blue-600 dark:text-blue-400 text-xs bg-white dark:bg-green-900/50 border border-blue-300 dark:border-blue-600 cursor-pointer flex items-center gap-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             {expanded ? 'عرض أقل' : 'عرض المزيد'}
                                             {expanded ? (
-                                                <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                                                <ChevronUp className="h-3.5 w-3.5" />
                                             ) : (
-                                                <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                                                <ChevronDown className="h-3.5 w-3.5" />
                                             )}
-                                        </Button>
+                                        </button>
                                     )}
 
                                 </div>
                             );
                             };
+                            if (isMobile) {
+                                const current = sortedData[mobileCardIndex];
+                                return (
+                                    <div className="flex flex-col gap-3">
+                                        <CardItem key={current.id} item={current} />
+                                        {/* أدوات التنقل للموبايل */}
+                                        {sortedData.length > 1 && (
+                                            <div className="flex items-center justify-center gap-4 mt-1 mb-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); goPrevMobile(); }}
+                                                    disabled={mobileCardIndex === 0}
+                                                    className={cn(
+                                                        'px-3 py-2 text-xs font-semibold rounded-md border flex items-center gap-1',
+                                                        mobileCardIndex === 0
+                                                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                                            : 'bg-white dark:bg-green-900/40 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700'
+                                                    )}
+                                                    data-stop="true"
+                                                >
+                                                    السابق
+                                                </button>
+                                                <span className="text-[11px] font-medium text-green-700 dark:text-green-200 select-none">
+                                                    {mobileCardIndex + 1} / {sortedData.length}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); goNextMobile(); }}
+                                                    disabled={mobileCardIndex === sortedData.length - 1}
+                                                    className={cn(
+                                                        'px-3 py-2 text-xs font-semibold rounded-md border flex items-center gap-1',
+                                                        mobileCardIndex === sortedData.length - 1
+                                                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                                                            : 'bg-white dark:bg-green-900/40 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700'
+                                                    )}
+                                                    data-stop="true"
+                                                >
+                                                    التالي
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
                             return sortedData.map((d) => <CardItem key={d.id} item={d} />);
                         })()}
                     </div>
