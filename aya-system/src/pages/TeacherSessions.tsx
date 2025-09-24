@@ -62,6 +62,8 @@ import { arSA } from "date-fns/locale";
 import { GenericTable, Column } from "@/components/ui/generic-table";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { CircleSession } from "@/types/circle-session";
+import { getLabels } from '@/lib/labels';
+import PaginatedCardList from '@/components/ui/paginated-card-list';
 
 type TeacherSessionsProps = {
   onNavigate: (page: string) => void;
@@ -108,6 +110,9 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
   // بحث الحلقات
   const [searchTerm, setSearchTerm] = useState("");
+  const labels = getLabels('ar');
+  const tsLabels = labels.teacherSessionsLabels;
+  const scsLabels = labels.studyCircleSchedulesLabels; // reuse pagination labels
 
   // دور المستخدم الحالي
   const userRole = currentUser?.role;
@@ -120,6 +125,29 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
     const teacherName = (circle?.teacher?.full_name || "").toLowerCase();
     return circleName.includes(term) || teacherName.includes(term);
   });
+
+  // Pagination for mobile circles similar to StudyCircleSchedules
+  const MOBILE_CIRCLES_PAGE_SIZE = 2; // match schedules page requirement
+  const [mobileCirclesPage, setMobileCirclesPage] = useState(0);
+  const totalMobileCirclePages = Math.ceil(filteredCircles.length / MOBILE_CIRCLES_PAGE_SIZE) || 1;
+  const pagedMobileCircles = filteredCircles.slice(
+    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE,
+    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE + MOBILE_CIRCLES_PAGE_SIZE
+  );
+  useEffect(() => { setMobileCirclesPage(0); }, [searchTerm, circles.length]);
+  useEffect(() => { setDesktopCirclesPage(0); }, [searchTerm, circles.length]);
+
+  const handleMobileCirclesPageChange = (p: number) => {
+    if (p >= 0 && p < totalMobileCirclePages) setMobileCirclesPage(p);
+  };
+
+  // Desktop pagination for circles list
+  const DESKTOP_CIRCLES_PAGE_SIZE = 8; // reasonable number for desktop list
+  const [desktopCirclesPage, setDesktopCirclesPage] = useState(0);
+  const totalDesktopCirclePages = Math.ceil(filteredCircles.length / DESKTOP_CIRCLES_PAGE_SIZE) || 1;
+  const handleDesktopCirclesPageChange = (p: number) => {
+    if (p >= 0 && p < totalDesktopCirclePages) setDesktopCirclesPage(p);
+  };
 
   // حالة نموذج إضافة/تعديل الجلسة
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -440,22 +468,20 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
           <div className="space-y-0.5 sm:space-y-1">
             <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
-                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
-                <span className="truncate">جلسات المعلمين</span>
-              </CardTitle>
-              <CardDescription className="text-green-100 text-xs sm:text-sm mt-0.5 sm:mt-1">
-                إدارة جلسات المعلمين والحلقات المستقبلية
-              </CardDescription>
-            </div>
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
+              <span className="truncate">جلسات المعلمين</span>
+            </CardTitle>
+            <CardDescription className="text-green-100 text-xs sm:text-sm mt-0.5 sm:mt-1">
+              إدارة جلسات المعلمين والحلقات المستقبلية
+            </CardDescription>
+          </div>
         </CardHeader>
 
-        <CardContent className="p-3 sm:p-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* ثلث الصفحة الأول - اختيار الحلقة */}
-            <div className="md:col-span-1">
+        <CardContent className="space-y-3 sm:space-y-6 px-2 sm:px-4 pt-3 pb-4">
+          <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
+            {/* قائمة الجوال */}
+            <div className="md:hidden">
               <div className="bg-white border border-green-200 rounded-xl shadow-md overflow-hidden">
-                {/* هيدر اختيار الحلقة */}
-                {/* قائمة الحلقات */}
                 {/* قائمة الجوال */}
                 <div className="md:hidden">
                   <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
@@ -463,13 +489,13 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                     <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
                       <div className="flex items-center gap-1">
                         <BookOpen className="h-3.5 w-3.5 text-white" />
-                        <h2 className="text-[12px] font-semibold text-white">قائمة الحلقات</h2>
+                        <h2 className="text-[12px] font-semibold text-white">{tsLabels.circlesListTitle}</h2>
                       </div>
                       {selectedCircle && (
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-white/80">المعلم:</span>
+                          <span className="text-[10px] text-white/80">{tsLabels.teacherShort}</span>
                           <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                            {getCircleTeacher(selectedCircle)?.split(" ")[0] || 'غير محدد'}
+                            {getCircleTeacher(selectedCircle)?.split(" ")[0] || tsLabels.teacherUnknown}
                           </Badge>
                         </div>
                       )}
@@ -481,7 +507,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                         <div className="relative">
                           <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
                           <Input
-                            placeholder="بحث..."
+                            placeholder={tsLabels.searchPlaceholder}
                             className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -491,185 +517,139 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                     )}
 
                     {/* العناصر */}
-                    <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 scrollbar-thin scrollbar-thumb-green-400 scrollbar-track-transparent">
+                    <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar scroll-fade">
                       {loading ? (
                         <div className="w-full py-6 text-center flex flex-col items-center">
                           <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                          <span className="text-green-700 text-[12px] font-medium">جاري التحميل...</span>
+                          <span className="text-green-700 text-[12px] font-medium">{tsLabels.loading}</span>
                         </div>
                       ) : filteredCircles.length === 0 ? (
-                        <div className="w-full py-6 text-center text-green-600 text-[12px]">لا توجد نتائج</div>
+                        <div className="w-full py-6 text-center text-green-600 text-[12px]">{tsLabels.noResults}</div>
                       ) : (
-                        <div className="flex flex-col gap-1">
-                          {filteredCircles.map(circle => {
+                        <PaginatedCardList
+                          items={filteredCircles}
+                          pageSize={MOBILE_CIRCLES_PAGE_SIZE}
+                          page={mobileCirclesPage}
+                          onPageChange={handleMobileCirclesPageChange}
+                          ariaLabels={{
+                            prev: scsLabels.prevLabel,
+                            next: scsLabels.nextLabel,
+                            pagesIndicator: scsLabels.pagesIndicatorAria,
+                            pagination: scsLabels.paginationAria,
+                            page: scsLabels.pageAria
+                          }}
+                          className="flex flex-col gap-1"
+                          navigationPosition="bottom"
+                          renderItem={(circle) => {
                             const active = selectedCircle === circle.id;
                             return (
                               <button
                                 key={circle.id}
                                 onClick={() => handleCircleChange(circle.id)}
-                                className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
-                        ${active
-                                    ? 'bg-gradient-to-r from-green-600 to-green-700 border-green-300 text-white shadow-md'
-                                    : 'bg-white border-green-200 text-green-700 hover:bg-green-50 hover:border-green-400 hover:shadow-sm'}
-                      `}
+                                className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white ${active ? 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300 text-white shadow-md' : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}`}
                               >
                                 <span className="font-medium truncate">{circle.name}</span>
                                 <div className="flex items-center gap-1.5">
                                   {circle.teacher && (
-                                    <span className={`text-[10px] ${active ? 'text-green-100' : 'text-green-500'}`}>
-                                      {circle.teacher.full_name.split(" ")[0]}
-                                    </span>
+                                    <span className={`text-[10px] ${active ? 'text-blue-100' : 'text-blue-500'}`}>{circle.teacher.full_name.split(' ')[0]}</span>
                                   )}
                                   {active && (
-                                    <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">
-                                      ✓
-                                    </span>
+                                    <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">✓</span>
                                   )}
                                 </div>
                               </button>
-                            );
-                          })}
-                        </div>
+                            )
+                          }}
+                        />
                       )}
                     </div>
-                  </div>
-                </div>
-
-                {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
-                <div className="hidden md:block w-full">
-                  {/* Body */}
-                  <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden">
-                    {/* الهيدر */}
-                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-3 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
-                      <div className="flex items-center gap-1.5">
-                        <BookOpen className="h-3.5 w-3.5 text-white" />
-                        <h2 className="text-[12px] font-semibold text-white">قائمة الحلقات</h2>
-                      </div>
-                      {selectedCircle && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-white/80">المعلم:</span>
-                          <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                            {getCircleTeacher(selectedCircle)?.split(" ")[0] || 'غير محدد'}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* مربع البحث */}
-                    {userRole !== 'teacher' && (
-                      <div className="p-2 border-b border-green-100">
-                        <div className="relative">
-                          <Search className="absolute right-2.5 top-[9px] h-3.5 w-3.5 text-green-500" />
-                          <Input
-                            placeholder="بحث عن حلقة..."
-                            className="pr-8 h-8 text-xs border border-green-200 rounded-md focus:border-green-400 focus:ring-1 focus:ring-green-200 shadow-sm"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* عرض الحلقات */}
-                    {loading ? (
-                      <div className="flex flex-col items-center justify-center p-4 gap-1.5">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
-                        <span className="text-xs text-green-600">جاري تحميل الحلقات...</span>
-                      </div>
-                    ) : filteredCircles.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center p-4 text-center gap-1.5 bg-green-50/50 m-2 rounded-lg border border-green-200">
-                        <BookOpen className="h-8 w-8 text-green-200" />
-                        <h3 className="text-sm font-semibold text-green-800">لا توجد حلقات</h3>
-                        <p className="text-xs text-green-600">
-                          لم يتم العثور على حلقات تطابق معايير البحث
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-1.5 max-h-[450px] overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-green-400/60 scrollbar-track-transparent">
-                        {filteredCircles.map(circle => {
-                          const active = selectedCircle === circle.id;
-                          return (
-                            <button
-                              key={circle.id}
-                              type="button"
-                              onClick={() => handleCircleChange(circle.id)}
-                              className={`
-                        group w-full text-right relative rounded-lg px-3 py-2.5 transition-all duration-200
-                        border flex flex-col gap-1
-                        ${active
-                                  ? 'bg-gradient-to-l from-green-700 via-green-600 to-green-500 text-white border-green-500 shadow-sm shadow-green-300/30'
-                                  : 'bg-white hover:bg-green-50 text-green-800 border-green-200 hover:border-green-400'}
-                        `}
-                            >
-                              {/* شريط جانبي للحالة */}
-                              <span
-                                className={`
-                          absolute right-0 top-0 h-full w-1 rounded-r-lg transition-all
-                          ${active ? 'bg-white/90' : 'bg-green-300/0 group-hover:bg-green-300/60'}
-                        `}
-                              />
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`
-                          inline-flex items-center justify-center h-7 w-7 rounded-md text-xs font-semibold
-                          ${active
-                                      ? 'bg-white/20 text-white ring-1 ring-white/40'
-                                      : 'bg-green-100 text-green-700 group-hover:bg-green-200'}
-                          `}
-                                >
-                                  <BookOpen className="h-3.5 w-3.5" />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className={`text-sm font-bold truncate ${active ? 'text-white' : 'text-green-800'}`}>
-                                    {circle.name}
-                                  </p>
-                                  {circle.teacher && (
-                                    <p
-                                      className={`text-xs mt-0.5 truncate flex items-center gap-1
-                            ${active ? 'text-green-100' : 'text-green-600 group-hover:text-green-700'}
-                            `}
-                                    >
-                                      <UserCheck className="h-3 w-3" />
-                                      {circle.teacher.full_name}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex flex-col items-end gap-1">
-                                  {active && (
-                                    <Badge
-                                      variant="outline"
-                                      className="border-white/60 text-[9px] leading-none px-1.5 py-0.5 bg-white/20 text-white"
-                                    >
-                                      <Check className="h-2.5 w-2.5 mr-0.5" />
-                                      محدد
-                                    </Badge>
-                                  )}
-                                  {typeof circle?.students_count !== 'undefined' && (
-                                    <span
-                                      className={`
-                            inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium
-                            ${active
-                                          ? 'bg-white/30 text-white'
-                                          : 'bg-green-100 text-green-700 group-hover:bg-green-200'}
-                            `}
-                                      title="عدد الطلاب"
-                                    >
-                                      {circle.students_count}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
+            <div className="md:col-span-1 hidden md:block">
+              <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3">
+                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    {scsLabels.circlesHeading}
+                  </h2>
+                </div>
+                {/* Body */}
+                <div className="p-4 space-y-4 md:space-y-5">
+                  {/* مربع البحث */}
+                  <div className="relative">
+                    {userRole !== 'teacher' && (
+                      <div className="relative mt-1">
+                        <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
+                        <Input
+                          placeholder={scsLabels.searchPlaceholder}
+                          className="pr-10 pl-3 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm text-sm"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center p-8 gap-2">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+                      <span className="text-sm text-green-600">{scsLabels.loadingCircles}</span>
+                    </div>
+                  ) : filteredCircles.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-8 text-center gap-2">
+                      <BookOpen className="h-12 w-12 text-green-200" />
+                      <h3 className="text-lg font-semibold text-green-800">{scsLabels.noCircles}</h3>
+                      <p className="text-sm text-green-600">
+                        {scsLabels.noCirclesSearch}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-green-100">
+                      {filteredCircles.map((circle) => (
+                        <div
+                          key={circle.id}
+                          className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2.5 shadow-sm text-sm ${selectedCircle === circle.id
+                            ? 'bg-green-700 text-white ring-1 ring-green-400'
+                            : 'bg-green-50 hover:bg-green-100 text-green-800'
+                            }`}
+                          onClick={() => handleCircleChange(circle.id)}
+                        >
+                          <div className="flex items-center justify-between font-medium gap-1">
+                            {/* اسم الحلقة مع أيقونة كتاب صغيرة */}
+                            <div className="flex items-center gap-1 truncate">
+                              <span className="text-green-500">📖</span>
+                              <span className="truncate">{circle.name}</span>
+                              {circle.teacher && (
+                                <span className={`flex items-center gap-1 text-[11px] truncate ${selectedCircle === circle.id ? 'text-white' : 'text-green-700'
+                                  }`}>
+                                  👨‍🏫 {circle.teacher.full_name}
+                                </span>
+                              )}
+                            </div>
+
+                            {selectedCircle === circle.id && (
+                              <Badge
+                                variant="outline"
+                                className={`${selectedCircle === circle.id ? 'text-white border-white' : 'text-green-800 border-green-400'
+                                  } text-xs`}
+                              >
+                                {scsLabels.selectedBadge}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* عرض الجلسات - ثلثي الصفحة */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-3">
               <div className="bg-white border border-green-200 rounded-xl shadow-md overflow-hidden">
                 {/* هيدر الجلسات */}
                 <div className="bg-gradient-to-r from-green-100 via-green-200 to-green-300 px-3 py-2 sm:px-4 sm:py-3 border-b border-green-300">
@@ -678,9 +658,9 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                       <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" />
                       <h3 className="text-sm sm:text-base md:text-lg font-bold text-green-800 text-center sm:text-right">
                         {selectedCircle ? (
-                          <span>الجلسات المستقبلية لحلقة: {getCircleName(selectedCircle)}</span>
+                          <span>{tsLabels.futureSessionsForCircle(getCircleName(selectedCircle))}</span>
                         ) : (
-                          <span>الجلسات المستقبلية للحلقة</span>
+                          <span>{tsLabels.futureSessionsGeneric}</span>
                         )}
                       </h3>
                     </div>
@@ -692,7 +672,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                         title="تسجيل جلسة جديدة"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        <span className="inline">تسجيل جلسة جديدة</span>
+                        <span className="inline">{tsLabels.addSessionButton}</span>
                       </Button>
                     )}
                   </div>
@@ -704,8 +684,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                   <div className="bg-green-50 rounded-lg border border-green-200 p-2 sm:p-3 mb-3 sm:mb-4">
                     <Badge variant="outline" className="text-green-800 border-green-400 text-xs sm:text-sm">
                       {circleSessions.length > 0
-                        ? `عدد الجلسات المستقبلية: ${circleSessions.length}`
-                        : "لا توجد جلسات مستقبلية"}
+                        ? tsLabels.totalFutureSessions(circleSessions.length)
+                        : tsLabels.noFutureSessions}
                     </Badge>
                   </div>
 
@@ -755,7 +735,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                             },
                             {
                               key: 'notes',
-                              header: '📝مذكرة',
+                              header: '📝' + tsLabels.fieldNotes,
                               align: 'right',
                               render: (session) => (
                                 <span className="text-green-800 text-xs max-w-[200px] block">{session.notes || '—'}</span>
@@ -763,7 +743,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                             },
                             {
                               key: 'actions',
-                              header: '⚙️ إجراءات',
+                              header: '⚙️ ' + 'إجراءات',
                               align: 'center',
                               render: (session) => (
                                 <div className="flex justify-center gap-2">
@@ -779,7 +759,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                                       teacher_id: session.teacher_id
                                     })}
                                     className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 transition-colors"
-                                    title="تعديل الجلسة"
+                                    title={tsLabels.editSession}
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
@@ -795,7 +775,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                                       teacher_id: session.teacher_id
                                     })}
                                     className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 transition-colors"
-                                    title="حذف الجلسة"
+                                    title={tsLabels.deleteSession}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -814,16 +794,16 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                       <div className="py-16 text-center">
                         <div className="bg-green-50 rounded-2xl p-6 max-w-md mx-auto border border-green-200 shadow-inner">
                           <Calendar className="w-12 h-12 text-green-300 mx-auto mb-3" />
-                          <h3 className="text-lg font-bold text-green-800 mb-2">لا توجد جلسات مستقبلية</h3>
+                          <h3 className="text-lg font-bold text-green-800 mb-2">{tsLabels.noFutureSessions}</h3>
                           <p className="text-green-600 text-sm mb-4">
-                            لا توجد جلسات مستقبلية مسجلة لهذه الحلقة
+                            {tsLabels.noFutureSessions}
                           </p>
                           <Button
                             onClick={handleAddSession}
                             className="bg-green-600 hover:bg-green-700 text-white rounded-xl"
                           >
                             <Plus className="h-4 w-4 mr-1" />
-                            تسجيل جلسة جديدة
+                            {tsLabels.addSessionButton}
                           </Button>
                         </div>
                       </div>
@@ -832,9 +812,9 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                     <div className="py-16 text-center">
                       <div className="bg-green-50 rounded-2xl p-6 max-w-md mx-auto border border-green-200 shadow-inner">
                         <BookOpen className="w-12 h-12 text-green-300 mx-auto mb-3" />
-                        <h3 className="text-lg font-bold text-green-800 mb-2">اختر حلقة لعرض الجلسات</h3>
+                        <h3 className="text-lg font-bold text-green-800 mb-2">{tsLabels.chooseCircleTitle}</h3>
                         <p className="text-green-600 text-sm">
-                          يرجى اختيار حلقة من القائمة على اليمين لعرض الجلسات المستقبلية الخاصة بها
+                          {tsLabels.chooseCircleHelp}
                         </p>
                       </div>
                     </div>

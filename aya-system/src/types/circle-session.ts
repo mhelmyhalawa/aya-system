@@ -51,7 +51,7 @@ export const formatDateDisplay = (dateStr?: string): string => {
     return date.toLocaleDateString('ar', {
       weekday: 'long',
       year: 'numeric',
-      month: 'long',
+      month: 'numeric',
       day: 'numeric'
     });
   } catch (error) {

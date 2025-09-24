@@ -482,6 +482,47 @@ const ar = {
     pageAria: 'صفحة',
     desktopSchedulesListAria: 'قائمة المواعيد في الديسكتوب',
     mobileSchedulesListAria: 'قائمة المواعيد في الجوال'
+  },
+  teacherSessionsLabels: {
+    pageTitle: 'جلسات المعلمين',
+    pageDescription: 'إدارة جلسات الحلقات المستقبلية للمعلمين',
+    circlesListTitle: 'قائمة الحلقات',
+    teacherShort: 'المعلم:',
+    teacherUnknown: 'غير محدد',
+    searchPlaceholder: 'بحث...',
+    searchCirclePlaceholder: 'بحث عن حلقة...',
+    loading: 'جاري التحميل...',
+    loadingCircles: 'جاري تحميل الحلقات...',
+    noResults: 'لا توجد نتائج',
+    noCircles: 'لا توجد حلقات',
+    noCirclesSearch: 'لم يتم العثور على حلقات تطابق معايير البحث',
+    selectedBadge: 'محدد',
+    studentsCountTitle: 'عدد الطلاب',
+    futureSessionsForCircle: (circle: string) => `الجلسات المستقبلية لحلقة: ${circle}`,
+    futureSessionsGeneric: 'الجلسات المستقبلية للحلقة',
+    addSessionButton: 'تسجيل جلسة جديدة',
+    totalFutureSessions: (count: number) => `عدد الجلسات المستقبلية: ${count}`,
+    noFutureSessions: 'لا توجد جلسات مستقبلية',
+    chooseCircleTitle: 'اختر حلقة لعرض الجلسات',
+    chooseCircleHelp: 'يرجى اختيار حلقة من القائمة على اليمين لعرض الجلسات المستقبلية الخاصة بها',
+    editSession: 'تعديل الجلسة',
+    deleteSession: 'حذف الجلسة',
+    addDialogTitle: 'تسجيل جلسة جديدة',
+    addDialogDescription: 'أدخل بيانات الجلسة الجديدة',
+    addDialogSave: 'حفظ الجلسة',
+    editDialogTitle: 'تعديل بيانات الجلسة',
+    editDialogDescription: 'عدّل بيانات الجلسة المختارة',
+    editDialogSave: 'حفظ التعديلات',
+    cancel: 'إلغاء',
+    fieldDate: 'التاريخ',
+    fieldStart: 'وقت البدء',
+    fieldEnd: 'وقت الانتهاء',
+    fieldNotes: 'ملاحظات',
+    fieldNotesPlaceholder: 'أي ملاحظات إضافية حول الجلسة...',
+    deleteDialogTitle: 'تأكيد حذف الجلسة',
+    deleteDialogDescription: 'هل أنت متأكد من رغبتك في حذف هذه الجلسة؟ لا يمكن التراجع عن هذا الإجراء.',
+    deleteDialogDetailsTitle: 'بيانات الجلسة المراد حذفها:',
+    deleteButton: 'نعم، قم بالحذف'
   }
 };
 
@@ -508,6 +549,7 @@ const en: typeof ar = {
   ,homeLabels: { ...ar.homeLabels }
   ,footerLabels: { ...ar.footerLabels }
   ,studyCircleSchedulesLabels: { ...ar.studyCircleSchedulesLabels }
+  ,teacherSessionsLabels: { ...ar.teacherSessionsLabels }
 };
 
 export const labelsByLang: Record<SupportedLang, typeof ar> = { ar, en };

@@ -18,5 +18,7 @@ export const dashboardStatsLabels = L.dashboardStatsLabels;
 export const loginLabels = L.loginLabels;
 export const userManagementLabels = L.userManagementLabels;
 export const teacherHistoryLabels = L.teacherHistoryLabels;
+
+export { getLabels };
 // For compatibility retain previous additional groups if needed in future migrations.
 // Developers should migrate to: import { getLabels } from '@/lib/labels';

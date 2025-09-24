@@ -184,8 +184,35 @@ All colors MUST be HSL.
 .custom-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: #86efac #dcfce7;
+  scroll-behavior: smooth;
 }
 
 .dark .custom-scrollbar {
   scrollbar-color: #16a34a #14532d;
+}
+
+/* Scroll fade utility (top/bottom gradient edges) */
+.scroll-fade { position: relative; }
+.scroll-fade::before,
+.scroll-fade::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: 16px;
+  pointer-events: none;
+  z-index: 10;
+}
+.scroll-fade::before {
+  top: 0;
+  background: linear-gradient(to bottom, hsl(var(--background)) 0%, hsla(var(--background)/0) 100%);
+}
+.scroll-fade::after {
+  bottom: 0;
+  background: linear-gradient(to top, hsl(var(--background)) 0%, hsla(var(--background)/0) 100%);
+}
+.dark .scroll-fade::before {
+  background: linear-gradient(to bottom, hsl(var(--background)) 0%, hsla(var(--background)/0) 100%);
+}
+.dark .scroll-fade::after {
+  background: linear-gradient(to top, hsl(var(--background)) 0%, hsla(var(--background)/0) 100%);
 }

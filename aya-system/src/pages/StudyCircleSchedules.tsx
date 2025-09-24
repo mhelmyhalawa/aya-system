@@ -3,30 +3,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormDialog, FormRow } from "@/components/ui/form-dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StudyCircle } from "@/types/study-circle";
 import { StudyCircleSchedule, StudyCircleScheduleCreate, StudyCircleScheduleUpdate, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
-import { getAllStudyCircles, getStudyCircleById, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
+import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
 import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle, AlertTriangle, X, ChevronRight } from "lucide-react";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
-import { GenericTable } from "@/components/ui/generic-table";
 import { getLabels } from '@/lib/labels';
+
 const { studyCircleSchedulesLabels: scsLabels } = getLabels('ar');
 
 interface StudyCircleSchedulesPageProps {
@@ -463,10 +450,11 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
   return (
     <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-      <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
-        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
-          <div className="space-y-0.5 sm:space-y-1">
-            <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
+      <Card>
+        {/* الهيدر */}
+        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
               <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
               <span className="line-clamp-1">{scsLabels.pageTitle} </span>
             </CardTitle>
@@ -531,8 +519,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                             onClick={() => handleSelectCircle(circle)}
                             className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
                         ${active
-                                ? 'bg-gradient-to-r from-green-600 to-green-700 border-green-300 text-white shadow-md'
-                                : 'bg-white border-green-200 text-green-700 hover:bg-green-50 hover:border-green-400 hover:shadow-sm'}
+                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300 text-white shadow-md'
+                                : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}
                       `}
                           >
                             <span className="font-medium truncate">{circle.name}</span>
@@ -1032,8 +1020,6 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 </CardContent>
               </div>
             </div>
-
-
           </div>
         </CardContent>
       </Card>
@@ -1136,7 +1122,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                   text-sm px-4 py-2 rounded-full border transition-all duration-200
                   flex-1 text-center
                   ${editScheduleForm.weekday === day.value.toString()
-                    ? 'bg-gradient-to-r from-green-400 to-blue-400 text-white shadow-md transform scale-105'
+                    ? 'bg-gradient-to-r from-blue-400 to-blue-400 text-white shadow-md transform scale-105'
                     : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100 hover:shadow-sm'
                   }
                 `}
