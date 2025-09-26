@@ -429,7 +429,7 @@ export function GenericTable<T extends { id: string }>(props: {
                     const primaryLabelColumn = columns.find(c => c.important) || columns[0];
                     return (
                         <div
-                            className="flex flex-wrap items-center justify-center gap-1 py-2 select-none w-full"
+                            className="md:hidden flex flex-wrap items-center justify-center gap-1 py-2 select-none w-full"
                             aria-label={`التنقل بين البطاقات، إجمالي ${totalItems} بطاقة`}
                         >
                             {sortedData.map((record, idx) => {

@@ -680,15 +680,6 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
                 {/* عداد الجلسات والبيانات */}
                 <div className="p-3 sm:p-4">
-                  {/* عدد الجلسات */}
-                  <div className="bg-green-50 rounded-lg border border-green-200 p-2 sm:p-3 mb-3 sm:mb-4">
-                    <Badge variant="outline" className="text-green-800 border-green-400 text-xs sm:text-sm">
-                      {circleSessions.length > 0
-                        ? tsLabels.totalFutureSessions(circleSessions.length)
-                        : tsLabels.noFutureSessions}
-                    </Badge>
-                  </div>
-
                   {/* جدول الجلسات */}
                   {loading ? (
                     <div className="text-center py-12 flex flex-col items-center justify-center">
@@ -703,7 +694,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                             ...session,
                             id: `${session.study_circle_id}-${session.session_date}-${index}`
                           }))}
-                          cardGridColumns={{ sm: 1, md: 1, lg: 2, xl: 3 }}
+                          cardGridColumns={{ sm: 1, md: 1, lg: 3, xl: 3 }}
                           cardWidth="100%"
                           columns={[
                             {
@@ -788,6 +779,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                           getRowClassName={(_, index) =>
                             `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
                           }
+                          cardMaxFieldsCollapsed ={4}
                         />
                       </div>
                     ) : (
