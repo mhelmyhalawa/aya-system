@@ -487,89 +487,84 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
           <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
             {/* قائمة الجوال */}
             <div className="md:hidden">
-              <div className="bg-white border border-green-200 rounded-xl shadow-md overflow-hidden">
-                {/* قائمة الجوال */}
-                <div className="md:hidden">
-                  <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
-                    {/* الهيدر */}
-                    <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
-                      <div className="flex items-center gap-1">
-                        <BookOpen className="h-3.5 w-3.5 text-white" />
-                        <h2 className="text-[12px] font-semibold text-white">{tsLabels.circlesListTitle}</h2>
-                      </div>
-                      {selectedCircle && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[10px] text-white/80">{tsLabels.teacherShort}</span>
-                          <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                            {getCircleTeacher(selectedCircle)?.split(" ")[0] || tsLabels.teacherUnknown}
-                          </Badge>
-                        </div>
-                      )}
+              <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
+                {/* الهيدر */}
+                <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
+                  <div className="flex items-center gap-1">
+                    <BookOpen className="h-3.5 w-3.5 text-white" />
+                    <h2 className="text-[12px] font-semibold text-white">{tsLabels.circlesListTitle}</h2>
+                  </div>
+                  {selectedCircle && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-white/80">{tsLabels.teacherShort}</span>
+                      <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-1 rounded-full text-[10px]">
+                        {getCircleTeacher(selectedCircle)?.split(" ")[0] || tsLabels.teacherUnknown}
+                      </Badge>
                     </div>
+                  )}
+                </div>
 
-                    {/* البحث */}
-                    {userRole !== 'teacher' && (
-                      <div className="px-2 pt-2">
-                        <div className="relative">
-                          <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
-                          <Input
-                            placeholder={tsLabels.searchPlaceholder}
-                            className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* العناصر */}
-                    <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar scroll-fade">
-                      {loading ? (
-                        <div className="w-full py-6 text-center flex flex-col items-center">
-                          <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                          <span className="text-green-700 text-[12px] font-medium">{tsLabels.loading}</span>
-                        </div>
-                      ) : filteredCircles.length === 0 ? (
-                        <div className="w-full py-6 text-center text-green-600 text-[12px]">{tsLabels.noResults}</div>
-                      ) : (
-                        <PaginatedCardList
-                          items={filteredCircles}
-                          pageSize={MOBILE_CIRCLES_PAGE_SIZE}
-                          page={mobileCirclesPage}
-                          onPageChange={handleMobileCirclesPageChange}
-                          ariaLabels={{
-                            prev: scsLabels.prevLabel,
-                            next: scsLabels.nextLabel,
-                            pagesIndicator: scsLabels.pagesIndicatorAria,
-                            pagination: scsLabels.paginationAria,
-                            page: scsLabels.pageAria
-                          }}
-                          className="flex flex-col gap-1"
-                          navigationPosition="bottom"
-                          renderItem={(circle) => {
-                            const active = selectedCircle === circle.id;
-                            return (
-                              <button
-                                key={circle.id}
-                                onClick={() => handleCircleChange(circle.id)}
-                                className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white ${active ? 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300 text-white shadow-md' : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}`}
-                              >
-                                <span className="font-medium truncate">{circle.name}</span>
-                                <div className="flex items-center gap-1.5">
-                                  {circle.teacher && (
-                                    <span className={`text-[10px] ${active ? 'text-blue-100' : 'text-blue-500'}`}>{circle.teacher.full_name.split(' ')[0]}</span>
-                                  )}
-                                  {active && (
-                                    <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">✓</span>
-                                  )}
-                                </div>
-                              </button>
-                            )
-                          }}
-                        />
-                      )}
+                {/* البحث */}
+                {userRole !== 'teacher' && (
+                  <div className="px-2 pt-2">
+                    <div className="relative">
+                      <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
+                      <Input
+                        placeholder={tsLabels.searchPlaceholder}
+                        className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
                     </div>
                   </div>
+                )}
+
+                {/* العناصر */}
+                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar scroll-fade">
+                  {loading ? (
+                    <div className="w-full py-6 text-center flex flex-col items-center">
+                      <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
+                      <span className="text-green-700 text-[12px] font-medium">{tsLabels.loading}</span>
+                    </div>
+                  ) : filteredCircles.length === 0 ? (
+                    <div className="w-full py-6 text-center text-green-600 text-[12px]">{tsLabels.noResults}</div>
+                  ) : (
+                    <PaginatedCardList
+                      items={filteredCircles}
+                      pageSize={MOBILE_CIRCLES_PAGE_SIZE}
+                      page={mobileCirclesPage}
+                      onPageChange={handleMobileCirclesPageChange}
+                      ariaLabels={{
+                        prev: scsLabels.prevLabel,
+                        next: scsLabels.nextLabel,
+                        pagesIndicator: scsLabels.pagesIndicatorAria,
+                        pagination: scsLabels.paginationAria,
+                        page: scsLabels.pageAria
+                      }}
+                      className="flex flex-col gap-1"
+                      navigationPosition="bottom"
+                      renderItem={(circle) => {
+                        const active = selectedCircle === circle.id;
+                        return (
+                          <button
+                            key={circle.id}
+                            onClick={() => handleCircleChange(circle.id)}
+                            className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white ${active ? 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300 text-white shadow-md' : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}`}
+                          >
+                            <span className="font-medium truncate">{circle.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              {circle.teacher && (
+                                <span className={`text-[10px] ${active ? 'text-blue-100' : 'text-blue-500'}`}>{circle.teacher.full_name.split(' ')[0]}</span>
+                              )}
+                              {active && (
+                                <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">✓</span>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -790,8 +785,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                             `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
                           }
                           cardMaxFieldsCollapsed={4}
-                          hideSortToggle={true}
-                          /* يمكن إضافة زر للتحديث لاحقاً إذا لزم الأمر: onRefresh={...} */
+                          hideSortToggle={false}
+                        /* يمكن إضافة زر للتحديث لاحقاً إذا لزم الأمر: onRefresh={...} */
                         />
                       </div>
                     ) : (

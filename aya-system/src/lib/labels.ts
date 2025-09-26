@@ -4,6 +4,8 @@
  * Use `getLabels(lang)` to retrieve a typed object.
  */
 
+import { time } from "console";
+
 export type SupportedLang = 'ar' | 'en';
 
 // Base Arabic labels imported (extracted from existing arabic-labels.ts). For English we provide placeholders.
@@ -444,9 +446,11 @@ const ar = {
     addDialogSave: 'إضافة الموعد',
     editDialogSave: 'حفظ التغييرات',
     fieldDay: 'اليوم *',
+    fieldDayHeader: 'اليوم',
+    fieldTime: 'الوقت',
     fieldStart: 'وقت البداية *',
     fieldEnd: 'وقت النهاية *',
-    fieldLocation: 'الموقع (اختياري)',
+    fieldLocation: 'الموقع',
     fieldLocationHelp: 'اتركه فارغاً لاستخدام موقع الحلقة الافتراضي',
     fieldLocationPlaceholder: 'أدخل موقع الموعد (اختياري)',
     deleteDialogTitle: 'تأكيد حذف الموعد',
@@ -481,7 +485,8 @@ const ar = {
     paginationAria: 'ترقيم الصفحات',
     pageAria: 'صفحة',
     desktopSchedulesListAria: 'قائمة المواعيد في الديسكتوب',
-    mobileSchedulesListAria: 'قائمة المواعيد في الجوال'
+    mobileSchedulesListAria: 'قائمة المواعيد في الجوال',
+    fieldActions: 'الإجراءات',
   },
   teacherSessionsLabels: {
     pageTitle: 'جلسات المعلمين',
