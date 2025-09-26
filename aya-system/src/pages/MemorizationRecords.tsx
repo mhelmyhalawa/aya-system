@@ -22,7 +22,7 @@ import {
 } from '../types/memorization-record';
 import { Profile } from '../types/profile';
 import { StudyCircle } from '../types/study-circle';
-import { Table2, LayoutGrid, Plus, Pencil, Trash2, SaveIcon, NotebookPenIcon, RefreshCwIcon } from 'lucide-react';
+import { Table2, LayoutGrid, Plus, Pencil, Trash2, SaveIcon, NotebookPenIcon, RefreshCwIcon, List } from 'lucide-react';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 
 import {
@@ -94,6 +94,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   // متغيرات مربع حوار تأكيد الحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [recordToDelete, setRecordToDelete] = useState<number | null>(null);
+  // حوار عرض جميع سجلات الطالب
+  const [isStudentRecordsDialogOpen, setIsStudentRecordsDialogOpen] = useState(false);
+  const [selectedStudentAllRecords, setSelectedStudentAllRecords] = useState<MemorizationRecord[] | null>(null);
 
   const { toast } = useToast();
 
@@ -1019,6 +1022,31 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
     return filteredStudents;
   }, [students, selectedTeacherId, selectedCircleId, visibleStudyCircles, searchQuery]);
 
+  // خريطة سجلات الطلاب (حسب الطالب) بعد تطبيق كل الفلاتر الحالية
+  const studentRecordsMap = useMemo(() => {
+    const map: Record<string, MemorizationRecord[]> = {};
+    filteredRecords.forEach(r => {
+      if (!r.student_id) return;
+      if (!map[r.student_id]) map[r.student_id] = [];
+      map[r.student_id].push(r);
+    });
+    // ترتيب سجلات كل طالب تنازلياً حسب التاريخ (الأحدث أولاً)
+    Object.values(map).forEach(arr => arr.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    return map;
+  }, [filteredRecords]);
+
+  // السجل الأحدث لكل طالب ليتم عرضه في الجدول الرئيسي
+  const latestStudentRecords: MemorizationRecord[] = useMemo(() => {
+    return Object.values(studentRecordsMap).map(arr => arr[0]);
+  }, [studentRecordsMap]);
+
+  // فتح حوار عرض جميع السجلات لطالب معين
+  const openStudentRecordsDialog = (studentId: string) => {
+    const all = studentRecordsMap[studentId] || [];
+    setSelectedStudentAllRecords(all);
+    setIsStudentRecordsDialogOpen(true);
+  };
+
   const handleTeacherChange = (value: string) => {
     // Handle "select-teacher" option (reset case)
     if (value === 'select-teacher') {
@@ -1303,7 +1331,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
       ) :
         <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
-          data={filteredRecords.map(record => ({
+          /* إظهار فقط أحدث سجل لكل طالب */
+          data={latestStudentRecords.map(record => ({
             ...record,
             id: record.id.toString()
           }))}
@@ -1392,6 +1421,27 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               header: '🖊 المُسجل بواسطة',
               align: 'right' as const,
               render: (record) => record.recorder?.full_name || 'غير معروف',
+            },
+            {
+              key: 'more',
+              header: '📜 باقي السجلات',
+              align: 'center' as const,
+              render: (record) => {
+                const all = studentRecordsMap[record.student_id || ''] || [];
+                const remaining = all.length - 1; // باستثناء الظاهر الآن
+                if (remaining <= 0) return <span className="text-gray-400 text-xs">لا يوجد</span>;
+                return (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => { e.stopPropagation(); openStudentRecordsDialog(record.student_id); }}
+                    className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors rounded-lg"
+                    title={`عرض باقي (${remaining}) سجل / سجلات`}
+                  >
+                    <List className="h-4 w-4 text-blue-600 dark:text-blue-300" />
+                  </Button>
+                );
+              }
             },
             {
               key: 'actions',
@@ -1795,6 +1845,108 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         deleteButtonText="نعم، احذف السجل"
         cancelButtonText="إلغاء"
       />
+
+      {/* حوار عرض جميع سجلات الطالب */}
+      <Dialog open={isStudentRecordsDialogOpen} onOpenChange={setIsStudentRecordsDialogOpen}>
+        <DialogContent dir="rtl" className="max-w-[95vw] sm:max-w-4xl w-full overflow-hidden rounded-xl p-3 shadow-lg bg-gradient-to-r from-green-50 to-blue-50 border border-gray-100">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-green-800 flex items-center gap-2">
+              📜 جميع سجلات الطالب
+            </DialogTitle>
+          </DialogHeader>
+          <div className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
+            {selectedStudentAllRecords && selectedStudentAllRecords[0]?.student?.full_name ? (
+              <span>
+                الطالب: {selectedStudentAllRecords[0].student.full_name}
+                {selectedStudentAllRecords[0].student.guardian?.full_name ? ` - ${selectedStudentAllRecords[0].student.guardian.full_name}` : ''}
+              </span>
+            ) : '---'}
+          </div>
+          {selectedStudentAllRecords && selectedStudentAllRecords.length > 0 ? (
+            <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
+              data={selectedStudentAllRecords.map(r => ({ ...r, id: r.id.toString() }))}
+              columns={[
+                {
+                  key: 'date',
+                  header: '📅 التاريخ',
+                  align: 'right' as const,
+                  render: (record) => new Date(record.date).toLocaleDateString('ar-EG', { year: 'numeric', month: '2-digit', day: '2-digit' })
+                },
+                {
+                  key: 'type',
+                  header: '📂 النوع',
+                  align: 'right' as const,
+                  render: (record) => (
+                    <Badge className={`${getMemorizationTypeColor(record.type)} px-2 py-1 rounded-lg`}>
+                      {getMemorizationTypeName(record.type)}
+                    </Badge>
+                  ),
+                },
+                {
+                  key: 'memorization_range',
+                  header: '🔖 نطاق الحفظ',
+                  align: 'right' as const,
+                  render: (record) => formatMemorizationRange({ ...(record as any), id: parseInt(record.id) } as MemorizationRecord),
+                },
+                {
+                  key: 'score',
+                  header: '🏆 الدرجة',
+                  align: 'right' as const,
+                  render: (record) => formatScore(record.score),
+                },
+                {
+                  key: 'tajweed_errors',
+                  header: '❌ أخطاء التجويد',
+                  align: 'right' as const,
+                  render: (record) => formatTajweedErrors(record.tajweed_errors),
+                },
+                {
+                  key: 'recorder',
+                  header: '🖊 المُسجل',
+                  align: 'right' as const,
+                  render: (record) => record.recorder?.full_name || 'غير معروف',
+                },
+                {
+                  key: 'actions',
+                  header: '⚙️',
+                  align: 'center' as const,
+                  render: (record) => (
+                    <div className="flex justify-center items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditRecord({ ...record, id: parseInt(record.id) })}
+                        className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-700 transition-colors rounded-lg"
+                        title="تعديل"
+                      >
+                        <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteRecord(parseInt(record.id))}
+                        className="h-7 w-7 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                        title="حذف"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+              emptyMessage="لا توجد سجلات"
+              className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+            />
+          ) : (
+            <div className="text-center text-gray-500 py-6">لا توجد سجلات</div>
+          )}
+          <DialogFooter className="flex justify-end">
+            <Button onClick={() => setIsStudentRecordsDialogOpen(false)} className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded">
+              إغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
