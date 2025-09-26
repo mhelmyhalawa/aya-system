@@ -7,7 +7,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { BookOpen, List, LayoutGrid, Plus, Hash, ArrowDownAZ, ArrowUpZA, ArrowDownUp, ChevronUp, ChevronDown } from 'lucide-react';
+import { BookOpen, List, LayoutGrid, Plus, Hash, ChevronUp, ChevronDown, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,14 @@ export function GenericTable<T extends { id: string }>(props: {
     showCardNavInHeader?: boolean;
     /** حد خاص لعدد البطاقات في الموبايل (يفوق أي قيمة افتراضية)، إذا لم يحدد يستخدم 1 عند استخدام cardPageSize */
     cardMobilePageSize?: number;
+    /** تفعيل الترقيم العام */
+    enablePagination?: boolean;
+    /** خيارات حجم الصفحة */
+    pageSizeOptions?: number[];
+    /** حجم الصفحة الافتراضي */
+    defaultPageSize?: number;
+    /** (معطل) كان لزر الترتيب الداخلي وتم الاستغناء عنه */
+    hideSortToggle?: boolean; // للإبقاء على التوافق الخلفي فقط
 }) {
     const {
         data,
@@ -76,6 +84,10 @@ export function GenericTable<T extends { id: string }>(props: {
         cardPageSize,
         showCardNavInHeader = false,
         cardMobilePageSize,
+        enablePagination = false,
+        pageSizeOptions = [5,10,20,50],
+        defaultPageSize = 5,
+    hideSortToggle = false,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -84,15 +96,23 @@ export function GenericTable<T extends { id: string }>(props: {
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
     // فهرس البطاقة الحالية على الموبايل (نعرض بطاقة واحدة مع تنقل)
     const [mobileCardIndex, setMobileCardIndex] = useState(0);
+    // الترقيم
+    const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+    const [currentPage, setCurrentPage] = useState<number>(1);
 
     // فرض نمط البطاقات على الموبايل
     useEffect(() => {
         if (isMobile) {
-            setViewMode('card');
+            setViewMode(prev => prev === 'card' ? prev : 'card');
         } else {
-            setViewMode('table');
+            setViewMode(prev => prev === 'table' ? prev : 'table');
         }
     }, [isMobile]);
+
+    // إعادة ضبط الصفحة عند تغيير نمط العرض لتفادي بقاء مؤشر خارج النطاق خاصة في وضع بطاقة واحدة
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [viewMode]);
 
     const goNext = () => {
         // حساب حجم الصفحة الحالي اعتماداً على السياق (موبايل أو سطح مكتب)
@@ -159,6 +179,47 @@ export function GenericTable<T extends { id: string }>(props: {
         }
     }, [sortedData.length, mobileCardIndex]);
 
+    // الترتيب النهائي للبيانات
+    // حساب عدد الصفحات مع مراعاة وضع بطاقة واحدة في الموبايل
+    const effectivePageSize = (isMobile && viewMode === 'card') ? 1 : pageSize;
+    const totalPages = React.useMemo(() => {
+        if (!enablePagination) return 1;
+        return Math.max(1, Math.ceil(sortedData.length / effectivePageSize));
+    }, [enablePagination, sortedData.length, effectivePageSize]);
+
+    useEffect(() => {
+        if (currentPage > totalPages) setCurrentPage(totalPages);
+    }, [totalPages, currentPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [pageSize, data]);
+
+    const paginatedData = React.useMemo(() => {
+        if (!enablePagination) return sortedData;
+        // في حالة الموبايل + عرض البطاقات نعرض بطاقة واحدة فقط لكل صفحة
+        if (isMobile && viewMode === 'card') {
+            const start = (currentPage - 1) * 1;
+            const end = start + 1;
+            return sortedData.slice(start, end);
+        }
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        return sortedData.slice(start, end);
+    }, [enablePagination, sortedData, currentPage, pageSize, isMobile, viewMode]);
+
+    // حساب نطاق العناصر المعروضة
+    const rangeInfo = React.useMemo(() => {
+        if (!enablePagination || sortedData.length === 0) return { start: 0, end: 0, total: sortedData.length };
+        const start = (currentPage - 1) * effectivePageSize + 1;
+        const end = Math.min(start + effectivePageSize - 1, sortedData.length);
+        return { start, end, total: sortedData.length };
+    }, [enablePagination, sortedData.length, currentPage, effectivePageSize]);
+
+    // تم دمج الترقيم داخل الهيدر الرئيسي بدلاً من مكوّن منفصل
+
+    const displayData = paginatedData;
+
     function getDisplayValue(value: any): string {
         if (value === null || value === undefined) return "-";
         if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -174,8 +235,9 @@ export function GenericTable<T extends { id: string }>(props: {
 
     return (
         <div className={cn('w-full overflow-hidden', className)}>
-            {/* العنوان وأدوات التحكم */}
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-0 mb-2 p-2 rounded-5xl shadow-lg bg-gradient-to-r from-green-900 via-blue to-green-500 dark:from-green-900/30 dark:via-green-800/40 dark:to-green-900/30 border border-green-200 dark:border-green-200">
+                        {/* العنوان وأدوات التحكم */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-1 mb-2 p-2 
+                shadow-lg bg-gradient-to-r from-green-900 via-blue to-green-500 dark:from-green-900/30 dark:via-green-800/40 dark:to-green-900/30 border border-green-200 dark:border-green-200">
                 {/* القسم الأيسر: العنوان + العدد */}
                 <div className="flex items-center gap-3 hidden md:flex">
                     {/* العنوان للـ desktop */}
@@ -184,11 +246,11 @@ export function GenericTable<T extends { id: string }>(props: {
                     </span>
                 </div>
 
-                {/* أزرار العرض */}
-                <div className="flex items-center gap-1 sm:gap-3">
+                {/* أزرار العرض + الترتيب + الترقيم */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-nowrap sm:flex-wrap justify-start sm:justify-end w-full sm:w-auto overflow-x-auto scrollbar-none">
                     {/* في الديسكتوب: عدد السجلات | في الموبايل: أزرار التنقل */}
                     {/* إخفاء عداد السجلات إذا كانت أزرار التنقل معروضة في نمط البطاقات */}
-                    {!isMobile && !((isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1) && (
+                    {!isMobile && !((isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1) && !enablePagination && (
                         <div
                             aria-label="عدد السجلات"
                             className="flex items-center gap-1 h-7 sm:h-9 px-2 sm:px-3 rounded-lg 
@@ -201,7 +263,7 @@ export function GenericTable<T extends { id: string }>(props: {
                             <span className="leading-none">{sortedData.length}</span>
                         </div>
                     )}
-                    {(isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1 && (
+                    {(isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1 && !enablePagination && (
                         <div className="flex items-center gap-1" aria-label="التنقل بين البطاقات">
                             <button
                                 type="button"
@@ -237,41 +299,63 @@ export function GenericTable<T extends { id: string }>(props: {
                         </div>
                     )}
 
-                    {/* زر الترتيب حسب العمود الأول */}
-                    {columns.length > 0 && (
-                        <Button
-                            onClick={toggleSort}
-                            size="icon"
-                            className={cn(
-                                "h-7 w-7 sm:h-9 sm:w-auto sm:px-3 sm:py-1.5 flex items-center justify-center gap-2 rounded-lg shadow-md",
-                                sortDirection
-                                    ? "bg-blue-600 text-white border-green-600"
-                                    : "bg-white dark:bg-green-800 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700"
+                    {/* الترقيم داخل الهيدر */}
+                    {/* زر الترتيب الداخلي تمت إزالته - يمكن استخدام الترتيب الخارجي في الصفحة */}
+                    {enablePagination && (
+                        <div className="flex items-center gap-1 sm:gap-2 bg-white/15 backdrop-blur-sm px-2 py-1.5 rounded-xl border border-white/25 shadow-inner shrink-0">
+                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-white">
+                                <span>📄</span>
+                                <span className="px-1.5 py-0.5 rounded-md bg-white/25 text-white font-bold tracking-wide">{currentPage}/{totalPages}</span>
+                                <span className="hidden lg:inline text-white/80 font-normal">{rangeInfo.total > 0 ? `من ${rangeInfo.start} إلى ${rangeInfo.end}` : 'لا بيانات'}</span>
+                            </div>
+                            {/* إخفاء اختيار حجم الصفحة في وضع بطاقة واحدة */}
+                            {!(isMobile && viewMode === 'card') && (
+                                <select
+                                    value={pageSize.toString()}
+                                    onChange={(e)=>setPageSize(parseInt(e.target.value))}
+                                    className="h-7 sm:h-8 text-[10px] sm:text-[11px] px-1.5 rounded-lg bg-white/25 text-white border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300/60"
+                                >
+                                    {pageSizeOptions.map(o=> <option className='text-green-900' key={o} value={o}>{o}</option>)}
+                                </select>
                             )}
-                            title={sortDirection === 'asc'
-                                ? `ترتيب تصاعدي حسب ${columns[0].header}`
-                                : sortDirection === 'desc'
-                                    ? `ترتيب تنازلي حسب ${columns[0].header}`
-                                    : `ترتيب حسب ${columns[0].header}`
-                            }
-                        >
-                            {sortDirection === 'asc' ? (
-                                <ArrowDownAZ className="h-4 w-4 sm:h-5 sm:w-5" />
-                            ) : sortDirection === 'desc' ? (
-                                <ArrowUpZA className="h-4 w-4 sm:h-5 sm:w-5" />
-                            ) : (
-                                <ArrowDownUp className="h-4 w-4 sm:h-5 sm:w-5" />
-                            )}
-                            <span className="hidden sm:inline font-medium">
-                                {sortDirection === 'asc'
-                                    ? 'تصاعدي'
-                                    : sortDirection === 'desc'
-                                        ? 'تنازلي'
-                                        : 'ترتيب'
-                                }
-                            </span>
-                        </Button>
+                            <div className="flex items-center gap-0.5">
+                                <button
+                                    onClick={()=>setCurrentPage(1)}
+                                    disabled={currentPage===1}
+                                    aria-label='الأولى'
+                                    className={cn('h-7 w-7 flex items-center justify-center rounded-md transition-all', currentPage===1? 'bg-white/15 text-white/40 cursor-not-allowed':'bg-white/90 text-green-700 hover:bg-yellow-200')}
+                                >
+                                    <ChevronsLeft className='h-3.5 w-3.5'/>
+                                </button>
+                                <button
+                                    onClick={()=>setCurrentPage(p=>Math.max(1,p-1))}
+                                    disabled={currentPage===1}
+                                    aria-label='السابق'
+                                    className={cn('h-7 w-7 flex items-center justify-center rounded-md transition-all', currentPage===1? 'bg-white/15 text-white/40 cursor-not-allowed':'bg-white/90 text-green-700 hover:bg-yellow-200')}
+                                >
+                                    <ChevronRight className='h-3.5 w-3.5'/>
+                                </button>
+                                <button
+                                    onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))}
+                                    disabled={currentPage===totalPages||totalPages===0}
+                                    aria-label='التالي'
+                                    className={cn('h-7 w-7 flex items-center justify-center rounded-md transition-all', (currentPage===totalPages||totalPages===0)? 'bg-white/15 text-white/40 cursor-not-allowed':'bg-white/90 text-green-700 hover:bg-yellow-200')}
+                                >
+                                    <ChevronLeft className='h-3.5 w-3.5'/>
+                                </button>
+                                <button
+                                    onClick={()=>setCurrentPage(totalPages)}
+                                    disabled={currentPage===totalPages||totalPages===0}
+                                    aria-label='الأخيرة'
+                                    className={cn('h-7 w-7 flex items-center justify-center rounded-md transition-all', (currentPage===totalPages||totalPages===0)? 'bg-white/15 text-white/40 cursor-not-allowed':'bg-white/90 text-green-700 hover:bg-yellow-200')}
+                                >
+                                    <ChevronsRight className='h-3.5 w-3.5'/>
+                                </button>
+                            </div>
+                        </div>
                     )}
+
+                    {/* تمت إزالة زر الترتيب الداخلي */}
 
                     {/* زر عرض الجدول */}
                     {/* إخفاء أزرار العرض على الموبايل */}
@@ -311,9 +395,9 @@ export function GenericTable<T extends { id: string }>(props: {
                 </div>
 
             </div>
-
+            
             {/* حالة عدم وجود بيانات */}
-            {sortedData.length === 0 && (
+            {displayData.length === 0 && (
                 <div className="text-center py-16 px-4 border border-green-200 dark:border-green-700 rounded-2xl bg-gradient-to-b from-green-50/50 to-white dark:from-green-900/20 dark:to-green-950/20">
                     <div className="flex flex-col items-center justify-center">
                         <div className="rounded-full bg-green-100 dark:bg-green-900/50 p-5 mb-4">
@@ -341,8 +425,9 @@ export function GenericTable<T extends { id: string }>(props: {
             )}
 
             {/* وضع الجدول */}
-            {sortedData.length > 0 && viewMode === 'table' && (
+            {displayData.length > 0 && viewMode === 'table' && (
                 <div className="border border-green-200 dark:border-green-700 rounded-2xl overflow-hidden shadow-md bg-white dark:bg-green-950/20">
+                    {/* تمت إزالة شريط الترقيم العلوي المستقل - تم دمجه في الهيدر */}
                     <div className="overflow-x-auto max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar">
                         <Table className="direction-rtl w-full border-collapse">
                             <TableHeader className="bg-gradient-to-b from-green-800 via-green-600 to-green-500 dark:from-green-900 dark:via-green-800 dark:to-green-700 sticky top-0 z-10">
@@ -370,7 +455,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedData.map((item, index) => (
+                                {displayData.map((item, index) => (
                                     <TableRow
                                         key={item.id}
                                         className={cn(
@@ -413,18 +498,21 @@ export function GenericTable<T extends { id: string }>(props: {
             )}
 
             {/* وضع البطاقات */}
-            {sortedData.length > 0 && viewMode === 'card' && (() => {
-                const smallSet = sortedData.length <= (cardPageSize ?? 2);
+            {displayData.length > 0 && viewMode === 'card' && (() => {
+                const effective = enablePagination ? displayData : sortedData;
+                const smallSet = effective.length <= (cardPageSize ?? 2);
                 // حجم الصفحة حسب نوع الجهاز
                 const pageSize = isMobile
                     ? (cardMobilePageSize ?? 1)
                     : (cardPageSize ?? sortedData.length);
                 // في حالة وجود حد للبطاقات أو كنا على الموبايل نستخدم mobileCardIndex كبداية
-                const startIndex = (pageSize < sortedData.length) ? mobileCardIndex : 0;
-                const endIndexExclusive = Math.min(startIndex + pageSize, sortedData.length);
-                const visibleSlice = sortedData.slice(startIndex, endIndexExclusive);
-                // النقاط الآن بعدد جميع السجلات وليس الصفحات، مع تظليل السجلات الظاهرة حالياً
-                const totalItems = sortedData.length;
+                const cardLogicalPageSize = isMobile
+                    ? (cardMobilePageSize ?? 1)
+                    : (cardPageSize ?? effective.length);
+                const startIndex = (cardLogicalPageSize < effective.length) ? mobileCardIndex : 0;
+                const endIndexExclusive = Math.min(startIndex + cardLogicalPageSize, effective.length);
+                const visibleSlice = enablePagination ? effective : effective.slice(startIndex, endIndexExclusive);
+                const totalItems = effective.length;
                 const Dots = () => {
                     const primaryLabelColumn = columns.find(c => c.important) || columns[0];
                     return (
@@ -432,7 +520,7 @@ export function GenericTable<T extends { id: string }>(props: {
                             className="md:hidden flex flex-wrap items-center justify-center gap-1 py-2 select-none w-full"
                             aria-label={`التنقل بين البطاقات، إجمالي ${totalItems} بطاقة`}
                         >
-                            {sortedData.map((record, idx) => {
+                            {effective.map((record, idx) => {
                                 const isVisible = idx >= startIndex && idx < endIndexExclusive; // ضمن الشريحة الحالية
                                 let rawVal: any = undefined;
                                 if (primaryLabelColumn) {
@@ -449,7 +537,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                         onClick={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            const maxStart = Math.max(totalItems - pageSize, 0);
+                                            const maxStart = Math.max(totalItems - cardLogicalPageSize, 0);
                                             const newStart = Math.min(idx, maxStart);
                                             setMobileCardIndex(newStart);
                                         }}
@@ -472,12 +560,13 @@ export function GenericTable<T extends { id: string }>(props: {
                     : smallSet
                         ? 'flex flex-col md:flex-row gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar justify-center items-stretch'
                         : `grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
-                            grid-cols-${Math.min(pageSize, 2)} md:grid-cols-${Math.min(pageSize, cardGridColumns.md || pageSize)} lg:grid-cols-${Math.min(pageSize, cardGridColumns.lg || pageSize)} xl:grid-cols-${Math.min(pageSize, cardGridColumns.xl || pageSize)}`;
+                            grid-cols-${Math.min(cardLogicalPageSize, 2)} md:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.md || cardLogicalPageSize)} lg:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.lg || cardLogicalPageSize)} xl:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.xl || cardLogicalPageSize)}`;
 
-                return (
-                    <div className="w-full flex flex-col items-stretch">
-                        {/* النقاط (متمركزة) فوق الشبكة عند وجود صفحات متعددة */}
-                        {totalItems > 1 && <Dots />}
+                                                return (
+                                                        <div className="w-full flex flex-col items-stretch">
+                                                                {/* الترقيم مدمج في الهيدر؛ لا حاجة لعنصر علوي هنا */}
+                                                {/* النقاط (متمركزة) فوق الشبكة عند عدم تفعيل الترقيم */}
+                                                {!enablePagination && totalItems > 1 && <Dots />}
                         <div className={containerClass}>
                         {(() => {
                             const CardItem = ({ item }: { item: T }) => {
@@ -548,21 +637,12 @@ export function GenericTable<T extends { id: string }>(props: {
                                                         ? column.render(item)
                                                         : (item as any)[column.key];
                                                     return (
-                                                        <tr
-                                                            key={`${item.id}-${column.key}-row`}
-                                                        >
+                                                        <tr key={`${item.id}-${column.key}-row`}>
                                                             <td className="w-[30%] border border-green-300 dark:border-green-700 px-2 py-1 font-medium text-green-700 dark:text-green-300 text-right">
                                                                 {column.header}
                                                             </td>
-                                                            <td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 
-                                                                            text-green-800 dark:text-green-100 text-right 
-                                                                            bg-green-50 dark:bg-green-900/50">
-                                                                <div
-                                                                    className="w-full sm:max-w-xs text-sm text-green-800 dark:text-green-100 
-                                                                                bg-green-50 dark:bg-green-800/30  
-                                                                                border border-green-200 dark:border-green-700
-                                                                                rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
-                                                                >
+                                                            <td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 text-green-800 dark:text-green-100 text-right bg-green-50 dark:bg-green-900/50">
+                                                                <div className="w-full sm:max-w-xs text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30 border border-green-200 dark:border-green-700 rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center">
                                                                     {value !== null && value !== undefined ? (
                                                                         typeof value === "object" && React.isValidElement(value) ? (
                                                                             value
@@ -649,7 +729,8 @@ export function GenericTable<T extends { id: string }>(props: {
                         })()}
                         </div>
                         {/* النقاط أسفل الشبكة أيضاً (اختياري يمكن الإبقاء على واحدة فقط، سنترك نسخة سفلية للتوازن على الشاشات الكبيرة) */}
-                        {totalItems > 1 && !isMobile && <Dots />}
+                        {!enablePagination && totalItems > 1 && !isMobile && <Dots />}
+                        {/* يمكن إضافة شريط سفلي لاحقاً عبر prop إذا لزم */}
                     </div>
                 );
             })()}

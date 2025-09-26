@@ -22,7 +22,7 @@ import {
 } from '../types/memorization-record';
 import { Profile } from '../types/profile';
 import { StudyCircle } from '../types/study-circle';
-import { Table2, LayoutGrid, Plus, Pencil, Trash2, SaveIcon, NotebookPenIcon, RefreshCwIcon, List } from 'lucide-react';
+import { Table2, LayoutGrid, Plus, Pencil, Trash2, SaveIcon, NotebookPenIcon, RefreshCwIcon, List, Filter, ArrowDownAZ, ArrowUpZA, ArrowDownUp } from 'lucide-react';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 
 import {
@@ -86,6 +86,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   const [tableExists, setTableExists] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0); // Add refresh trigger
+  // اتجاه الترتيب الخارجي للجدول الرئيسي
+  const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc' | null>(null);
+  // اظهار/اخفاء فلاتر البحث
+  const [showFilters, setShowFilters] = useState<boolean>(false);
   // متغيرات للتحكم في النموذج
   const [formSelectedTeacherId, setFormSelectedTeacherId] = useState<string>('');
   const [formSelectedCircleId, setFormSelectedCircleId] = useState<string>('');
@@ -97,6 +101,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   // حوار عرض جميع سجلات الطالب
   const [isStudentRecordsDialogOpen, setIsStudentRecordsDialogOpen] = useState(false);
   const [selectedStudentAllRecords, setSelectedStudentAllRecords] = useState<MemorizationRecord[] | null>(null);
+  // NOTE: تم نقل الترقيم (Pagination) إلى المكون العام GenericTable لإعادة الاستخدام عبر النظام.
 
   const { toast } = useToast();
 
@@ -1037,8 +1042,22 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
   // السجل الأحدث لكل طالب ليتم عرضه في الجدول الرئيسي
   const latestStudentRecords: MemorizationRecord[] = useMemo(() => {
-    return Object.values(studentRecordsMap).map(arr => arr[0]);
-  }, [studentRecordsMap]);
+    const base = Object.values(studentRecordsMap).map(arr => arr[0]);
+    if (!listSortDirection) return base;
+    // نرتب حسب اسم الطالب (student.full_name) أبجدياً
+    return [...base].sort((a, b) => {
+      const aName = a.student?.full_name || '';
+      const bName = b.student?.full_name || '';
+      if (listSortDirection === 'asc') return aName.localeCompare(bName, 'ar');
+      return bName.localeCompare(aName, 'ar');
+    });
+  }, [studentRecordsMap, listSortDirection]);
+
+  const toggleListSort = () => {
+    setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+  };
+
+  // لم نعد نستخدم الترقيم المحلي هنا؛ GenericTable سيتولى التقطيع (slicing) داخلياً.
 
   // فتح حوار عرض جميع السجلات لطالب معين
   const openStudentRecordsDialog = (studentId: string) => {
@@ -1153,6 +1172,41 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               </TabsList>
             </Tabs>
             <div className="flex gap-2 items-center">
+              {/* زر الفلتر */}
+              <Button
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-2xl 
+              ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}
+              dark:bg-green-700 dark:hover:bg-green-600 
+              shadow-md hover:scale-105 
+              transition-transform duration-200 
+              px-3 py-1.5 text-xs font-semibold h-8`}
+                onClick={()=> setShowFilters(p=>!p)}
+                title={showFilters ? 'إخفاء أدوات الفلترة' : 'إظهار أدوات الفلترة'}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
+              </Button>
+              {/* زر الترتيب الخارجي */}
+              <Button
+                type="button"
+                variant={listSortDirection ? 'default' : 'outline'}
+                onClick={toggleListSort}
+                title={listSortDirection === null ? 'ترتيب تصاعدي حسب اسم الطالب' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
+                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200
+                  ${listSortDirection === null
+                    ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600'
+                    : listSortDirection === 'asc'
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
+              >
+                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
+                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
+                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">
+                  {listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
+                </span>
+              </Button>
               {/* زر التحديث */}
               <Button
                 variant="outline"
@@ -1187,8 +1241,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             </div>
           </div>
 
+          {showFilters && (
           <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white 
-                    dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700">
+                    dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 rounded-lg animate-fade-in">
 
             <div className="w-full md:flex-1 min-w-0 md:min-w-[180px]">
               <Input
@@ -1299,6 +1354,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               </Select>
             </div>
           </div>
+          )}
 
         </CardContent>
       </Card>
@@ -1330,12 +1386,17 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         </div>
 
       ) :
-        <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
-          /* إظهار فقط أحدث سجل لكل طالب */
-          data={latestStudentRecords.map(record => ({
-            ...record,
-            id: record.id.toString()
-          }))}
+        <>
+          <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
+            /* إظهار فقط أحدث سجل لكل طالب مع الترقيم */
+            data={latestStudentRecords.map(record => ({
+              ...record,
+              id: record.id.toString()
+            }))}
+            enablePagination
+            defaultPageSize={5}
+            pageSizeOptions={[5,10,20,50]}
+            hideSortToggle
           columns={[
             {
               key: 'student',
@@ -1476,102 +1537,103 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
           getRowClassName={(_, index) =>
             `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
           }
-        />
+          />
+        </>
       }
 
       {/* معالج (Wizard) إضافة/تعديل سجل */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent dir="rtl" className="max-w-[95vw] sm:max-w-[640px] w-full overflow-hidden rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100">
-          <DialogHeader className="pb-1">
-            <DialogTitle className="text-xl font-bold text-center">
-              <h3 className="text-center leading-tight text-green-800 bg-gradient-to-r from-green-100 to-blue-100 py-2 px-3 rounded-lg">
-                {recordToEdit ? '✏️ تعديل سجل الحفظ' : '👨‍🏫 إضافة سجل حفظ جديد'}
-              </h3>
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent dir="rtl" className="max-w-[95vw] sm:max-w-[640px] w-full overflow-hidden rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100 flex flex-col max-h-[90vh]">
+          <div className="flex-shrink-0">
+            <DialogHeader className="pb-1 sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-green-50">
+              <DialogTitle className="text-xl font-bold text-center">
+                <h3 className="text-center leading-tight text-green-800 bg-gradient-to-r from-green-100 to-blue-100 py-2 px-3 rounded-lg">
+                  {recordToEdit ? '✏️ تعديل سجل الحفظ' : '👨‍🏫 إضافة سجل حفظ جديد'}
+                </h3>
+              </DialogTitle>
+            </DialogHeader>
+          </div>
 
-          {/* شريط خطوات المعالج - متجاوب */}
-          <div dir="rtl" className="w-full">
-            <ol className="flex items-center w-full gap-1 sm:gap-2">
-              {wizardSteps.map((step, i) => {
-                const active = i === wizardStep;
-                const done = i < wizardStep;
-                return (
-                  <li key={step.key} className="flex-1">
-                    <button type="button" onClick={() => (i < wizardStep ? setWizardStep(i) : null)} className={`w-full flex items-center justify-center sm:justify-between gap-2 p-2 rounded-lg text-xs sm:text-sm border transition-colors ${active
-                      ? 'bg-islamic-green text-white border-islamic-green'
-                      : done
-                        ? 'bg-green-100 text-green-800 border-green-200'
-                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                      }`} aria-current={active ? 'step' : undefined} aria-disabled={!done && !active}>
-                      <div className="flex items-center gap-2">
-                        {i === 0 && <User size={14} />}
-                        {i === 1 && <SaveIcon size={14} />}
-                        {i === 2 && <BookOpen size={14} />}
-                        <span className="hidden sm:inline">{step.label}</span>
-                      </div>
-                      <span className="sm:hidden">{i + 1}/{wizardSteps.length}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-            {/* شريط تقدم */}
-            <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div className="h-full bg-islamic-green transition-all" style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }} />
+          <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 pr-1 -mr-1">
+            {/* شريط خطوات المعالج - متجاوب */}
+            <div dir="rtl" className="w-full">
+              <ol className="flex items-center w-full gap-1 sm:gap-2">
+                {wizardSteps.map((step, i) => {
+                  const active = i === wizardStep;
+                  const done = i < wizardStep;
+                  return (
+                    <li key={step.key} className="flex-1">
+                      <button type="button" onClick={() => (i < wizardStep ? setWizardStep(i) : null)} className={`w-full flex items-center justify-center sm:justify-between gap-2 p-2 rounded-lg text-xs sm:text-sm border transition-colors ${active
+                        ? 'bg-islamic-green text-white border-islamic-green'
+                        : done
+                          ? 'bg-green-100 text-green-800 border-green-200'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                        }`} aria-current={active ? 'step' : undefined} aria-disabled={!done && !active}>
+                        <div className="flex items-center gap-2">
+                          {i === 0 && <User size={14} />}
+                          {i === 1 && <SaveIcon size={14} />}
+                          {i === 2 && <BookOpen size={14} />}
+                          <span className="hidden sm:inline">{step.label}</span>
+                        </div>
+                        <span className="sm:hidden">{i + 1}/{wizardSteps.length}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+              {/* شريط تقدم */}
+              <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div className="h-full bg-islamic-green transition-all" style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }} />
+              </div>
             </div>
 
+            <div className="text-[11px] sm:text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden overflow-ellipsis">
+              {formData.student_id ? (
+                <>
+                  <span>الطالب: </span>
+                  <span>
+                    {formFilteredStudents.find(s => s.id === formData.student_id)?.full_name ?? ""}
+                    {formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name ? ` ${formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name}` : ""}
+                  </span>
+                </>
+              ) : (
+                <span className="text-gray-400 dark:text-gray-500">الرجاء اختيار طالب</span>
+              )}
+            </div>
 
-          </div>
-
-          <div className="text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden overflow-ellipsis">
-            {formData.student_id ? (
-              <>
-                <span>الطالب: </span>
-                <span>
-                  {formFilteredStudents.find(s => s.id === formData.student_id)?.full_name ?? ""}
-                  {formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name ? ` ${formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name}` : ""}
-                </span>
-
-              </>
-            ) : (
-              <span className="text-gray-400 dark:text-gray-500">الرجاء اختيار طالب</span>
-            )}
-          </div>
-
-          {/* محتوى كل خطوة */}
-          <div className="p-4  bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
-            {wizardStep === 0 && (
-              <div className="space-y-4">
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="teacher" className="flex items-center gap-1">
-                      المعلم <span className="text-red-500">*</span>
-                    </Label>
-                    <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
-                      <SelectTrigger id="teacher" dir="rtl" className="text-right truncate max-w-full min-w-0">
-                        <SelectValue placeholder="اختر المعلم" />
-                      </SelectTrigger>
-                      <SelectContent position="popper" dir="rtl">
-                        {visibleTeachers && visibleTeachers.length > 0 ? (
-                          visibleTeachers.map(teacher => (
-                            <SelectItem key={teacher.id} value={teacher.id}>
-                              {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0, 4)}`}
-                              {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
+            {/* محتوى كل خطوة */}
+            <div className="p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
+              {wizardStep === 0 && (
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="grid gap-3 sm:gap-4">
+                    <div className="grid gap-1.5 sm:gap-2">
+                      <Label htmlFor="teacher" className="flex items-center gap-1">
+                        المعلم <span className="text-red-500">*</span>
+                      </Label>
+                      <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
+                        <SelectTrigger id="teacher" dir="rtl" className="text-right truncate max-w-full min-w-0">
+                          <SelectValue placeholder="اختر المعلم" />
+                        </SelectTrigger>
+                        <SelectContent position="popper" dir="rtl">
+                          {visibleTeachers && visibleTeachers.length > 0 ? (
+                            visibleTeachers.map(teacher => (
+                              <SelectItem key={teacher.id} value={teacher.id}>
+                                {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0, 4)}`}
+                                {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value={currentUser?.id || 'initial'}>
+                              {currentUser?.full_name || 'المستخدم الحالي'}
+                              {currentUser?.role && (currentUser.role === 'teacher' ? ' (معلم)' : ` (${currentUser.role === 'admin' ? 'مشرف' : currentUser.role})`)}
                             </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value={currentUser?.id || 'initial'}>
-                            {currentUser?.full_name || 'المستخدم الحالي'}
-                            {currentUser?.role && (currentUser.role === 'teacher' ? ' (معلم)' : ` (${currentUser.role === 'admin' ? 'مشرف' : currentUser.role})`)}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.recorded_by && <p className="text-sm text-red-500">{formErrors.recorded_by}</p>}
-                  </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      {formErrors.recorded_by && <p className="text-sm text-red-500">{formErrors.recorded_by}</p>}
+                    </div>
 
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5 sm:gap-2">
                     <Label htmlFor="circle">الحلقة</Label>
                     <Select value={formData.circle_id || ''} onValueChange={(value) => handleCircleChange(value)} disabled={!formData.recorded_by}>
                       <SelectTrigger id="circle" dir="rtl" className="text-right truncate max-w-full min-w-0">
@@ -1591,7 +1653,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     </Select>
                   </div>
 
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5 sm:gap-2">
                     <Label htmlFor="student" className="flex items-center gap-1">
                       الطالب <span className="text-red-500">*</span>
                     </Label>
@@ -1619,13 +1681,13 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             )}
 
             {wizardStep === 1 && (
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
                   <div>
                     <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2 text-sm">
                       نوع السجل <span className="text-red-500">*</span>
                     </Label>
-                    <div className="flex flex-nowrap pb-1 -mx-2 px-2 gap-1 sm:gap-2 sm:flex-wrap mt-2">
+                    <div className="flex flex-nowrap pb-1 -mx-2 px-2 gap-1 sm:gap-2 sm:flex-wrap mt-1.5 sm:mt-2">
                       {memorizationTypeOptions.map(option => (
                         <button
                           key={option.value}
@@ -1645,7 +1707,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   </div>
 
                   <div>
-                    <Label htmlFor="date" className="flex items-center gap-1 mb-2 text-sm">
+                    <Label htmlFor="date" className="flex items-center gap-1 mb-1.5 sm:mb-2 text-sm">
                       التاريخ <span className="text-red-500">*</span>
                     </Label>
                     <Input
@@ -1660,10 +1722,10 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   </div>
                 </div>
 
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800/50 mb-3">
+                <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 sm:p-3 rounded-lg border border-blue-100 dark:border-blue-800/50 mb-2.5 sm:mb-3">
                   <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">نطاق الحفظ</h4>
 
-                  <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
                     <div>
                       <Label htmlFor="from_surah" className="flex items-center gap-1 mb-1 text-xs">
                         من سورة <span className="text-red-500">*</span>
@@ -1700,7 +1762,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                     <div>
                       <Label htmlFor="to_surah" className="flex items-center gap-1 mb-1 text-xs">
                         إلى سورة <span className="text-red-500">*</span>
@@ -1747,17 +1809,17 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             )}
 
             {wizardStep === 2 && (
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
-                  <div className="grid grid-cols-1 gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 sm:p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
+                  <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                       {[
                         { id: 'score', label: 'درجة التسميع', required: true, value: formData.score, onChange: (val) => handleInputChange('score', val) },
                         { id: 'lahn_jali', label: 'اللحن الجلي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_jali, onChange: (val) => handleTajweedErrorChange('lahn_jali', val) },
                         { id: 'lahn_khafi', label: 'اللحن الخفي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_khafi, onChange: (val) => handleTajweedErrorChange('lahn_khafi', val) },
                       ].map((field) => (
                         <div key={field.id} className="flex flex-col">
-                          <Label htmlFor={field.id} className="text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1 whitespace-nowrap">
+                          <Label htmlFor={field.id} className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1 whitespace-nowrap">
                             {field.label} {field.required && <span className="text-red-500">*</span>}
                             {field.hint && <span className="text-[10px] text-gray-400 dark:text-gray-400">{field.hint}</span>}
                           </Label>
@@ -1767,7 +1829,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                             min={0}
                             max={field.id === 'score' ? 100 : undefined}
                             dir="rtl"
-                            className="h-10 text-right bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:outline-none"
+                            className="h-9 sm:h-10 text-right bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 sm:px-3 text-xs sm:text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:outline-none"
                             value={field.value || ''}
                             onChange={(e) => {
                               let val = parseFloat(e.target.value);
@@ -1787,12 +1849,13 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 </div>
 
                 <div>
-                  <Label htmlFor="notes" className="mb-2">ملاحظات</Label>
-                  <Textarea id="notes" dir="rtl" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-24 text-right" />
+                  <Label htmlFor="notes" className="mb-1.5 sm:mb-2 text-xs sm:text-sm">ملاحظات</Label>
+                  <Textarea id="notes" dir="rtl" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-20 sm:h-24 text-right text-xs sm:text-sm" />
                 </div>
               </div>
             )}
-          </div>
+          </div>{/* end inner step content */}
+        </div>{/* end scrollable wizard content */}
 
           <DialogFooter dir="rtl" className="flex items-center justify-between">
             <table className="w-full">
@@ -1848,24 +1911,48 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
       {/* حوار عرض جميع سجلات الطالب */}
       <Dialog open={isStudentRecordsDialogOpen} onOpenChange={setIsStudentRecordsDialogOpen}>
-        <DialogContent dir="rtl" className="max-w-[95vw] sm:max-w-4xl w-full overflow-hidden rounded-xl p-3 shadow-lg bg-gradient-to-r from-green-50 to-blue-50 border border-gray-100">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-green-800 flex items-center gap-2">
-              📜 جميع سجلات الطالب
-            </DialogTitle>
+        <DialogContent
+          dir="rtl"
+          className="overflow-hidden rounded-t-2xl sm:rounded-xl p-3 sm:p-4 
+          shadow-lg bg-gradient-to-r from-green-50 to-blue-50 border border-gray-100 flex flex-col 
+          max-h-[85vh] sm:max-h-[90vh] w-full sm:max-w-4xl max-w-[95vw]
+          
+          pb-2"
+        >
+          <DialogHeader className="flex-shrink-0 sticky top-0 z-10 bg-gradient-to-r from-green-50 to-blue-50 pb-2 sm:pb-3">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-base sm:text-lg font-bold text-green-800 flex items-center gap-2">
+                📜 جميع سجلات الطالب
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="sm:hidden h-8 w-8 p-0 hover:bg-red-100 rounded-full"
+                onClick={() => setIsStudentRecordsDialogOpen(false)}
+                title="إغلاق"
+              >
+                ✕
+              </Button>
+            </div>
           </DialogHeader>
-          <div className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2">
-            {selectedStudentAllRecords && selectedStudentAllRecords[0]?.student?.full_name ? (
-              <span>
-                الطالب: {selectedStudentAllRecords[0].student.full_name}
-                {selectedStudentAllRecords[0].student.guardian?.full_name ? ` - ${selectedStudentAllRecords[0].student.guardian.full_name}` : ''}
-              </span>
-            ) : '---'}
-          </div>
-          {selectedStudentAllRecords && selectedStudentAllRecords.length > 0 ? (
-            <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
-              data={selectedStudentAllRecords.map(r => ({ ...r, id: r.id.toString() }))}
-              columns={[
+
+          <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 pr-1 -mr-1">
+            <div className="text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-300">
+              {selectedStudentAllRecords && selectedStudentAllRecords[0]?.student?.full_name ? (
+                <span>
+                  الطالب: {selectedStudentAllRecords[0].student.full_name}
+                  {selectedStudentAllRecords[0].student.guardian?.full_name ? ` - ${selectedStudentAllRecords[0].student.guardian.full_name}` : ''}
+                </span>
+              ) : '---'}
+            </div>
+            {selectedStudentAllRecords && selectedStudentAllRecords.length > 0 ? (
+              <GenericTable<Omit<MemorizationRecord, 'id'> & { id: string }>
+                data={selectedStudentAllRecords.map(r => ({ ...r, id: r.id.toString() }))}
+                enablePagination
+                defaultPageSize={5}
+                pageSizeOptions={[5,10,20,50]}
+                title="سجلات الطالب"
+                columns={[
                 {
                   key: 'date',
                   header: '📅 التاريخ',
@@ -1933,15 +2020,16 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     </div>
                   ),
                 },
-              ]}
-              emptyMessage="لا توجد سجلات"
-              className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-            />
-          ) : (
-            <div className="text-center text-gray-500 py-6">لا توجد سجلات</div>
-          )}
-          <DialogFooter className="flex justify-end">
-            <Button onClick={() => setIsStudentRecordsDialogOpen(false)} className="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded">
+                ]}
+                emptyMessage="لا توجد سجلات"
+                className="overflow-hidden rounded-xl border border-green-300 shadow-md text-[11px] sm:text-xs"
+              />
+            ) : (
+              <div className="text-center text-gray-500 py-6">لا توجد سجلات</div>
+            )}
+          </div>
+          <DialogFooter className="flex-shrink-0 sticky bottom-0 bg-gradient-to-r from-green-50 to-blue-50 pt-2 mt-1 border-t border-green-200 justify-end">
+            <Button onClick={() => setIsStudentRecordsDialogOpen(false)} className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm px-3 py-1.5 sm:px-4 sm:py-2 rounded">
               إغلاق
             </Button>
           </DialogFooter>
