@@ -449,18 +449,23 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
   // لم نعد نحتاج groupedSchedules بعد تحويل العرض إلى بطاقات أفقية
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-      <Card>
+    <div className="w-full max-w-[1600px] mx-auto">
+      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
-              <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
-              <span className="line-clamp-1">{scsLabels.pageTitle} </span>
-            </CardTitle>
-            <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
-              {scsLabels.pageDescription}
-            </CardDescription>
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
+                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+            {/* العنوان والوصف */}
+            <div className="flex flex-col">
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
+                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
+                <span className="line-clamp-1">{scsLabels.pageTitle} </span>
+              </CardTitle>
+              <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
+                {scsLabels.pageDescription}
+              </CardDescription>
+            </div>
+
           </div>
         </CardHeader>
 
@@ -973,22 +978,22 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                               >
                                 <ChevronRight className="w-5 h-5" />
                               </button>
-                                <div className="flex items-center gap-2" aria-label={scsLabels.paginationAria}>
+                              <div className="flex items-center gap-2" aria-label={scsLabels.paginationAria}>
                                 {Array.from({ length: totalDesktopSchedulePages }).map((_, i) => (
                                   <button
                                     key={i}
                                     onClick={() => setDesktopSchedulePage(i)}
                                     className={`w-2.5 h-2.5 rounded-full transition ${i === desktopSchedulePage ? 'bg-green-600 scale-110' : 'bg-green-300 hover:bg-green-400'}`}
-                                      aria-label={`${scsLabels.pageAria} ${i + 1}`}
+                                    aria-label={`${scsLabels.pageAria} ${i + 1}`}
                                   />
                                 ))}
                               </div>
-                                <button
-                                  onClick={nextDesktopSchedulePage}
-                                  disabled={desktopSchedulePage >= totalDesktopSchedulePages - 1}
-                                  className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
-                                  aria-label={scsLabels.nextLabel}
-                                >
+                              <button
+                                onClick={nextDesktopSchedulePage}
+                                disabled={desktopSchedulePage >= totalDesktopSchedulePages - 1}
+                                className="p-2 rounded-full bg-green-100 hover:bg-green-200 disabled:opacity-40 disabled:hover:bg-green-100 text-green-700 transition"
+                                aria-label={scsLabels.nextLabel}
+                              >
                                 <ChevronLeft className="w-5 h-5" />
                               </button>
                             </div>

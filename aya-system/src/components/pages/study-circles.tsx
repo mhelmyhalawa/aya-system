@@ -24,7 +24,12 @@ import {
   School,
   Clock,
   Info,
-  User
+  User,
+  Filter,
+  ArrowDownAZ,
+  ArrowUpZA,
+  ArrowDownUp,
+  BookUser
 } from "lucide-react";
 import { StudyCircle, StudyCircleCreate, StudyCircleUpdate } from "@/types/study-circle";
 import { Profile } from "@/types/profile";
@@ -44,6 +49,7 @@ import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSc
 import { StudyCircleSchedule, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
 import { TeacherSessions } from "@/pages/TeacherSessions";
 import { GenericTable, Column } from "../ui/generic-table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StudyCirclesProps {
   onNavigate: (path: string) => void;
@@ -54,11 +60,20 @@ interface StudyCirclesProps {
 export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps) {
   const { toast } = useToast();
 
-  // حالة القائمة
+  // حالة القائمة (كل الحلقات)
   const [circles, setCircles] = useState<StudyCircle[]>([]);
+  // حلقات المعلم فقط (في حال كان الدور معلم)
+  const [myCircles, setMyCircles] = useState<StudyCircle[]>([]);
+  // التاب النشط (حلقاتي / كل الحلقات)
+  // التبويب الحالي (جميع الحلقات / حلقاتي) بالقيم المتوافقة مع مكون الواجهة المطلوب
+  const [activeTab, setActiveTab] = useState<'all-records' | 'my-records'>(userRole === 'teacher' ? 'my-records' : 'all-records');
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  // اظهار/اخفاء صندوق البحث
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  // اتجاه ترتيب الحلقات
+  const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // حالة الحوار
@@ -69,6 +84,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   // حالة حوار الحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [circleToDelete, setCircleToDelete] = useState<StudyCircle | null>(null);
+  const [isDeletingCircle, setIsDeletingCircle] = useState(false);
 
   // متغيرات حالة لجدولة الحلقة
   const [openScheduleDialog, setOpenScheduleDialog] = useState(false);
@@ -84,6 +100,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   // متغيرات لحوار تأكيد حذف الجدولة
   const [isDeleteScheduleDialogOpen, setIsDeleteScheduleDialogOpen] = useState(false);
   const [scheduleToDelete, setScheduleToDelete] = useState<StudyCircleSchedule | null>(null);
+  const [isDeletingSchedule, setIsDeletingSchedule] = useState(false);
   const [editScheduleForm, setEditScheduleForm] = useState({ weekday: "0", start_time: "", end_time: "", location: "" });
   const [savingNewSchedule, setSavingNewSchedule] = useState(false);
   const [savingScheduleEdit, setSavingScheduleEdit] = useState(false);
@@ -93,6 +110,8 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   const [circleName, setCircleName] = useState<string>("");
   const [teacherId, setTeacherId] = useState<string>("");
   const [maxStudents, setMaxStudents] = useState<string>("");
+  // حالة حفظ الحلقة (لمنع الضغط المزدوج وإظهار التحميل)
+  const [isSavingCircle, setIsSavingCircle] = useState(false);
 
   // تحميل البيانات
   useEffect(() => {
@@ -106,16 +125,17 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     setError(null);
 
     try {
-      let data: StudyCircle[] = [];
+      // نجلب دائمًا كل الحلقات (لإمكانية عرض تب "كل الحلقات")
+      const allData = await getAllStudyCircles();
+      setCircles(allData);
 
-      // إذا كان المستخدم معلم، استرجع فقط الحلقات المرتبطة به
+      // إذا كان الدور معلم نجلب حلقاته الخاصة
       if (userRole === 'teacher' && userId) {
-        data = await getStudyCirclesByTeacherId(userId);
+        const teacherData = await getStudyCirclesByTeacherId(userId);
+        setMyCircles(teacherData);
       } else {
-        data = await getAllStudyCircles();
+        setMyCircles([]);
       }
-
-      setCircles(data);
     } catch (error) {
       console.error(studyCirclesLabels.circleLoadError + ':', error);
       setError(studyCirclesLabels.circleLoadError);
@@ -134,11 +154,35 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     }
   };
 
-  // فلترة الحلقات حسب البحث
-  const filteredCircles = circles.filter(circle =>
-    circle.name.includes(searchTerm) ||
-    (circle.teacher?.full_name && circle.teacher.full_name.includes(searchTerm))
-  );
+  // اختيار مصدر البيانات حسب التاب النشط
+  const baseDataset = activeTab === 'my-records'
+    ? (
+      userRole === 'teacher'
+        ? myCircles
+        : (userId ? circles.filter(c => c.teacher_id === userId) : [])
+    )
+    : circles;
+
+  // فلترة الحلقات حسب البحث (يتم تطبيق البحث فقط إذا كان صندوق البحث ظاهرًا)
+  const filteredCircles = baseDataset.filter(circle => {
+    if (!showFilters || !searchTerm.trim()) return true;
+    return (
+      circle.name.includes(searchTerm) ||
+      (circle.teacher?.full_name && circle.teacher.full_name.includes(searchTerm))
+    );
+  });
+
+  // ترتيب الحلقات حسب الاسم وفق الاتجاه المحدد
+  const displayedCircles = [...filteredCircles].sort((a, b) => {
+    if (!listSortDirection) return 0;
+    const aName = a.name || '';
+    const bName = b.name || '';
+    return listSortDirection === 'asc' ? aName.localeCompare(bName, 'ar') : bName.localeCompare(aName, 'ar');
+  });
+
+  const toggleListSort = () => {
+    setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+  };
 
   // إضافة حلقة جديدة
   const handleAddCircle = () => {
@@ -171,6 +215,9 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   // تأكيد حذف حلقة
   const confirmDeleteCircle = async () => {
     if (!circleToDelete) return;
+    if (isDeletingCircle) return; // منع التكرار
+
+    setIsDeletingCircle(true);
 
     try {
       const result = await deleteStudyCircle(circleToDelete.id);
@@ -198,6 +245,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     } finally {
       setIsDeleteDialogOpen(false);
       setCircleToDelete(null);
+      setIsDeletingCircle(false);
     }
   };
 
@@ -365,6 +413,9 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   // تنفيذ عملية حذف الموعد
   const executeDeleteSchedule = async () => {
     if (!scheduleToDelete) return;
+    if (isDeletingSchedule) return; // منع التكرار
+
+    setIsDeletingSchedule(true);
 
     try {
       const result = await deleteStudyCircleSchedule(scheduleToDelete.id);
@@ -391,6 +442,10 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         description: studyCirclesLabels.schedule.toast.unexpectedErrorDescription,
         variant: 'destructive'
       });
+    } finally {
+      setIsDeleteScheduleDialogOpen(false);
+      setScheduleToDelete(null);
+      setIsDeletingSchedule(false);
     }
   };
 
@@ -423,6 +478,10 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
       return;
     }
 
+    // إذا كان هناك عملية سابقة جارية لا نعيد التنفيذ
+    if (isSavingCircle) return;
+
+    setIsSavingCircle(true);
     // تحويل الحد الأقصى للطلاب إلى رقم
     const maxStudentsNum = maxStudents ? parseInt(maxStudents) : undefined;
 
@@ -484,6 +543,9 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         description: "حدث خطأ غير متوقع",
         variant: "destructive",
       });
+    } finally {
+      // إعادة الحالة بعد الانتهاء سواء نجحت العملية أم لا
+      setIsSavingCircle(false);
     }
   };
 
@@ -576,66 +638,158 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
   // عرض الواجهة
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-      <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
-        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
-          <div className="space-y-0.5 sm:space-y-1">
-            <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
-              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-300" />
-              <span className="truncate max-w-[180px] sm:max-w-none">{studyCirclesLabels.title}</span>
-            </CardTitle>
-            <CardDescription className="text-[10px] sm:text-xs text-green-100 leading-relaxed">
-              {studyCirclesLabels.description}
-            </CardDescription>
-          </div>
-
-          <div className="flex gap-1 sm:gap-1.5">
-            {(userRole === 'superadmin' || userRole === 'admin') && (
-              <>
-                <Button
-                  size="sm"
-                  className="h-7 sm:h-8 px-2 sm:px-2.5 rounded-full bg-white/10 text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm transition-colors text-[11px] sm:text-xs"
-                  onClick={() => onNavigate('/study-circle-schedules')}
-                  title={studyCirclesLabels.navigateToSchedulesTooltip}
-                >
-                  <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  <span className="sr-only md:not-sr-only md:ml-1 md:text-[11px] sm:md:text-xs">
-                  {studyCirclesLabels.manageSchedules}
-                  </span>
-                </Button>
-                <Button
-                  size="sm"
-                  className="h-7 sm:h-8 px-2 sm:px-2.5 rounded-full bg-white text-green-700 hover:bg-green-500 border border-green-200 shadow-sm transition-colors text-[11px] sm:text-xs"
-                  onClick={handleAddCircle}
-                  title={studyCirclesLabels.addCircle}
-                >
-                  <Plus className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  <span className="sr-only md:not-sr-only md:ml-1 md:text-[11px] sm:md:text-xs">
-                  {studyCirclesLabels.addCircle}
-                  </span>
-                </Button>
-              </>
-            )}
+    <div className="w-full max-w-[1600px] mx-auto">
+      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
+        {/* الهيدر */}
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
+                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+            {/* العنوان والوصف */}
+            <div className="flex flex-col">
+              {/* العنوان والوصف */}
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-yellow-300" />
+                <span className="truncate max-w-[180px] sm:max-w-none">{studyCirclesLabels.title}</span>
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5">
+                {studyCirclesLabels.description}
+              </CardDescription>
+            </div>
           </div>
         </CardHeader>
-
-        <CardContent className="pt-2 sm:pt-3 pb-0 px-3 sm:px-4">
+        <CardContent className="pt-0.5 pb-0 px-0 sm:px-0">
+          {/* التابات + أزرار الأدوات */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-1 rounded-lg
+            bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
+            {/* التابات */}
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as 'all-records' | 'my-records')}
+              className="w-full md:w-[380px] bg-green-50 rounded-lg shadow-inner p-0.5"
+            >
+              <TabsList className="grid w-full grid-cols-2 gap-0.5 rounded-lg bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
+                {/* Tab جميع السجلات */}
+                <TabsTrigger
+                  value="all-records"
+                  className="
+              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+              rounded-md text-green-800 py-1.5 px-2
+              hover:bg-green-100 hover:text-green-900
+              data-[state=active]:bg-islamic-green
+              data-[state=active]:text-white
+              transition-all duration-200
+                "
+                  title='جميع السجلات'
+                >
+                  📋 <span className="hidden sm:inline">جميع السجلات</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="my-records"
+                  className="
+              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+              rounded-md text-green-800 py-1.5 px-2
+              hover:bg-green-100 hover:text-green-900
+              data-[state=active]:bg-islamic-green
+              data-[state=active]:text-white
+              transition-all duration-200
+                "
+                  title='سجلاتي فقط'
+                >
+                  👤 <span className="hidden sm:inline">سجلاتي</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="flex gap-2 items-center flex-wrap justify-center md:justify-end">
+              {/* زر الفلتر */}
+              <Button
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-2xl 
+              ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}
+              dark:bg-green-700 dark:hover:bg-green-600 
+              shadow-md hover:scale-105 
+              transition-transform duration-200 
+              px-3 py-1.5 text-xs font-semibold h-8`}
+                onClick={() => setShowFilters(p => !p)}
+                title={showFilters ? 'إخفاء أدوات الفلترة' : 'إظهار أدوات الفلترة'}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
+              </Button>
+              {/* زر الترتيب */}
+              <Button
+                type="button"
+                variant={listSortDirection ? 'default' : 'outline'}
+                onClick={toggleListSort}
+                title={listSortDirection === null ? 'ترتيب تصاعدي حسب اسم الحلقة' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
+                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200
+                  ${listSortDirection === null
+                    ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600'
+                    : listSortDirection === 'asc'
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
+              >
+                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
+                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
+                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">
+                  {listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
+                </span>
+              </Button>
+              {/* زر التحديث */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl 
+              bg-green-600 hover:bg-green-700 
+              dark:bg-green-700 dark:hover:bg-green-600 
+              text-white shadow-md hover:scale-105 
+              transition-transform duration-200 
+              px-3 py-1.5 text-xs font-semibold h-8"
+                onClick={loadCircles}
+                title='تحديث البيانات'
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
+              {(userRole === 'superadmin' || userRole === 'admin') && (
+                <>
+                  {/* زر إضافة حلقة */}
+                  <Button
+                    onClick={handleAddCircle}
+                    variant="outline"
+                    className="flex items-center gap-1.5 rounded-2xl 
+                  bg-green-600 hover:bg-green-700 
+                  dark:bg-green-700 dark:hover:bg-green-600 
+                  text-white shadow-md hover:scale-105 
+                  transition-transform duration-200 
+                  px-3 py-1.5 text-xs font-semibold h-8"
+                    title='إضافة حلقة جديدة'
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">إضافة حلقة</span>
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
           {error && (
             <Alert variant="destructive" className="mb-3 py-2 text-sm">
               <AlertCircle className="h-4 w-4 ml-2" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
-          <div className="relative mb-3 sm:mb-4">
-            <Search className="absolute right-2.5 sm:right-3 top-2 sm:top-2.5 h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
-            <Input
-              placeholder={studyCirclesLabels.searchPlaceholder}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pr-8 sm:pr-9 h-8 sm:h-9 rounded-md sm:rounded-lg border-green-200 text-[12px] sm:text-sm"
-            />
-          </div>
+          {showFilters && (
+            <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white 
+                    dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 
+                    rounded-lg animate-fade-in">
+              <Search className="absolute right-2.5 sm:right-3 top-2 sm:top-2.5 h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500" />
+              <Input
+                placeholder={studyCirclesLabels.searchPlaceholder}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pr-8 sm:pr-9 h-8 sm:h-9 rounded-md sm:rounded-lg border-green-200 text-[12px] sm:text-sm"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -644,7 +798,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         const columns: Column<StudyCircle>[] = [
           {
             key: 'row_index',
-            header: '#',
+            header: '🔢',
             align: 'center',
             render: (c) => {
               const idx = filteredCircles.findIndex(circle => circle.id === c.id);
@@ -655,7 +809,12 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             key: 'name',
             header: `📘 ${studyCirclesLabels.name}`,
             important: true,
-            render: (c) => <span className="font-medium">{c.name}</span>
+            render: (c) => (
+              <div className="flex items-center gap-2">
+                <BookUser className="h-4 w-4 text-green-700 dark:text-green-300" />
+                <span>{c.name}</span>
+              </div>
+            )
           },
           {
             key: 'teacher',
@@ -675,6 +834,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               <div className="flex gap-1 justify-center">
                 <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
                 <span>{c.max_students}</span>
+                طالب
               </div>
             ) : <span className="text-green-500/60">-</span>
           },
@@ -718,12 +878,15 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
         return (
           <GenericTable
-            data={filteredCircles}
+            data={displayedCircles}
             columns={columns}
-            title={studyCirclesLabels.title}
-            emptyMessage={searchTerm ? studyCirclesLabels.searchNoResults : studyCirclesLabels.noCircles}
+            //title={studyCirclesLabels.title}
+            emptyMessage={searchTerm ? studyCirclesLabels.searchNoResults : (activeTab === 'my-records' ? 'لا توجد حلقات خاصة بك' : studyCirclesLabels.noCircles)}
             onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddCircle : undefined}
             onRefresh={loadCircles}
+            enablePagination
+            defaultPageSize={5}
+            pageSizeOptions={[5, 10, 20, 50]}
             cardMaxFieldsCollapsed={4}
             cardPrimaryActions={(c) => (
               (userRole === 'superadmin' || userRole === 'admin') ? (
@@ -760,6 +923,10 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 <span className="hidden sm:inline">{studyCirclesLabels.scheduleButtonLabel}</span>
               </Button>
             )}
+            /* تطبيق نفس فكرة جدول سجلات الحفظ: إخفاء أيقونة الترتيب الافتراضي، تلوين الصفوف، تنسيق الإطار */
+            className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+            getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
+            hideSortToggle={true}
           />
         );
       })()}
@@ -769,6 +936,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSave={handleSaveCircle}
+        isLoading={isSavingCircle}
         saveButtonText={dialogMode === "add"
           ? studyCirclesLabels.addForm.submit
           : studyCirclesLabels.editForm.submit}
@@ -832,7 +1000,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         isOpen={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
         onConfirm={confirmDeleteCircle}
-        isLoading={false}
+        isLoading={isDeletingCircle}
         title={studyCirclesLabels.deleteCircle}
         description={studyCirclesLabels.confirmDelete}
         itemDetails={circleToDelete ? {
@@ -918,6 +1086,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 columns={tableColumns}
                 className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
                 defaultView="table"
+                hideSortToggle={true}
               />
             )}
           </div>
@@ -1086,7 +1255,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         isOpen={isDeleteScheduleDialogOpen}
         onOpenChange={setIsDeleteScheduleDialogOpen}
         onConfirm={executeDeleteSchedule}
-        isLoading={false}
+        isLoading={isDeletingSchedule}
         title={studyCirclesLabels.schedule.deleteDialog.title}
         description={studyCirclesLabels.schedule.deleteDialog.description}
         itemDetails={scheduleToDelete ? {

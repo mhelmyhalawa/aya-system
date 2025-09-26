@@ -463,17 +463,23 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
   };
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-      <Card className="mb-3 sm:mb-4 shadow-sm border-green-200 rounded-lg sm:rounded-xl overflow-hidden">
-        <CardHeader className="py-2.5 sm:py-3 px-3 sm:px-4 bg-gradient-to-r from-green-700 to-green-600 flex flex-row justify-between items-center gap-1.5 sm:gap-2">
-          <div className="space-y-0.5 sm:space-y-1">
-            <CardTitle className="text-base sm:text-lg text-white flex items-center gap-1 sm:gap-1.5">
-              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
-              <span className="truncate">جلسات المعلمين</span>
-            </CardTitle>
-            <CardDescription className="text-green-100 text-xs sm:text-sm mt-0.5 sm:mt-1">
-              إدارة جلسات المعلمين والحلقات المستقبلية
-            </CardDescription>
+    <div className="w-full max-w-[1600px] mx-auto">
+      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
+        {/* الهيدر */}
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
+                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+            {/* العنوان والوصف */}
+            <div className="flex flex-col">
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
+                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
+                <span className="truncate">جلسات المعلمين</span>
+              </CardTitle>
+              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5">
+                إدارة جلسات المعلمين والحلقات المستقبلية
+              </CardDescription>
+            </div>
+
           </div>
         </CardHeader>
 
@@ -696,6 +702,10 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                           }))}
                           cardGridColumns={{ sm: 1, md: 1, lg: 3, xl: 3 }}
                           cardWidth="100%"
+                          /* تم تكييف إعدادات الجدول لتطابق إعدادات الجداول العامة في بقية النظام */
+                          enablePagination
+                          defaultPageSize={5}
+                          pageSizeOptions={[5, 10, 20, 50]}
                           columns={[
                             {
                               key: 'session_date',
@@ -775,11 +785,13 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                             },
                           ]}
                           emptyMessage="لا توجد جلسات مستقبلية"
-                          className="overflow-hidden rounded-xl border border-green-300 shadow-md"
+                          className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
                           getRowClassName={(_, index) =>
                             `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
                           }
-                          cardMaxFieldsCollapsed ={4}
+                          cardMaxFieldsCollapsed={4}
+                          hideSortToggle={true}
+                          /* يمكن إضافة زر للتحديث لاحقاً إذا لزم الأمر: onRefresh={...} */
                         />
                       </div>
                     ) : (
