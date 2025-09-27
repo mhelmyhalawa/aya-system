@@ -33,14 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "../components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogTrigger,
-} from "../components/ui/dialog";
+// استبدال Dialog بـ FormDialog (تم الاستغناء عن مكونات Dialog الأصلية)
 import {
   Select,
   SelectContent,
@@ -1311,48 +1304,39 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       </FormDialog>
 
 
-      {/* حوار إضافة/تعديل تقييم */}
-      <Dialog
+      {/* حوار إضافة/تعديل تقييم باستخدام FormDialog */}
+      <FormDialog
+        title={assessmentToEdit ? '✏️ تعديل تقييم الطالب' : '✨ إضافة تقييم طالب جديد'}
         open={isDialogOpen}
         onOpenChange={(open) => {
-          // عند إغلاق الحوار، إعادة تعيين الفلاتر
           if (!open) {
-            // استعادة الفلاتر المستخدمة في العرض
             const defaultTeacherId = currentUser?.role === 'teacher' ? currentUser.id : 'all-teachers';
-            if (selectedTeacherId !== defaultTeacherId) {
-              setSelectedTeacherId(defaultTeacherId);
-            }
-            if (selectedCircleId !== 'all-circles') {
-              setSelectedCircleId('all-circles');
-            }
+            if (selectedTeacherId !== defaultTeacherId) setSelectedTeacherId(defaultTeacherId);
+            if (selectedCircleId !== 'all-circles') setSelectedCircleId('all-circles');
           }
           setIsDialogOpen(open);
         }}
+        onSave={handleSaveAssessment}
+        mode={assessmentToEdit ? 'edit' : 'add'}
+        saveButtonText={isLoading ? 'جاري الحفظ...' : (assessmentToEdit ? '✓ تحديث التقييم' : '✓ إضافة التقييم')}
+        isLoading={isLoading}
+        maxWidth="540px"
       >
-        <DialogContent dir="rtl" className="sm:max-w-[520px] w-full rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100">
-          <DialogHeader className="pb-1">
-            <DialogTitle className="text-xl font-bold text-center">
-              <h3 className="text-center leading-tight text-green-800 bg-gradient-to-r from-green-100 to-blue-100 py-2 px-3 rounded-lg">
-                {assessmentToEdit ? '✏️ تعديل تقييم الطالب' : '✨ إضافة تقييم طالب جديد'}
-              </h3>
-            </DialogTitle>
-            {assessmentToEdit && visibleStudents.length > 0 && (
-              <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-md">
-                <div className="flex flex-col gap-1 text-center">
-                  <span className="text-sm font-medium">
-                    <span className="text-blue-700">الطالب:</span> {visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.full_name}
-                  </span>
-                  <span className="text-xs text-gray-600">
-                    <span className="text-blue-700">ولي الأمر:</span> {
-                      visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.guardian?.full_name || 
-                      'لم يتم تسجيل بيانات ولي الأمر'
-                    }
-                  </span>
-                </div>
+        <div className="bg-white dark:bg-gray-900 p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700" dir="rtl">
+          {assessmentToEdit && visibleStudents.length > 0 && (
+            <div className="mt-2 p-2 mb-3 bg-blue-50 border border-blue-100 rounded-md">
+              <div className="flex flex-col gap-1 text-center">
+                <span className="text-sm font-medium">
+                  <span className="text-blue-700">الطالب:</span> {visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.full_name}
+                </span>
+                <span className="text-xs text-gray-600">
+                  <span className="text-blue-700">ولي الأمر:</span> {
+                    visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.guardian?.full_name || 'لم يتم تسجيل بيانات ولي الأمر'
+                  }
+                </span>
               </div>
-            )}
-          </DialogHeader>
-          <div className="bg-white dark:bg-gray-900 p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            </div>
+          )}
             <Tabs defaultValue="basic" className="w-full">
               <TabsList className="flex flex-row-reverse w-full mb-3 bg-gradient-to-r from-blue-100 to-green-100 p-1 rounded-lg">
                 <TabsTrigger value="basic" className="flex-1 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-green-800 data-[state=active]:shadow-sm">
@@ -1687,15 +1671,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
 
             </Tabs>
 
-            <DialogFooter dir="rtl" className="flex space-x-2 rtl:space-x-reverse justify-end">
-              <Button type="button" onClick={handleSaveAssessment} disabled={isLoading}>
-                {isLoading ? 'جاري الحفظ...' : assessmentToEdit ? '✓ تحديث التقييم' : '✓ إضافة التقييم'}
-              </Button>
-              <Button type="button" variant="secondary" onClick={() => setIsDialogOpen(false)}>إلغاء</Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </FormDialog>
 
       {/* مربع حوار تأكيد الحذف */}
       <DeleteConfirmationDialog
