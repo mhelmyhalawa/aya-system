@@ -934,7 +934,6 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               </Alert>
             </div>
           )}
-          {/* التابات + أزرار الأدوات */}
           <div className="flex flex-col md:flex-row justify-end items-center gap-3 mb-1 rounded-lg
             bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
             {/* أزرار الأدوات */}

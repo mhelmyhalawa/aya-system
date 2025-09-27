@@ -241,6 +241,18 @@ export const searchStudents = async (criteria: { [key: string]: any }): Promise<
       }
     });
     
+    // معالجة البحث بقائمة من معرفات أولياء الأمور
+    if (criteria.guardian_ids && Array.isArray(criteria.guardian_ids) && criteria.guardian_ids.length > 0) {
+      const validGuardianIds = criteria.guardian_ids.filter((id: string) => id && id !== 'all' && id !== '');
+      if (validGuardianIds.length > 0) {
+        console.log('البحث عن الطلاب باستخدام معرفات أولياء الأمور:', validGuardianIds);
+        query = query.in('guardian_id', validGuardianIds);
+      } else {
+        console.log('تم تجاهل guardian_ids لأنها فارغة أو غير صالحة');
+      }
+      delete criteria.guardian_ids;
+    }
+
     // معالجة البحث بقائمة من معرفات الحلقات الدراسية
     if (criteria.study_circle_ids && Array.isArray(criteria.study_circle_ids) && criteria.study_circle_ids.length > 0) {
       // تحقق من أن القائمة لا تحتوي على قيم فارغة أو "الكل"

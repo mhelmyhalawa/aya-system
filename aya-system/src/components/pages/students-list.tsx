@@ -24,8 +24,10 @@ import {
   Database,
   School,
   UserCircle,
-  History
+  History,
+  ChevronDown
 } from "lucide-react";
+import { Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { Student, StudentCreate, StudentUpdate } from "@/types/student";
 import { teacherHistory } from "@/types/teacher-history";
 import { Guardian, GuardianCreate } from "@/types/guardian";
@@ -63,13 +65,17 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   const [exportLoading, setExportLoading] = useState(false);
   const [filterGrade, setFilterGrade] = useState<string>("all");
   const [guardians, setGuardians] = useState<Guardian[]>([]);
-  const [guardianSearchTerm, setGuardianSearchTerm] = useState("");
+  // حوار اختيار ولي الأمر (بدلاً من حقل النص المباشر)
+  const [isGuardianPickerOpen, setIsGuardianPickerOpen] = useState(false);
+  const [guardianPickerSearch, setGuardianPickerSearch] = useState("");
+  const [selectedGuardianIds, setSelectedGuardianIds] = useState<string[]>([]);
   const [teachers, setteachers] = useState<Profile[]>([]);
   const [teacherSearchTerm, setteacherSearchTerm] = useState("");
 
   // حالة الحلقات الدراسية
   const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
   const [teacherStudyCircles, setTeacherStudyCircles] = useState<StudyCircle[]>([]);
+  const [isTeacherCirclesLoading, setIsTeacherCirclesLoading] = useState<boolean>(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("");
   const [studyCircleId, setStudyCircleId] = useState<string>("");
   // حالات خاصة بالنموذج فقط (لا تؤثر على فلترة الجدول)
@@ -85,10 +91,13 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
     if (userRole === 'teacher' && userId) {
       setSelectedTeacherId(userId);
+      setIsTeacherCirclesLoading(true);
       loadStudyCirclesForTeacher(userId).then(() => {
+        setIsTeacherCirclesLoading(false);
+        // سيتم تنفيذ البحث بعد اكتمال تحميل الحلقات
         const searchCriteria = { teacher_id: userId } as any;
         loadStudents(searchCriteria);
-      });
+      }).catch(() => setIsTeacherCirclesLoading(false));
     } else {
       loadStudyCircles();
       loadStudents();
@@ -98,11 +107,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   // تنفيذ البحث عند تغيير الحلقة الدراسية
   useEffect(() => {
     console.log('تغيير الحلقة الدراسية:', studyCircleId);
+    if (userRole === 'teacher' && isTeacherCirclesLoading) return; // لا نبحث قبل تحميل الحلقات
     const timeoutId = setTimeout(() => {
       handleSearch();
     }, 100);
     return () => clearTimeout(timeoutId);
-  }, [studyCircleId]);
+  }, [studyCircleId, isTeacherCirclesLoading]);
+
+  // اختيار تلقائي للحلقة الوحيدة عند المعلم
+  useEffect(() => {
+    if (userRole === 'teacher' && !isTeacherCirclesLoading) {
+      if (teacherStudyCircles.length === 1) {
+        if (studyCircleId !== teacherStudyCircles[0].id) {
+          setStudyCircleId(teacherStudyCircles[0].id);
+        }
+      }
+    }
+  }, [teacherStudyCircles, userRole, isTeacherCirclesLoading]);
 
   // تنفيذ البحث عند تغيير مستوى الصف
   useEffect(() => {
@@ -126,6 +147,31 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   const [guardianPhoneNumber, setGuardianPhoneNumber] = useState<string>("");
   const [guardianEmail, setGuardianEmail] = useState<string>("");
   const [guardianAddress, setGuardianAddress] = useState<string>("");
+
+  // دالة موحدة لتصفير الفلاتر
+  const resetFilters = (triggerReload: boolean = true) => {
+    const had = (searchTerm && searchTerm.trim()) || filterGrade !== 'all' || (!isTeacherRole(userRole) && selectedTeacherId) || studyCircleId || selectedGuardianIds.length;
+    setSearchTerm('');
+    setFilterGrade('all');
+    // لا نزيل معرف المعلم إذا كان المستخدم نفسه معلماً
+    if (!isTeacherRole(userRole)) {
+      setSelectedTeacherId('');
+    }
+    if (isTeacherRole(userRole) && teacherStudyCircles.length === 1) {
+      setStudyCircleId(teacherStudyCircles[0].id);
+    } else {
+      setStudyCircleId('');
+    }
+    setSelectedGuardianIds([]);
+    setCurrentPage(1);
+    if (triggerReload && had) {
+      if (userRole === 'teacher') {
+        handleSearch();
+      } else {
+        loadStudents();
+      }
+    }
+  };
 
   // حوار تأكيد الحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -461,8 +507,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         }
       }
 
-      setSearchTerm('');
-      console.log('إجمالي الطلاب الذين تم تحميلهم:', studentsList.length);
+  // ملاحظة: لم نعد نصفر حقل البحث هنا حتى لا نفقد كلمات البحث عند التحديث
+  console.log('إجمالي الطلاب الذين تم تحميلهم:', studentsList.length);
 
       if (studentsList.length > 0) {
         console.log('نموذج للطالب الأول:', {
@@ -507,6 +553,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
       searchTerm: searchTerm ? searchTerm.trim() : 'فارغ',
       studyCircleId: studyCircleId || 'غير محدد',
       selectedTeacherId: selectedTeacherId || 'غير محدد',
+      selectedGuardianIds: selectedGuardianIds.length ? selectedGuardianIds : 'غير محدد',
       filterGrade: filterGrade || 'غير محدد',
       userRole: userRole || 'غير محدد',
       userId: userId || 'غير محدد'
@@ -523,6 +570,15 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
       if (filterGrade && filterGrade !== 'all') {
         searchCriteria.grade = filterGrade;
+      }
+
+      // فلترة حسب ولي الأمر إذا تم اختياره
+      if (selectedGuardianIds.length) {
+        const guardianRealIds = guardians.filter(g => g.id && (selectedGuardianIds.includes(g.id) || selectedGuardianIds.includes(g.phone_number || ''))).map(g => g.id as string);
+        if (guardianRealIds.length) {
+          searchCriteria.guardian_ids = guardianRealIds;
+          console.log('تطبيق فلترة guardian_ids:', guardianRealIds);
+        }
       }
 
       // لضمان أن المعلم يرى فقط الطلاب المرتبطين به
@@ -570,6 +626,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // زر التحديث: إذا كانت هناك فلاتر أو المستخدم معلم نستدعي البحث بالمعايير، وإلا تحميل كامل
+  const handleRefreshClick = () => {
+    const hasActiveFilters = !!(
+      (searchTerm && searchTerm.trim()) ||
+      (filterGrade && filterGrade !== 'all') ||
+      selectedTeacherId ||
+      studyCircleId ||
+      selectedGuardianIds.length
+    );
+    console.log('تشغيل زر التحديث. فلاتر نشطة؟', hasActiveFilters);
+    if (hasActiveFilters || userRole === 'teacher') {
+      handleSearch();
+    } else {
+      loadStudents();
     }
   };
 
@@ -681,6 +754,19 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
     }
   };
 
+  // شريط الأدوات: إظهار الفلاتر + الترتيب
+  const [showFilters, setShowFilters] = useState(false);
+  const [listSortDirection, setListSortDirection] = useState<null | 'asc' | 'desc'>(null);
+  const toggleListSort = () => {
+    setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+  };
+  // لم نعد نستخدم حقول البحث النصي المباشرة للمعلم والحلقة، سيتم استبدالها بقوائم اختيار مع ترقيم صفحات
+  // سنعيد استعمال teacherSearchTerm كسيرش داخلي في حوار اختيار المعلم فقط، ونضيف حقل جديد للحلقة
+  const [circlePickerSearch, setCirclePickerSearch] = useState("");
+  // حوارات اختيار المعلم والحلقة
+  const [isTeacherPickerOpen, setIsTeacherPickerOpen] = useState(false);
+  const [isCirclePickerOpen, setIsCirclePickerOpen] = useState(false);
+
   // تأكيد حذف طالب
   const confirmDeleteStudent = async () => {
     if (!studentToDelete) return;
@@ -774,9 +860,9 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
       searchTerm: searchTerm ? searchTerm.trim() : 'فارغ',
       filterGrade: filterGrade || 'غير محدد',
       selectedTeacherId: selectedTeacherId || 'غير محدد',
-      studyCircleId: studyCircleId || 'غير محدد'
+      studyCircleId: studyCircleId || 'غير محدد',
+      guardians: selectedGuardianIds
     });
-
     return students.filter(student => {
       // تطبيق البحث النصي
       const matchesSearch = !searchTerm ||
@@ -799,9 +885,72 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         matchesTeacher = student.study_circle?.teacher?.id === selectedTeacherId;
       }
 
-      return matchesSearch && matchesGrade && matchesStudyCircle && matchesTeacher;
+      // فلتر ولي الأمر المحدد (إن وُجد)
+      // بيانات ولي الأمر في الطالب لا تحتوي id ضمن النوع الحالي؛ نستخدم phone_number كبديل (مع افتراض uniqueness)
+  // بعض السجلات قد لا تحتوي على id لولي الأمر (اعتماداً على select المستخدم في الاستعلام) لذا نستخدم phone_number كمعرف بديل
+  const guardianKey = (student as any).guardian?.id || student.guardian?.phone_number;
+  const matchesGuardian = selectedGuardianIds.length === 0 || (guardianKey && selectedGuardianIds.includes(guardianKey));
+
+      return matchesSearch && matchesGrade && matchesStudyCircle && matchesTeacher && matchesGuardian;
     });
-  }, [students, searchTerm, filterGrade, selectedTeacherId, studyCircleId, userRole]);
+  }, [students, searchTerm, filterGrade, selectedTeacherId, studyCircleId, userRole, selectedGuardianIds]);
+
+  // بيانات المعلم / الحلقة / ولي الأمر المختار
+  const selectedTeacher = useMemo(() => teachers.find(t => t.id === selectedTeacherId), [teachers, selectedTeacherId]);
+  const allCirclesForSelection = useMemo(() => (selectedTeacherId ? teacherStudyCircles : studyCircles), [selectedTeacherId, teacherStudyCircles, studyCircles]);
+  const selectedCircle = useMemo(() => allCirclesForSelection.find(c => c.id === studyCircleId), [allCirclesForSelection, studyCircleId]);
+  const selectedGuardians = useMemo(() => guardians.filter(g => selectedGuardianIds.includes(g.id) || selectedGuardianIds.includes(g.phone_number || '')), [guardians, selectedGuardianIds]);
+
+  const toggleGuardianSelection = (g: Guardian) => {
+    const key = g.id || g.phone_number;
+    if (!key) return;
+    setSelectedGuardianIds(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+    // تشغيل البحث بعد تغيير الاختيار (تأخير بسيط لضمان تحديث الحالة)
+    setTimeout(() => handleSearch(), 80);
+  };
+
+  const clearAllGuardians = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (selectedGuardianIds.length === 0) return;
+    setSelectedGuardianIds([]);
+    setTimeout(() => handleSearch(), 50);
+  };
+
+  // فلترة قوائم الاختيار (المعلم / الحلقة)
+  const filteredTeachersForPicker = useMemo(() => {
+    return teachers.filter(t => !teacherSearchTerm || t.full_name.toLowerCase().includes(teacherSearchTerm.toLowerCase()));
+  }, [teachers, teacherSearchTerm]);
+  const filteredCirclesForPicker = useMemo(() => {
+    return allCirclesForSelection.filter(c => !circlePickerSearch || (c.name || '').toLowerCase().includes(circlePickerSearch.toLowerCase()));
+  }, [allCirclesForSelection, circlePickerSearch]);
+  const filteredGuardiansForPicker = useMemo(() => {
+    return guardians.filter(g => !guardianPickerSearch || (g.full_name || '').toLowerCase().includes(guardianPickerSearch.toLowerCase()));
+  }, [guardians, guardianPickerSearch]);
+  // عدد الحلقات لكل معلم (نعتمد على studyCircles العامة، أو teacherStudyCircles عند الحاجة)
+  const teacherCirclesCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    // استخدم كل الحلقات المتاحة (studyCircles) لضمان الشمول
+    studyCircles.forEach(sc => {
+      const tid = (sc as any).teacher_id || sc.teacher_id || sc.teacher?.id;
+      if (tid) map[tid] = (map[tid] || 0) + 1;
+    });
+    return map;
+  }, [studyCircles]);
+
+  const handleSelectTeacher = (t: Profile) => {
+    // إعادة استخدام منطق تغيير المعلم الأصلي
+    handleTeacherChange(t.id);
+    setIsTeacherPickerOpen(false);
+  };
+
+  const handleSelectCircle = (c: StudyCircle) => {
+    setStudyCircleId(c.id);
+    setIsCirclePickerOpen(false);
+  };
+  // الإبقاء على الدالة القديمة للاستخدام المحتمل، لكن الآن تعتمد على التبديل متعدد
+  const handleSelectGuardian = (g: Guardian) => {
+    toggleGuardianSelection(g);
+  };
 
   // Calculate total pages
   const totalPages = Math.max(1, Math.ceil(filteredStudents.length / itemsPerPage));
@@ -900,15 +1049,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-
-      <Card>
+    <div className="w-full max-w-[1600px] mx-auto">
+      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
+                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
+              {/* العنوان والوصف */}
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
                 <UserCircle className="h-5 w-5 text-yellow-300" />
                 {userRole === 'teacher' ? studentsLabels.teacherViewTitle : studentsLabels.title}
               </CardTitle>
@@ -919,20 +1069,85 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 }
               </CardDescription>
             </div>
-
-            {/* الأزرار */}
-            <div className="flex gap-2">
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0.5 pb-0 px-0 sm:px-0">
+          {error && (
+            <div className="flex flex-col md:flex-row justify-between items-center gap-0 mb-1 bg-white dark:bg-gray-900 p-1 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4 ml-2" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
+          <div className="flex flex-col md:flex-row justify-end items-center gap-3 mb-1 rounded-lg bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
+            <div className="flex gap-2 items-center flex-wrap justify-center md:justify-end">
               <Button
-                className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
-                onClick={handleAddGuardian}
-                title={guardiansLabels.addGuardian}
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-2xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8`}
+                onClick={() => {
+                  setShowFilters(prev => {
+                    const next = !prev;
+                    if (next) {
+                      // عند الفتح نقوم بالتصفير حسب طلب المستخدم
+                      resetFilters();
+                    }
+                    return next;
+                  });
+                }}
+                title={showFilters ? 'إخفاء أدوات الفلترة' : 'إظهار أدوات الفلترة (سيتم تصفير الفلاتر)'}
               >
-                <span className="text-lg">👤</span>
-                <span className="hidden sm:inline">{guardiansLabels.addGuardian}</span>
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
               </Button>
               <Button
-                className="flex items-center gap-2 rounded-3xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
-                onClick={handleAddStudent}
+                type="button"
+                variant={listSortDirection ? 'default' : 'outline'}
+                onClick={toggleListSort}
+                title={listSortDirection === null ? 'ترتيب تصاعدي حسب الاسم' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
+                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200 ${listSortDirection === null ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600' : listSortDirection === 'asc' ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500' : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
+              >
+                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
+                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
+                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                onClick={handleRefreshClick}
+                title={studentsLabels.refresh}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
+              {(userRole === 'superadmin') && (
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-2xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                  onClick={handleExportData}
+                  title={studentsLabels.export}
+                  disabled={exportLoading || students.length === 0}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">تصدير</span>
+                </Button>
+              )}
+              {(userRole === 'superadmin' || userRole === 'admin') && (
+                <Button
+                  onClick={handleAddGuardian}
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                  title={guardiansLabels.addGuardian}
+                >
+                  <span className="text-lg">👤</span>
+                  <span className="hidden sm:inline"> {guardiansLabels.addGuardian}</span>
+                </Button>
+              )}
+              <Button
+                onClick={() => handleAddStudent()}
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                 title={studentsLabels.addStudent}
               >
                 <span className="text-lg">🧒</span>
@@ -940,200 +1155,282 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               </Button>
             </div>
           </div>
-        </CardHeader>
-
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-2">
-              <AlertCircle className="h-4 w-4 ml-2" />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* شريط البحث والتصفية (نسخة مضغوطة) */}
-          <div className="flex flex-col md:flex-row md:items-stretch gap-0 md:gap-0 mb-1 md:mb-0">
-            {/* حقل البحث */}
-            <div className="relative md:w-[220px] lg:w-[260px]">
-              <Search className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={studentsLabels.searchPlaceholder}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-3 pr-8 h-9 text-sm"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-
-            {/* الفلاتر + أزرار الإجراءات */}
-            <div className="flex flex-col md:flex-row md:items-stretch gap-0 md:gap-0 md:w-auto flex-1">
-              {/* فلتر ديناميكي: معلم أو حلقة */}
-              {userRole === 'teacher' ? (
-                <div className="w-full sm:w-auto md:w-[200px]">
-                  <Select
-                    value={studyCircleId || 'all'}
-                    onValueChange={value => {
-                      const newValue = value === 'all' ? '' : value;
-                      setStudyCircleId(newValue);
-                      setTimeout(() => handleSearch(), 100);
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-9 text-sm">
-                      <SelectValue placeholder={studentsLabels.allStudyCircles} />
-                    </SelectTrigger>
-                    <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                      <SelectItem value="all">{studentsLabels.allStudyCircles}</SelectItem>
-                      {teacherStudyCircles.length > 0 ? (
-                        teacherStudyCircles.map(circle => (
-                          <SelectItem key={circle.id} value={circle.id}>{circle.name}</SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value="none" disabled>{studentsLabels.noStudyCircles}</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="flex flex-col md:flex-row gap-2 md:gap-2 md:w-auto flex-1">
-                  {!isTeacherRole(userRole) && (
-                    <div className="w-full sm:w-auto md:w-[180px]">
-                      <Select
-                        value={selectedTeacherId || 'all'}
-                        onValueChange={value => {
-                          const newValue = value === 'all' ? '' : value;
-                          handleTeacherChange(newValue);
-                        }}
-                      >
-                        <SelectTrigger className="w-full h-9 text-sm">
-                          <SelectValue placeholder={studentsLabels.allTeachers} />
-                        </SelectTrigger>
-                        <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                          <SelectItem value="all">{studentsLabels.allTeachers}</SelectItem>
-                          {teachers.map(teacher => (
-                            <SelectItem key={teacher.id} value={teacher.id}>{teacher.full_name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+          {showFilters && (
+            <div className="mt-2 mb-2 w-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3 flex flex-col md:flex-row gap-3">
+              {/* بحث الطالب */}
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                <Input
+                  placeholder={studentsLabels.searchPlaceholder}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-3 pr-10 w-full bg-white dark:bg-green-950"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                />
+              </div>
+              {/* اختيار ولي الأمر (قائمة مع ترقيم صفحات) */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setIsGuardianPickerOpen(true)}
+                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden
+                    ${selectedGuardianIds.length ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                    hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                  title={guardiansLabels.guardian}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
+                      <UserCircle className="h-4 w-4" />
                     </div>
-                  )}
-
-                  {isTeacherRole(userRole) && (
-                    <div className="bg-gray-100 rounded-md px-3 py-2 flex items-center w-full md:w-[180px]">
-                      <GraduationCap className="h-4 w-4 text-islamic-green/60 mr-2" />
-                      <span className="text-sm">{studentsLabels.currentTeacherLabel}</span>
-                    </div>
-                  )}
-
-                  <div className="w-full md:w-[180px]">
-                    <Select
-                      value={studyCircleId || 'all'}
-                      onValueChange={value => {
-                        const newValue = value === 'all' ? '' : value;
-                        setStudyCircleId(newValue);
-                        setTimeout(() => handleSearch(), 100);
-                      }}
-                      disabled={isLoadingStudyCircles}
-                    >
-                      <SelectTrigger className="w-full h-9 text-sm">
-                        <SelectValue placeholder={studentsLabels.allStudyCircles} />
-                      </SelectTrigger>
-                      <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px]">
-                        <SelectItem value="all">{studentsLabels.allStudyCircles}</SelectItem>
-                        {teacherStudyCircles.length > 0 ? (
-                          teacherStudyCircles.map(circle => (
-                            <SelectItem key={circle.id} value={circle.id}>{circle.name}</SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="none" disabled>
-                            {selectedTeacherId ? studentsLabels.noCirclesForTeacher : studentsLabels.selectTeacherFirst}
-                          </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <span className={`truncate text-sm ${selectedGuardianIds.length ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                      {selectedGuardianIds.length === 0 && (guardiansLabels.guardian || 'اختر أولياء')}
+                      {selectedGuardianIds.length === 1 && selectedGuardians[0]?.full_name}
+                      {selectedGuardianIds.length > 1 && `${selectedGuardianIds.length} أولياء محددون`}
+                    </span>
                   </div>
-                </div>
-              )}
-
-              {/* أزرار الإجراءات */}
-              <div className="hidden sm:flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => loadStudents()}
-                  title={studentsLabels.refresh}
-                  className="shrink-0 w-9 h-9"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleExportData}
-                  title={studentsLabels.export}
-                  className="shrink-0 w-9 h-9"
-                  disabled={exportLoading || students.length === 0}
-                >
-                  <FileDown className="h-4 w-4" />
-                </Button>
+                  <div className="flex items-center gap-2 pl-1">
+                    {selectedGuardianIds.length > 0 && (
+                      <span
+                        onClick={(e) => clearAllGuardians(e)}
+                        className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                      >
+                        مسح
+                      </span>
+                    )}
+                    <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isGuardianPickerOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                </button>
+              </div>
+              {/* اختيار المعلم */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
+                {userRole === 'teacher' ? (
+                  <div
+                    className={`relative w-full h-10 px-3 rounded-xl border flex items-center gap-2 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900 border-green-400`}
+                    title={studentsLabels.teacherColumn}
+                  >
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
+                      <GraduationCap className="h-4 w-4" />
+                    </div>
+                    <span className="truncate text-sm text-green-700 font-medium">
+                      {selectedTeacher?.full_name || 'المعلم'}
+                    </span>
+                    <div className="ml-auto flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span>
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">{teacherStudyCircles.length}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    onClick={() => setIsTeacherPickerOpen(true)}
+                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden
+                      ${selectedTeacher ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                      hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                    title={studentsLabels.teacherColumn}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
+                        <GraduationCap className="h-4 w-4" />
+                      </div>
+                      <span className={`truncate text-sm ${selectedTeacher ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                        {selectedTeacher ? selectedTeacher.full_name : (studentsLabels.teacherPlaceholder || 'اختر معلماً')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-1">
+                      {selectedTeacher && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setSelectedTeacherId(''); setStudyCircleId(''); }}
+                          className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                        >
+                          إزالة
+                        </span>
+                      )}
+                      <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isTeacherPickerOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                  </button>
+                )}
+              </div>
+              {/* اختيار الحلقة */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
+                {userRole === 'teacher' && teacherStudyCircles.length === 1 ? (
+                  <div className="relative w-full h-10 px-3 rounded-xl border border-green-300 dark:border-green-700 bg-white dark:bg-green-950 flex items-center gap-2">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
+                      <BookOpen className="h-4 w-4" />
+                    </div>
+                    <span className="truncate text-sm text-green-700 font-medium">{teacherStudyCircles[0]?.name || 'حلقة'}</span>
+                    <div className="ml-auto flex items-center gap-1">
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span>
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">1</span>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    disabled={userRole === 'teacher' && isTeacherCirclesLoading}
+                    onClick={() => setIsCirclePickerOpen(true)}
+                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
+                      ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                      hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                    title={studentsLabels.studyCircleShort}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
+                        <BookOpen className="h-4 w-4" />
+                      </div>
+                      <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                        {isTeacherCirclesLoading ? '...جاري التحميل' : (selectedCircle ? selectedCircle.name : (studentsLabels.studyCirclePlaceholder || 'اختر حلقة'))}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-1">
+                      {selectedCircle && (
+                        <span
+                          onClick={(e) => { e.stopPropagation(); setStudyCircleId(''); }}
+                          className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                        >
+                          إزالة
+                        </span>
+                      )}
+                      <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isCirclePickerOpen ? 'rotate-180' : ''}`} />
+                    </div>
+                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                  </button>
+                )}
               </div>
             </div>
-          </div>
+          )}
+          {/* تمت إزالة واجهة الفلاتر النشطة بناء على طلب المستخدم */}
         </CardContent>
 
       </Card>
 
-      {/* الجدول عبر المكون العام GenericTable */}
+      {/* جدول الطلاب بنمط محسّن مع ترقيم داخلي */}
       <GenericTable
         title={studentsLabels.title}
-        data={paginatedStudents.map((s, idx) => ({ ...s, __index: (currentPage - 1) * itemsPerPage + idx + 1 }))}
+        data={(listSortDirection ? [...filteredStudents].sort((a, b) => {
+          if (listSortDirection === 'asc') return a.full_name.localeCompare(b.full_name, 'ar');
+          if (listSortDirection === 'desc') return b.full_name.localeCompare(a.full_name, 'ar');
+          return 0;
+        }) : filteredStudents)}
         defaultView="table"
+        enablePagination
+        defaultPageSize={6}
+        pageSizeOptions={[6, 12, 24, 48, 100, 200, 500]}
+        cardMaxFieldsCollapsed={4}
+        enableCardExpand={true}
+        hideSortToggle
+        className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+        getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
         columns={([
-          { key: '__index', header: '#', render: (item: any) => <span className="font-medium">{item.__index}</span>, width: '50px', align: 'center' },
-          // عمود اسم الطالب (يُستخدم في رأس البطاقة مع الفهرس)
-          { key: 'full_name', header: studentsLabels.name, render: (item: any) => <span className="font-medium">{item.full_name} {item.guardian?.full_name}</span> },
-           ...(userRole !== 'teacher' ? [{
-            key: 'teacher', header: studentsLabels.teacherColumn, render: (item: any) => item.study_circle?.teacher?.full_name ? (
-              <div className="flex items-center gap-1"><GraduationCap className="h-4 w-4 text-islamic-green/60" /><span>{item.study_circle.teacher.full_name}</span></div>
+          {
+            key: 'row_index',
+            header: '🔢',
+            align: 'center',
+            width: '50px',
+            render: (_item: any, globalIndex?: number) => <span className="font-medium">{(globalIndex ?? 0) + 1}</span>
+          },
+          {
+            key: 'full_name',
+            header: `👤 ${studentsLabels.name}`,
+            important: true,
+            render: (item: any) => (
+              <div className="flex flex-col">
+                <span className="font-medium leading-snug">{item.full_name}</span>
+                {item.guardian?.full_name && (
+                  <span className="text-[10px] text-gray-500">{item.guardian.full_name}</span>
+                )}
+              </div>
+            )
+          },
+          ...(userRole !== 'teacher' ? [{
+            key: 'teacher',
+            header: `🎓 ${studentsLabels.teacherColumn}`,
+            align: 'center',
+            render: (item: any) => item.study_circle?.teacher?.full_name ? (
+              <div className="flex items-center justify-center gap-1">
+                <GraduationCap className="h-4 w-4 text-islamic-green/60" />
+                <span className="text-xs">{item.study_circle.teacher.full_name}</span>
+              </div>
             ) : <span className="text-muted-foreground">—</span>
           }] : []),
           {
-            key: 'study_circle', header: studentsLabels.studyCircleShort, render: (item: any) => (
-              <div className="flex items-center gap-1"><BookOpen className="h-4 w-4 text-islamic-green/60" /><span>{item.study_circle?.name || '-'}</span></div>
+            key: 'study_circle',
+            header: `📘 ${studentsLabels.studyCircleShort}`,
+            align: 'center',
+            render: (item: any) => (
+              <div className="flex items-center justify-center gap-1">
+                <BookOpen className="h-4 w-4 text-islamic-green/60" />
+                <span className="text-xs">{item.study_circle?.name || '-'}</span>
+              </div>
             )
           },
           {
-            key: 'memorized_parts', header: studentsLabels.memorizeLevelHeader, render: (item: any) => (
-              <span>{studentsLabels.quranPartsOptions.find(p => p.value === item.memorized_parts)?.label || item.memorized_parts}</span>
+            key: 'grade',
+            header: `🏷️ ${studentsLabels.gradeShort}`,
+            align: 'center',
+            render: (item: any) => (
+              <span className="text-xs">{studentsLabels.gradeOptions.find(g => g.value === (item.grade_level || item.grade))?.label || (item.grade_level || item.grade || '-')}</span>
             )
           },
           {
-            key: 'grade', header: studentsLabels.gradeShort, render: (item: any) => (
-              <span>{studentsLabels.gradeOptions.find(g => g.value === (item.grade_level || item.grade))?.label || (item.grade_level || item.grade || '-')}</span>
+            key: 'memorized_parts',
+            header: `📖 ${studentsLabels.memorizeLevelHeader}`,
+            align: 'center',
+            render: (item: any) => (
+              <span className="text-xs">{studentsLabels.quranPartsOptions.find(p => p.value === item.memorized_parts)?.label || item.memorized_parts || '-'}</span>
             )
           },
           {
-            key: 'gender', header: studentsLabels.gender || 'الجنس', render: (item: any) => (
-              <span>{item.gender === 'male' ? studentsLabels.genderMale : item.gender === 'female' ? studentsLabels.genderFemale : '-'}</span>
+            key: 'gender',
+            header: `⚧ ${studentsLabels.gender || 'الجنس'}`,
+            align: 'center',
+            render: (item: any) => (
+              <span className="text-xs">{item.gender === 'male' ? studentsLabels.genderMale : item.gender === 'female' ? studentsLabels.genderFemale : '-'}</span>
             )
           },
           {
-            key: 'actions', header: studentsLabels.actions, render: (item: any) => (
+            key: 'actions',
+            header: `⚙️ ${studentsLabels.actions}`,
+            align: 'center',
+            render: (item: any) => (
               <div className="flex justify-center items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={() => handleEditStudent(item)} className="h-8 w-8 text-islamic-green hover:bg-green-100 rounded-full" title={studentsLabels.editTooltip}>
-                  <Pencil size={16} />
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => handleEditStudent(item)}
+                  title={studentsLabels.editTooltip}
+                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <Pencil className="h-4 w-4 text-green-600" />
+                </button>
                 {canDelete && (
-                  <Button variant="ghost" size="icon" onClick={() => handleDeleteStudent(item)} className="h-8 w-8 text-red-500 hover:bg-red-100 rounded-full" title={studentsLabels.deleteTooltip}>
-                    <Trash2 size={16} />
-                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteStudent(item)}
+                    title={studentsLabels.deleteTooltip}
+                    className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-500" />
+                  </button>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => handleViewteacherHistory(item)} className="h-8 w-8 text-blue-500 hover:bg-blue-100 rounded-full" title={teacherHistoryLabels.title}>
-                  <History size={16} />
-                </Button>
+                <button
+                  type="button"
+                  onClick={() => handleViewteacherHistory(item)}
+                  title={teacherHistoryLabels.title}
+                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <History className="h-4 w-4 text-blue-500" />
+                </button>
               </div>
             )
           }
         ]) as Column<any>[]}
         emptyMessage={studentsLabels.noStudents || 'لا يوجد طلاب'}
+        onRefresh={loadStudents}
+        onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddStudent : undefined}
       />
 
       <StudentFormDialog
@@ -1192,6 +1489,248 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             <Label htmlFor="guardian_address" className="mb-1 block text-sm font-medium">{guardiansLabels.addressNotes || guardiansLabels.address} <span className="text-muted-foreground text-xs">{guardiansLabels.optionalField}</span></Label>
             <Textarea id="guardian_address" value={guardianAddress} onChange={(e) => setGuardianAddress(e.target.value)} placeholder={guardiansLabels.addressPlaceholder || guardiansLabels.address} rows={3} className="focus:border-islamic-green" />
           </div>
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار ولي الأمر */}
+      <FormDialog
+        title={guardiansLabels.guardian || 'ولي الأمر'}
+        open={isGuardianPickerOpen}
+        onOpenChange={setIsGuardianPickerOpen}
+        onSave={() => setIsGuardianPickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <div className="relative">
+            <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+            <Input
+              placeholder={guardiansLabels.searchPlaceholder || 'ابحث عن ولي أمر'}
+              value={guardianPickerSearch}
+              onChange={(e) => setGuardianPickerSearch(e.target.value)}
+              className="pl-3 pr-10 bg-white dark:bg-green-950"
+            />
+          </div>
+          <GenericTable
+            title={guardiansLabels.guardian}
+            defaultView="table"
+            enablePagination
+            defaultPageSize={5}
+            pageSizeOptions={[5, 10, 20, 50]}
+            data={filteredGuardiansForPicker}
+            getRowClassName={(item: any, index) => `${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-xs"
+            columns={([
+              {
+                key: 'row_index',
+                header: '🔢',
+                width: '40px',
+                align: 'center',
+                render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+              },
+              {
+                key: 'full_name',
+                header: guardiansLabels.fullNameFull || guardiansLabels.fullName || 'الاسم',
+                render: (item: any) => (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectGuardian(item)}
+                    className="flex items-center justify-between w-full group"
+                  >
+                    <span className={`text-sm font-medium group-hover:text-green-700 ${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'text-green-700' : ''}`}>{item.full_name}</span>
+                    {(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محدد</span>}
+                  </button>
+                )
+              },
+              {
+                key: 'phone_number',
+                header: guardiansLabels.phoneNumber || 'الهاتف',
+                align: 'center',
+                render: (item: any) => <span className="text-xs" dir="ltr">{item.phone_number || '-'}</span>
+              },
+              {
+                key: 'actions',
+                header: `⚙️ ${studentsLabels.actions}`,
+                align: 'center',
+                render: (item: any) => (
+                  <Button
+                    size="sm"
+                    className={`h-7 px-3 rounded-full text-white ${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'}`}
+                    onClick={() => handleSelectGuardian(item)}
+                  >
+                    {(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'ازالة' : 'اختيار'}
+                  </Button>
+                )
+              }
+            ]) as Column<any>[]}
+            emptyMessage={guardiansLabels.noGuardians || 'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار المعلم */}
+      <FormDialog
+        title={studentsLabels.teacherColumn || 'المعلم'}
+        open={isTeacherPickerOpen}
+        onOpenChange={setIsTeacherPickerOpen}
+        onSave={() => setIsTeacherPickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <div className="relative">
+            <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+            <Input
+              placeholder={studentsLabels.teacherPlaceholder || 'ابحث عن معلم'}
+              value={teacherSearchTerm}
+              onChange={(e) => setteacherSearchTerm(e.target.value)}
+              className="pl-3 pr-10 bg-white dark:bg-green-950"
+            />
+          </div>
+          <GenericTable
+            title={studentsLabels.teacherColumn}
+            defaultView="table"
+            enablePagination
+            defaultPageSize={4}
+            pageSizeOptions={[4, 8, 16, 48, 100]}
+            data={filteredTeachersForPicker}
+            getRowClassName={(item: any, index) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-xs"
+            columns={([
+              {
+                key: 'row_index',
+                header: '🔢',
+                width: 'auto',
+                align: 'center',
+                render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+              },
+              {
+                key: 'full_name',
+                header: studentsLabels.name,
+                width: 'auto',
+                render: (item: any) => (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectTeacher(item)}
+                    className="flex items-center justify-between w-full text-right group"
+                  >
+                    <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === selectedTeacherId ? 'text-green-700' : ''}`}>{item.full_name}</span>
+                    {item.id === selectedTeacherId && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محدد</span>}
+                  </button>
+                )
+              },
+              {
+                key: 'circles_count',
+                header: '📘 عدد الحلقات',
+                width: 'auto',
+                align: 'center',
+                render: (item: any) => (
+                  <span className="text-xs font-semibold text-green-700">{teacherCirclesCountMap[item.id] ?? 0}</span>
+                )
+              },
+              {
+                key: 'actions',
+                header: `⚙️ ${studentsLabels.actions}`,
+                align: 'center',
+                render: (item: any) => (
+                  <Button
+                    size="sm"
+                    disabled={item.id === selectedTeacherId}
+                    className={`h-7 px-3 rounded-full text-white ${item.id === selectedTeacherId ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'}`}
+                    onClick={() => handleSelectTeacher(item)}
+                  >
+                    {item.id === selectedTeacherId ? '✓' : 'اختيار'}
+                  </Button>
+                )
+              }
+            ]) as Column<any>[]}
+            emptyMessage={studentsLabels.noStudents || 'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار الحلقة */}
+      <FormDialog
+        title={studentsLabels.studyCircleShort || 'الحلقة'}
+        open={isCirclePickerOpen}
+        onOpenChange={setIsCirclePickerOpen}
+        onSave={() => setIsCirclePickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <div className="relative">
+            <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+            <Input
+              placeholder={studentsLabels.studyCirclePlaceholder || 'ابحث عن حلقة'}
+              value={circlePickerSearch}
+              onChange={(e) => setCirclePickerSearch(e.target.value)}
+              className="pl-3 pr-10 bg-white dark:bg-green-950"
+            />
+          </div>
+          <GenericTable
+            title={studentsLabels.studyCircleShort}
+            defaultView="table"
+            enablePagination
+            defaultPageSize={4}
+            pageSizeOptions={[4, 8, 16, 48, 100]}
+            data={filteredCirclesForPicker}
+            getRowClassName={(item: any, index) => `${item.id === studyCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-xs"
+            columns={([
+              {
+                key: 'row_index',
+                header: '🔢',
+                width: '40px',
+                align: 'center',
+                render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+              },
+              {
+                key: 'name',
+                header: `📘 ${studentsLabels.studyCircleShort}`,
+                render: (item: any) => (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectCircle(item)}
+                    className="flex items-center justify-between w-full group"
+                  >
+                    <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === studyCircleId ? 'text-green-700' : ''}`}>{item.name}</span>
+                    {item.id === studyCircleId && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محددة</span>}
+                  </button>
+                )
+              },
+              {
+                key: 'max_students',
+                header: '👥 الحد الأقصى',
+                align: 'center',
+                render: (item: any) => (
+                  <span className="text-xs font-medium">{(item.max_students ?? item.capacity) || '-'}</span>
+                )
+              },
+              {
+                key: 'actions',
+                header: `⚙️ ${studentsLabels.actions}`,
+                align: 'center',
+                render: (item: any) => (
+                  <Button
+                    size="sm"
+                    disabled={item.id === studyCircleId}
+                    className={`h-7 px-3 rounded-full text-white ${item.id === studyCircleId ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'}`}
+                    onClick={() => handleSelectCircle(item)}
+                  >
+                    {item.id === studyCircleId ? '✓' : 'اختيار'}
+                  </Button>
+                )
+              }
+            ]) as Column<any>[]}
+            emptyMessage={studentsLabels.noStudents || 'لا يوجد بيانات'}
+          />
         </div>
       </FormDialog>
 
@@ -1266,7 +1805,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               columns={([
                 {
                   key: 'teacher_name',
-                  header: teacherHistoryLabels.teacherHeader,
+                  header: `🎓 ${studentsLabels.teacherColumn}`,
                   render: (item: any) => (
                     <div className="flex items-center gap-1">
                       <GraduationCap className="h-4 w-4 text-islamic-green/60" />
