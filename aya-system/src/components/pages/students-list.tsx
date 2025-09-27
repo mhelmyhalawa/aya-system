@@ -897,9 +897,24 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
   // بيانات المعلم / الحلقة / ولي الأمر المختار
   const selectedTeacher = useMemo(() => teachers.find(t => t.id === selectedTeacherId), [teachers, selectedTeacherId]);
-  const allCirclesForSelection = useMemo(() => (selectedTeacherId ? teacherStudyCircles : studyCircles), [selectedTeacherId, teacherStudyCircles, studyCircles]);
+  // جميع الحلقات المتاحة للاختيار (مع فرز أبجدي عربي/لاتيني)
+  const allCirclesForSelection = useMemo(() => {
+    const base = selectedTeacherId ? teacherStudyCircles : studyCircles;
+    // لا نعدّل المصفوفة الأصلية
+    return [...base].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar')); // فرز أبجدي
+  }, [selectedTeacherId, teacherStudyCircles, studyCircles]);
   const selectedCircle = useMemo(() => allCirclesForSelection.find(c => c.id === studyCircleId), [allCirclesForSelection, studyCircleId]);
   const selectedGuardians = useMemo(() => guardians.filter(g => selectedGuardianIds.includes(g.id) || selectedGuardianIds.includes(g.phone_number || '')), [guardians, selectedGuardianIds]);
+
+  // خريطة عدد الطلاب لكل حلقة (تعتمد على قائمة الطلاب الحالية بعد البحث)
+  const circleStudentsCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    students.forEach(st => {
+      const cid = (st as any).study_circle_id || st.study_circle_id || st.study_circle?.id;
+      if (cid) map[cid] = (map[cid] || 0) + 1;
+    });
+    return map;
+  }, [students]);
 
   const toggleGuardianSelection = (g: Guardian) => {
     const key = g.id || g.phone_number;
@@ -1272,7 +1287,13 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     type="button"
                     aria-haspopup="dialog"
                     disabled={userRole === 'teacher' && isTeacherCirclesLoading}
-                    onClick={() => setIsCirclePickerOpen(true)}
+                    onClick={() => {
+                      if ((allCirclesForSelection?.length || 0) === 0) {
+                        toast({ title: 'لا توجد حلقات متاحة', description: 'لا يمكنك فتح الاختيار حالياً لأنه لا توجد حلقات مرتبطة', variant: 'destructive' });
+                        return;
+                      }
+                      setIsCirclePickerOpen(true);
+                    }}
                     className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
                       ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
                       hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
@@ -1282,12 +1303,19 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                       <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
                         <BookOpen className="h-4 w-4" />
                       </div>
-                      <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                        {isTeacherCirclesLoading ? '...جاري التحميل' : (selectedCircle ? selectedCircle.name : (studentsLabels.studyCirclePlaceholder || 'اختر حلقة'))}
-                      </span>
+                      {isTeacherCirclesLoading ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <div className="h-3 w-20 rounded-full bg-gradient-to-r from-green-200/40 via-green-300/60 to-green-200/40 animate-pulse" />
+                          <div className="h-3 w-10 rounded-full bg-gradient-to-r from-green-200/40 via-green-300/60 to-green-200/40 animate-pulse" />
+                        </div>
+                      ) : (
+                        <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                          {selectedCircle ? selectedCircle.name : (studentsLabels.studyCirclePlaceholder || 'اختر حلقة')}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 pl-1">
-                      {selectedCircle && (
+                      {selectedCircle && !isTeacherCirclesLoading && (
                         <span
                           onClick={(e) => { e.stopPropagation(); setStudyCircleId(''); }}
                           className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
@@ -1703,6 +1731,14 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === studyCircleId ? 'text-green-700' : ''}`}>{item.name}</span>
                     {item.id === studyCircleId && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محددة</span>}
                   </button>
+                )
+              },
+              {
+                key: 'students_count',
+                header: '👥 عدد الطلاب',
+                align: 'center',
+                render: (item: any) => (
+                  <span className="text-xs font-semibold text-green-700">{circleStudentsCountMap[item.id] ?? 0}</span>
                 )
               },
               {

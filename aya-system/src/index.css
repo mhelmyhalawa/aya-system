@@ -216,3 +216,27 @@ All colors MUST be HSL.
 .dark .scroll-fade::after {
   background: linear-gradient(to top, hsl(var(--background)) 0%, hsla(var(--background)/0) 100%);
 }
+
+/* Enhanced reusable scrollbar palette */
+.scrollbar-green { scrollbar-width: thin; scrollbar-color: #16a34a #dcfce7; }
+.dark .scrollbar-green { scrollbar-color: #22c55e #14532d; }
+
+.scrollbar-green::-webkit-scrollbar { width: 10px; height: 10px; }
+.scrollbar-green::-webkit-scrollbar-track { background: linear-gradient(to bottom, #f0fdf4, #dcfce7); border-radius: 12px; }
+.dark .scrollbar-green::-webkit-scrollbar-track { background: linear-gradient(to bottom, #052e16, #134e31); }
+.scrollbar-green::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#34d399,#059669); border-radius: 12px; border: 2px solid #ecfdf5; box-shadow: 0 0 0 1px #bbf7d0 inset; }
+.dark .scrollbar-green::-webkit-scrollbar-thumb { background: linear-gradient(180deg,#16a34a,#065f46); border: 2px solid #064e3b; box-shadow: 0 0 0 1px #047857 inset; }
+.scrollbar-green::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#10b981,#047857); }
+.dark .scrollbar-green::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,#22c55e,#047857); }
+
+/* Ultra thin variant */
+.scrollbar-thin::-webkit-scrollbar { width:6px; height:6px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { border-radius: 8px; }
+
+/* Edge fade helper for any scrollable container */
+.scroll-fade-overlay { position:relative; }
+.scroll-fade-overlay::before,.scroll-fade-overlay::after { content:""; position:absolute; left:0; right:0; height:14px; pointer-events:none; z-index:5; }
+.scroll-fade-overlay::before { top:0; background:linear-gradient(to bottom,rgba(255,255,255,0.9),rgba(255,255,255,0)); }
+.scroll-fade-overlay::after { bottom:0; background:linear-gradient(to top,rgba(255,255,255,0.9),rgba(255,255,255,0)); }
+.dark .scroll-fade-overlay::before { background:linear-gradient(to bottom,rgba(0,0,0,0.85),rgba(0,0,0,0)); }
+.dark .scroll-fade-overlay::after { background:linear-gradient(to top,rgba(0,0,0,0.85),rgba(0,0,0,0)); }

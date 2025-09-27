@@ -72,6 +72,8 @@ export function GenericTable<T extends { id: string }>(props: {
     currentPageExternal?: number;
     /** رد نداء عند تغيير الصفحة داخلياً */
     onPageChange?: (page: number) => void;
+    /** تعطيل الحد الداخلي للارتفاع (max-height) للسماح للحاوية الأم بالتحكم بالتمرير */
+    noMaxHeight?: boolean;
 }) {
     const {
         data,
@@ -100,6 +102,7 @@ export function GenericTable<T extends { id: string }>(props: {
         defaultPageSize = 5,
         hideSortToggle = false,
         enableSorting = true,
+        noMaxHeight = false,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -512,9 +515,12 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* وضع الجدول */}
             {displayData.length > 0 && viewMode === 'table' && (
                 <div className="border border-green-300 dark:border-green-800 overflow-hidden bg-white 
-                dark:bg-green-950/20 shadow-[0_4px_6px_rgba(0,0,0,0.1),0_8px_15px_rgba(0,0,0,0.1)]">
+                dark:bg-green-950/20 shadow-[0_4px_6px_rgba(0,0,0,0.1),0_8px_15px_rgba(0,0,0,0.1)] h-full flex flex-col">
                     {/* تمت إزالة شريط الترقيم العلوي المستقل - تم دمجه في الهيدر */}
-                    <div className="overflow-x-auto max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar">
+                    <div className={cn(
+                        "overflow-x-auto overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay rounded-b-lg flex-1",
+                        !noMaxHeight && 'max-h-[calc(100vh-200px)]'
+                    )}>
                         <Table className="direction-rtl w-full border-collapse text-[11px] sm:text-[12px]">
                             <TableHeader className="bg-gradient-to-b from-green-700 via-green-600 to-green-500 
                             dark:from-green-900 dark:via-green-800 dark:to-green-700 sticky top-0 z-10 shadow-inner">
@@ -666,14 +672,15 @@ export function GenericTable<T extends { id: string }>(props: {
                 };
 
                 const containerClass = isMobile
-                    ? 'w-full p-2'
+                    ? 'w-full p-2 custom-scrollbar scrollbar-thin scrollbar-green scroll-fade-overlay'
                     : smallSet
-                        ? 'flex flex-col md:flex-row gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar justify-center items-stretch'
-                        : `grid gap-4 w-full p-2 max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar
-                            grid-cols-${Math.min(cardLogicalPageSize, 2)} md:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.md || cardLogicalPageSize)} lg:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.lg || cardLogicalPageSize)} xl:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.xl || cardLogicalPageSize)}`;
+                        ? cn('flex flex-col md:flex-row gap-4 w-full p-2 overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay justify-center items-stretch', !noMaxHeight && 'max-h-[calc(100vh-200px)]')
+                        : cn(`grid gap-4 w-full p-2 overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay
+                            grid-cols-${Math.min(cardLogicalPageSize, 2)} md:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.md || cardLogicalPageSize)} lg:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.lg || cardLogicalPageSize)} xl:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.xl || cardLogicalPageSize)}`,
+                            !noMaxHeight && 'max-h-[calc(100vh-200px)]');
 
                 return (
-                    <div className="w-full flex flex-col items-stretch">
+                    <div className="w-full flex flex-col items-stretch h-full">
                         {/* الترقيم مدمج في الهيدر؛ لا حاجة لعنصر علوي هنا */}
                         {/* النقاط (متمركزة) فوق الشبكة عند عدم تفعيل الترقيم */}
                         {!enablePagination && totalItems > 1 && <Dots />}

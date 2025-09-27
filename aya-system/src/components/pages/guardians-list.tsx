@@ -1314,6 +1314,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         isLoadingCircles={isLoadingTeacherCircles}
       />
 
+      { /* طلاب ولي أمر */}
       <FormDialog
         open={isStudentsListDialogOpen}
         onOpenChange={(open) => {
@@ -1327,15 +1328,17 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         onSave={() => { /* no-op (list dialog) */ }}
         showSaveButton={false}
         hideCancelButton={true}
+        fullBleedBody
         headerContent={(
-          <div className="border-b border-green-200 pb-2 flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-islamic-green flex items-center gap-2">
-              <span className="bg-green-100 p-1.5 rounded-full">
-                <UserCircle className="h-5 w-5 text-green-600" />
+          <div className="border-b border-teal-200 dark:border-teal-700 pb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-teal-700 dark:text-teal-300 flex items-center gap-2">
+              <span className="bg-teal-100 dark:bg-teal-800/60 p-1.5 rounded-full">
+                <UserCircle className="h-5 w-5 text-blue-600 dark:text-teal-300" />
               </span>
               {guardiansLabels.studentsListTitle}: {selectedGuardianName}
             </h3>
           </div>
+
         )}
       >
         <div className="py-1">
@@ -1357,6 +1360,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               defaultPageSize={3}
               pageSizeOptions={[3, 6, 12, 24, 50]}
               hideSortToggle={false}
+              noMaxHeight
               columns={[
                 {
                   key: 'row_index',
