@@ -22,7 +22,7 @@ import {
 } from '../types/memorization-record';
 import { Profile } from '../types/profile';
 import { StudyCircle } from '../types/study-circle';
-import { Table2, LayoutGrid, Plus, Pencil, Trash2, SaveIcon, NotebookPenIcon, RefreshCwIcon, List, Filter, ArrowDownAZ, ArrowUpZA, ArrowDownUp } from 'lucide-react';
+import { Table2, LayoutGrid, Plus, Pencil, Trash2, SaveIcon, NotebookPenIcon, RefreshCwIcon, List, Filter, ArrowDownAZ, ArrowUpZA, ArrowDownUp, ChevronRight } from 'lucide-react';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 
 import {
@@ -1697,8 +1697,25 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         isLoading={isLoading}
         hideCancelButton
         maxWidth="680px"
+        /* تحسينات الموبايل (نفس معالجة شاشة التقييم) */
+        mobileFullScreen
+        mobileFullWidth
+        mobileFlatStyle
+        mobileStickyHeader
+        mobileInlineActions
+        mobileFooterShadow
+        compactFooterSpacing
         extraButtons={wizardStep > 0 && (
-          <Button type="button" variant="outline" onClick={goBack} disabled={isLoading} className="min-w-[90px]">رجوع</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goBack}
+            disabled={isLoading}
+            className="flex-1 basis-0 sm:w-auto py-1.5 text-sm font-medium flex items-center justify-center"
+          >
+            <ChevronRight className="h-4 w-4" />
+            رجوع
+          </Button>
         )}
       >
         {/* مؤشرات الخطوات */}
@@ -1829,7 +1846,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             </div>
           )}
           {wizardStep === 1 && (
-            <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+            <div className="space-y-3 sm:space-y-4 pr-0 pb-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
                 <div>
                   <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2 text-sm">نوع السجل <span className="text-red-500">*</span></Label>
@@ -1899,7 +1916,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             </div>
           )}
           {wizardStep === 2 && (
-            <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+            <div className="space-y-3 sm:space-y-4 pr-0 pb-1">
               <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 sm:p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
                 <div className="grid grid-cols-1 gap-3 sm:gap-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">

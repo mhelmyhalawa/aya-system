@@ -20,7 +20,7 @@ import {
 } from '../types/assessment';
 import { Profile } from '../types/profile';
 import { StudyCircle } from '../types/study-circle';
-import { Plus, Pencil, Trash2, ClipboardList, RefreshCwIcon, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA, GraduationCap, BookOpen, User, ChevronDown, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, ClipboardList, RefreshCwIcon, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA, GraduationCap, BookOpen, User, ChevronDown, Search, ChevronRight } from 'lucide-react';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { GenericTable } from '@/components/ui/generic-table';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
@@ -58,6 +58,45 @@ interface StudentAssessmentsProps {
 const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, currentUser: propCurrentUser }) => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [filteredAssessments, setFilteredAssessments] = useState<Assessment[]>([]);
+  // Grouped (latest per student) view toggle & data
+  // تفعيل عرض آخر تقييم لكل طالب بشكل افتراضي حسب الطلب
+  const [showLatestPerStudent, setShowLatestPerStudent] = useState<boolean>(true);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
+  const [historyStudentId, setHistoryStudentId] = useState<string | null>(null);
+  const [historyStudentName, setHistoryStudentName] = useState<string>('');
+  const [historyItems, setHistoryItems] = useState<Assessment[]>([]);
+
+  // Memo: build a map of latest assessment per student with remaining count & list
+  const latestPerStudent = useMemo(() => {
+    if (!showLatestPerStudent) return null;
+    const byStudent: Record<string, Assessment[]> = {};
+    for (const a of filteredAssessments) {
+      const sid = (a as any).student_id || a.student_id || a.student?.id; // fallback chain
+      if (!sid) continue;
+      if (!byStudent[sid]) byStudent[sid] = [];
+      byStudent[sid].push(a);
+    }
+    const rows: (Assessment & { __remainingCount: number; __remainingList: Assessment[] })[] = [];
+    Object.entries(byStudent).forEach(([sid, list]) => {
+      list.sort((a, b) => {
+        // Prefer date field if exists else id desc
+        const da: any = (a as any).date || (a as any).created_at || 0;
+        const db: any = (b as any).date || (b as any).created_at || 0;
+        if (da && db && da !== db) return (da > db ? -1 : 1);
+        return (b as any).id - (a as any).id;
+      });
+      const latest = list[0];
+      const remaining = list.slice(1);
+      rows.push(Object.assign({}, latest, { __remainingCount: remaining.length, __remainingList: remaining }));
+    });
+    // Sort resulting rows by student name (optional) or keep original latest order by date
+    rows.sort((a, b) => {
+      const an = (a as any).student?.full_name || '';
+      const bn = (b as any).student?.full_name || '';
+      return an.localeCompare(bn, 'ar');
+    });
+    return rows;
+  }, [filteredAssessments, showLatestPerStudent]);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<Array<{
     id: string;
@@ -1131,7 +1170,9 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           </div>
         ) : (
           (() => {
-            const tableData = filteredAssessments.map((a, idx) => ({
+            // اختيار المصدر: آخر تقييم لكل طالب أو كل السجلات (حاليًا نعرض الأخير فقط)
+            const assessmentsSource = (showLatestPerStudent && latestPerStudent) ? latestPerStudent : filteredAssessments;
+            const tableData = assessmentsSource.map((a, idx) => ({
               ...a,
               id: String(a.id),
               __index: idx + 1,
@@ -1173,6 +1214,28 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                     )
                   },
                   { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir="rtl">{r.__display.range}</span> },
+                  ...(showLatestPerStudent ? [{
+                    key: '__remaining', header: '📂 باقي السجلات', align: 'center', render: (r: any) => {
+                      const remaining = (r as any).__remainingCount;
+                      if (remaining === undefined) return <span className="text-[10px] text-gray-400">-</span>;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHistoryStudentId(r.student_id);
+                            setHistoryStudentName(r.__display.student);
+                            setHistoryItems(((r as any).__remainingList) || []);
+                            setHistoryDialogOpen(true);
+                          }}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${remaining > 0 ? 'bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}
+                          disabled={remaining === 0}
+                          title={remaining > 0 ? 'عرض السجلات السابقة' : 'لا يوجد سجلات أخرى'}
+                        >
+                          {remaining > 0 ? `${remaining}` : '0'}
+                        </button>
+                      );
+                    }
+                  }] : []),
                   { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
                   {
                     key: 'details', header: '📊 تفاصيل الدرجات', align: 'center', render: (r: any) => {
@@ -1399,8 +1462,27 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         hideCancelButton
         maxWidth="680px"
         extraButtons={wizardStep > 0 && (
-          <Button type="button" variant="outline" onClick={() => setWizardStep(p => p - 1)} disabled={isLoading} className="min-w-[90px]">رجوع</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setWizardStep(p => p - 1)}
+            disabled={isLoading}
+            className="flex-1 basis-0 sm:w-auto py-1.5 text-sm font-medium flex items-center justify-center gap-1"
+          >
+            <ChevronRight className="h-4 w-4" />
+            رجوع
+          </Button>
         )}
+        mobileFullWidth
+        mobileFlatStyle
+        mobileStickyHeader
+        mobileFullScreen
+        mobileInlineActions
+        /* saveButtonFirst + (default) mobilePrimaryLeft=false => زر (التالي) / الحفظ يظهر أولاً DOM وبالتالي في أقصى اليمين RTL، وزر رجوع بعده في اليسار */
+        saveButtonFirst
+        mobilePrimaryLeft={false}
+        compactFooterSpacing
+        mobileFooterShadow
       >
         {/* مؤشرات الخطوات */}
         <div className="w-full mb-2" dir="rtl">
@@ -1441,7 +1523,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           {wizardStep === 0 && (
             <div className="grid gap-3 py-2">
               {/* المعلم/المشرف والحلقة */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="grid gap-1 order-last ">
                   <Label htmlFor="recorded_by" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">المسجل <span className="text-red-500">*</span></Label>
                   <Select
@@ -1450,7 +1532,6 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   >
                     <SelectTrigger
                       id="recorded_by"
-                      dir="rtl"
                       className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.recorded_by || currentUser?.id)
                         ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
                         : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
@@ -1548,7 +1629,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
               </div>
 
               {/* تاريخ التقييم ونوع الاختبار */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="grid gap-1 order-last">
                   <Label htmlFor="date" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">تاريخ الاختبار <span className="text-red-500">*</span></Label>
                   <Input
@@ -1602,7 +1683,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           {wizardStep === 1 && (
             <div className="grid gap-3 py-2">
               {/* نطاق التقييم - من */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="grid gap-1 order-last">
                   <Label htmlFor="from_ayah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">من آية <span className="text-red-500">*</span></Label>
                   <Input
@@ -1644,7 +1725,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
               </div>
 
               {/* نطاق التقييم - إلى */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="grid gap-1 order-last">
                   <Label htmlFor="to_surah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">إلى سورة <span className="text-red-500">*</span></Label>
                   <Select
@@ -1700,7 +1781,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           )}
           {wizardStep === 2 && (
             <div className="grid gap-3 py-2">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="grid gap-1 order-3">
                   <Label htmlFor="tajweed_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
                     <span>درجة التجويد</span>
@@ -1811,6 +1892,49 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         deleteButtonText="نعم، احذف التقييم"
         cancelButtonText="إلغاء"
       />
+
+      {/* حوار السجلات السابقة للطالب */}
+      <FormDialog
+        title={`السجلات السابقة - ${historyStudentName}`}
+        open={historyDialogOpen}
+        onOpenChange={setHistoryDialogOpen}
+        onSave={() => setHistoryDialogOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="760px"
+      >
+        <div className="py-1">
+          {historyItems.length === 0 ? (
+            <div className="text-center text-sm text-gray-500 py-6">لا توجد سجلات أخرى</div>
+          ) : (
+            <GenericTable
+              title=""
+              defaultView="table"
+              enablePagination
+              defaultPageSize={6}
+              pageSizeOptions={[6, 12, 24, 60]}
+              data={historyItems.map((a, i) => ({
+                ...a,
+                id: String(a.id),
+                __index: i + 1,
+                __display: formatAssessmentDisplay(a)
+              })) as any}
+              className="rounded-xl border border-green-300 shadow-sm text-[11px]"
+              getRowClassName={(_: any, index: number) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
+              hideSortToggle
+              columns={([
+                { key: '__index', header: '🔢', align: 'center', render: (r: any) => <span className='text-[10px] font-bold'>{r.__index}</span> },
+                { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
+                { key: 'type', header: '📂 النوع', align: 'right', render: (r: any) => (<Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>{r.__display.type}</Badge>) },
+                { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir='rtl'>{r.__display.range}</span> },
+                { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
+                { key: 'details', header: '📊 تفاصيل', align: 'center', render: (r: any) => { const parts: string[] = []; if (r.tajweed_score !== undefined) parts.push(`تجويد: ${formatScore(r.tajweed_score)}`); if (r.memorization_score !== undefined) parts.push(`حفظ: ${formatScore(r.memorization_score)}`); if (r.recitation_score !== undefined) parts.push(`تلاوة: ${formatScore(r.recitation_score)}`); return parts.length ? <span className='text-[10px] whitespace-pre-line'>{parts.join('\n')}</span> : <span className='text-[10px] text-gray-400'>-</span>; } }
+              ]) as any}
+              emptyMessage="لا توجد سجلات"
+            />
+          )}
+        </div>
+      </FormDialog>
 
     </div>
   );

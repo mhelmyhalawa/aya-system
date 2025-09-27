@@ -91,6 +91,27 @@ export type FormDialogProps = {
      * مفيد في القوائم أو الجداول التي نريدها تلامس الحواف الداخلية
      */
     fullBleedBody?: boolean;
+    /**
+     * في الموبايل اجعل الحاوية تمتد بعرض الشاشة بالكامل بدون حدود جانبية داخلية إضافية
+     * useful for wide multi-step wizard forms
+     */
+    mobileFullWidth?: boolean;
+    /** نمط أبسط للموبايل (خلفية بيضاء وبدون تدرج) */
+    mobileFlatStyle?: boolean;
+    /** جعل شريط العنوان / التقدم لاصق (sticky) في الأعلى بالموبايل */
+    mobileStickyHeader?: boolean;
+    /** جعل الحوار يأخذ طول الشاشة كاملاً في الموبايل (ويزارد كامل الشاشة) */
+    mobileFullScreen?: boolean;
+    /** في الموبايل: عرض أزرار الإجراءات (رجوع / التالي) جنباً إلى جنب بدلاً من تكديسها */
+    mobileInlineActions?: boolean;
+    /** في الموبايل مع inline actions ضع الزر الأساسي (التالي/حفظ) في اليسار والرجوع في اليمين */
+    mobilePrimaryLeft?: boolean;
+    /** تقليل الفراغ السفلي بين محتوى الجسم والفوتر في الموبايل (يقلل الـ padding) */
+    compactFooterSpacing?: boolean;
+    /** إضافة ظل علوي خفيف للفوتر في الموبايل لتحسين الفصل البصري */
+    mobileFooterShadow?: boolean;
+    /** اجعل زر الحفظ/التالي يُرسم أولاً (مفيد لعكس الترتيب في RTL ليظهر يميناً) */
+    saveButtonFirst?: boolean;
 };
 
 /**
@@ -112,17 +133,38 @@ export function FormDialog({
     hideCancelButton = true,
     headerContent,
     showSaveButton,
-    fullBleedBody
+    fullBleedBody,
+    mobileFullWidth = true,
+    mobileFlatStyle = false,
+    mobileStickyHeader = true,
+    mobileFullScreen = false,
+    mobileInlineActions = false,
+    mobilePrimaryLeft = false,
+    compactFooterSpacing = false,
+    mobileFooterShadow = false,
+    saveButtonFirst = false
 }: FormDialogProps) {
     const realShowSaveButton = showSaveButton !== false; // default true if undefined
     const hasFooterContent = realShowSaveButton || (!!extraButtons) || (!hideCancelButton && realShowSaveButton);
     // ديناميكيات ارتفاع الحاوية: إذا لا يوجد فوتر نلغي h-full حتى لا يظهر فراغ سفلي كبير
     // في كلا الحالتين نُبقي الحوار بكامل ارتفاع الشاشة في الموبايل، لكن بدون فوتر نجعل الجسم يتمدد ليملأ المساحة
-    const containerHeightClasses = 'h-full sm:h-auto max-h-full sm:max-h-[85vh]';
+    const containerHeightClasses = mobileFullScreen
+        ? 'h-screen sm:h-auto max-h-screen sm:max-h-[85vh]'
+        : 'h-full sm:h-auto max-h-full sm:max-h-[85vh]';
     // إذا لا يوجد فوتر فعلي نستخدم حشوة سفلية أصغر
-    const bodyBottomPaddingClass = hasFooterContent ? 'pb-24 sm:pb-1' : 'pb-2 sm:pb-1';
+    const bodyBottomPaddingClass = hasFooterContent
+        ? (compactFooterSpacing ? 'pb-16 sm:pb-1' : 'pb-24 sm:pb-1')
+        : 'pb-2 sm:pb-1';
     // دعم الإمتداد الكامل
     const bodyHorizontalPaddingClass = (typeof fullBleedBody !== 'undefined' && fullBleedBody) ? 'px-0 pr-0' : 'px-1 pr-2';
+    const hasExtraButtons = !!extraButtons;
+    // تخطيط الفوتر في الموبايل: نجعل الأزرار تأخذ نفس العرض بدون فراغ كبير بينهما
+    const footerLayoutMobile = mobileInlineActions
+        ? (mobilePrimaryLeft
+            ? (hasExtraButtons ? 'flex-row-reverse' : 'flex-row')
+            : 'flex-row')
+        : 'flex-col-reverse';
+    const saveButtonWidthClasses = mobileInlineActions ? 'flex-1 basis-0 sm:w-auto' : 'w-full sm:w-auto';
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPortal>
@@ -134,9 +176,11 @@ export function FormDialog({
                     dir="rtl"
                     style={{ maxWidth, "--dialog-max-width": maxWidth } as React.CSSProperties}
                     className={cn(
-                        "fixed inset-x-0 top-0 sm:left-[50%] sm:top-[50%] z-50 grid w-full sm:w-auto",
+                        "fixed top-0 z-50 grid",
+                        // موبايل: تمدد كامل (يمين/يسار 0) ، ديسكتوب يتوسط
+                        mobileFullWidth ? "inset-x-0 w-full sm:left-[50%] sm:top-[50%] sm:w-auto" : "inset-x-4 sm:left-[50%] sm:top-[50%] w-auto",
                         "sm:translate-x-[-50%] sm:translate-y-[-50%]",
-                        "gap-2 border p-3 sm:p-4 shadow-lg sm:rounded-lg",
+                        "gap-2 border sm:border p-2 sm:p-4 shadow-lg sm:rounded-lg",
                         "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out",
                         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -144,8 +188,9 @@ export function FormDialog({
                         "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
                         "max-w-full sm:max-w-[450px] overflow-hidden sm:overflow-visible",
                         // الخلفية الملونة هنا
-                        "bg-gradient-to-br from-teal-600 via-white to-green-50",
-                        "dark:from-teal-900 dark:via-green-950 dark:to-green-900",
+                        mobileFlatStyle
+                            ? "bg-gradient-to-br from-teal-600 via-white to-green-50 dark:from-teal-900 dark:via-green-950 dark:to-green-900"
+                            : "bg-gradient-to-br from-teal-600 via-white to-green-50 dark:from-teal-900 dark:via-green-950 dark:to-green-900",
                         containerHeightClasses
                     )}
 
@@ -169,10 +214,11 @@ export function FormDialog({
                                 {headerContent}
                             </div>
                         ) : (
-                            <div className="mt-2 sm:mt-1 mb-1 px-1 sm:px-0">
-                                {/* موبايل: العنوان مع زر الإغلاق */}
-                                <div className="flex items-center justify-between sm:hidden pr-1 pl-12">
-                                    <h3 className="text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-lg shadow-sm truncate max-w-[75%]">
+                            <div className={cn("mt-2 sm:mt-1 mb-1 px-1 sm:px-0",
+                                mobileStickyHeader && "sticky top-0 z-40 bg-white/500 dark:bg-green-950/85 backdrop-blur-sm rounded-b-md pb-1") }>
+                                {/* موبايل: العنوان وسط مستقل عن زر الإغلاق */}
+                                <div className="relative sm:hidden h-10">
+                                    <h3 className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-lg shadow-sm truncate max-w-[75%] text-center">
                                         {title}
                                     </h3>
                                 </div>
@@ -198,11 +244,12 @@ export function FormDialog({
                         <div
                             className={cn(
                                 "space-y-3 mt-1 overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay rounded-b-md min-h-0 flex flex-col",
-                                hasFooterContent
-                                    ? "max-h-[calc(100vh-155px)] sm:max-h-[55vh]"
-                                    : "flex-1",
+                                        mobileFullScreen
+                                            ? (hasFooterContent ? 'flex-1' : 'flex-1')
+                                            : (hasFooterContent ? "max-h-[calc(100vh-155px)] sm:max-h-[55vh]" : "flex-1"),
                                 bodyBottomPaddingClass,
-                                bodyHorizontalPaddingClass
+                                bodyHorizontalPaddingClass,
+                                mobileFlatStyle && "bg-white dark:bg-green-950"
                             )}
                         >
                             {children}
@@ -211,12 +258,48 @@ export function FormDialog({
                         {/* الفوتر */}
                         {hasFooterContent && (
                             <DialogFooter
-                                className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3 pt-2 
-            border-t border-gray-200 bg-background/95 backdrop-blur 
-            supports-[backdrop-filter]:bg-background/80 
-            sm:static fixed bottom-0 left-0 right-0 px-3 sm:px-0 py-3 sm:py-0"
+                                className={cn(
+                                    `flex ${footerLayoutMobile} w-full sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t border-gray-200 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static fixed bottom-0 left-0 right-0 px-3 sm:px-0 py-3 sm:py-0`,
+                                    mobileFooterShadow && 'shadow-[0_-4px_10px_-2px_rgba(0,0,0,0.12)] sm:shadow-none'
+                                )}
                             >
                                 {extraButtons}
+                                
+                                {/* ترتيب ديناميكي: إذا saveButtonFirst نرسم زر الحفظ قبل الأزرار الإضافية */}
+                                {saveButtonFirst && realShowSaveButton && (
+                                    <Button
+                                        type="button"
+                                        onClick={onSave}
+                                        disabled={isLoading}
+                                        className={cn(
+                                            "text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 shadow-md flex-1 basis-0",
+                                            saveButtonWidthClasses,
+                                            mode === "add"
+                                                ? "bg-blue-600 hover:bg-blue-700"
+                                                : "bg-green-600 hover:bg-green-700"
+                                        )}
+                                    >
+                                        {isLoading ? (
+                                            <>
+                                                <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                <span className="leading-none">جاري...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                {saveButtonText === "التالي" ? (
+                                                    <ChevronLeft className="h-4 w-4" />
+                                                ) : mode === "add" ? (
+                                                    <PlusCircle className="h-4 w-4" />
+                                                ) : (
+                                                    <Check className="h-4 w-4" />
+                                                )}
+                                                <span className="leading-none tracking-wide">{saveButtonText}</span>
+                                            </>
+                                        )}
+                                    </Button>
+                                )}
+
+                                
 
                                 {/* زر إلغاء للموبايل */}
                                 {!hideCancelButton && realShowSaveButton && (
@@ -231,14 +314,14 @@ export function FormDialog({
                                     </Button>
                                 )}
 
-                                {/* زر الحفظ */}
-                                {realShowSaveButton && (
+                                {!saveButtonFirst && realShowSaveButton && (
                                     <Button
                                         type="button"
                                         onClick={onSave}
                                         disabled={isLoading}
                                         className={cn(
-                                            "text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 w-full sm:w-auto shadow-md",
+                                            "text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 shadow-md flex-1 basis-0",
+                                            saveButtonWidthClasses,
                                             mode === "add"
                                                 ? "bg-blue-600 hover:bg-blue-700"
                                                 : "bg-green-600 hover:bg-green-700"
