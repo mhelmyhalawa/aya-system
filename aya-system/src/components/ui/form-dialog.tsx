@@ -78,6 +78,14 @@ export type FormDialogProps = {
      * إخفاء زر الإلغاء (مثلاً في نمط ويزارد ضيق)
      */
     hideCancelButton?: boolean;
+    /**
+     * محتوى مخصص للهيدر، إذا تم توفيره سيتم استبدال الهيدر الافتراضي بالكامل
+     */
+    headerContent?: React.ReactNode;
+    /**
+     * إخفاء زر الحفظ (مفيد لحوارات العرض / القوائم)
+     */
+    showSaveButton?: boolean;
 };
 
 /**
@@ -96,8 +104,11 @@ export function FormDialog({
     isLoading = false,
     maxWidth = "480px",
     extraButtons,
-    hideCancelButton = true
+    hideCancelButton = true,
+    headerContent,
+    showSaveButton
 }: FormDialogProps) {
+    const realShowSaveButton = showSaveButton !== false; // default true if undefined
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPortal>
@@ -116,13 +127,22 @@ export function FormDialog({
                     {/* الإطار الداخلي */}
                     <div>
                         {/* الهيدر */}
-                        <DialogHeader className="pb-1 flex justify-center items-center mt-12 sm:mt-1">
-                            <DialogTitle className="w-full flex justify-center">
-                                <h3 className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-green-500 text-white text-base font-semibold py-1.5 px-5 rounded-xl shadow-md transform transition-transform hover:scale-105">
-                                    <span>{title}</span>
-                                </h3>
-                            </DialogTitle>
-                        </DialogHeader>
+                        {headerContent ? (
+                            <div className="mt-12 sm:mt-1 px-1 sm:px-0">{headerContent}</div>
+                        ) : (
+                            <DialogHeader className="pb-1 flex justify-center items-center mt-12 sm:mt-1">
+                                <DialogTitle className="w-full flex justify-center">
+                                    <h3 className="flex items-center justify-center gap-2 bg-gradient-to-r from-blue-400 to-green-500 text-white text-base font-semibold py-1.5 px-5 rounded-xl shadow-md transform transition-transform hover:scale-105">
+                                        <span>{title}</span>
+                                    </h3>
+                                </DialogTitle>
+                                {description && (
+                                    <DialogDescription className="text-xs text-center mt-1 text-muted-foreground">
+                                        {description}
+                                    </DialogDescription>
+                                )}
+                            </DialogHeader>
+                        )}
 
                         {/* الجسم */}
                         <div className="space-y-3 mt-2 pb-24 sm:pb-1 px-1 max-h-[calc(100vh-170px)] sm:max-h-[55vh] overflow-auto">
@@ -133,7 +153,7 @@ export function FormDialog({
                         <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t border-gray-200 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static fixed bottom-0 left-0 right-0 px-3 sm:px-0 py-3 sm:py-0">
                             {extraButtons}
                             {/* زر إغلاق إضافي في الفوتر للأجهزة المحمولة */}
-                            {!hideCancelButton && (
+                            {!hideCancelButton && realShowSaveButton && (
                                 <Button
                                     type="button"
                                     onClick={() => onOpenChange(false)}
@@ -144,35 +164,37 @@ export function FormDialog({
                                     {cancelButtonText}
                                 </Button>
                             )}
-                            <Button
-                                type="button"
-                                onClick={onSave}
-                                disabled={isLoading}
-                                className={cn(
-                                    "text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 w-full sm:w-auto shadow-md",
-                                    mode === "add"
-                                        ? "bg-blue-600 hover:bg-blue-700"
-                                        : "bg-green-600 hover:bg-green-700"
-                                )}
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        <span className="leading-none">جاري...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        {saveButtonText === 'التالي' ? (
-                                            <ChevronLeft className="h-4 w-4" />
-                                        ) : mode === 'add' ? (
-                                            <PlusCircle className="h-4 w-4" />
-                                        ) : (
-                                            <Check className="h-4 w-4" />
-                                        )}
-                                        <span className="leading-none tracking-wide">{saveButtonText}</span>
-                                    </>
-                                )}
-                            </Button>
+                            {realShowSaveButton && (
+                                <Button
+                                    type="button"
+                                    onClick={onSave}
+                                    disabled={isLoading}
+                                    className={cn(
+                                        "text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 w-full sm:w-auto shadow-md",
+                                        mode === "add"
+                                            ? "bg-blue-600 hover:bg-blue-700"
+                                            : "bg-green-600 hover:bg-green-700"
+                                    )}
+                                >
+                                    {isLoading ? (
+                                        <>
+                                            <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            <span className="leading-none">جاري...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            {saveButtonText === 'التالي' ? (
+                                                <ChevronLeft className="h-4 w-4" />
+                                            ) : mode === 'add' ? (
+                                                <PlusCircle className="h-4 w-4" />
+                                            ) : (
+                                                <Check className="h-4 w-4" />
+                                            )}
+                                            <span className="leading-none tracking-wide">{saveButtonText}</span>
+                                        </>
+                                    )}
+                                </Button>
+                            )}
 
 
                         </DialogFooter>

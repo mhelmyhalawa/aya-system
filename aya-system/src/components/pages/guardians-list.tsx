@@ -11,7 +11,7 @@ import { getAllGuardians, searchGuardians, deleteGuardian, exportGuardiansToJson
 import { getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { addStudent } from "@/lib/supabase-service";
 import { getteachers } from "@/lib/profile-service";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"; // legacy usages elsewhere
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -1315,160 +1315,144 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         isLoadingCircles={isLoadingTeacherCircles}
       />
 
-      <Dialog modal={false} open={isStudentsListDialogOpen} onOpenChange={(open) => {
-        // إذا تم إغلاق قائمة الطلاب أثناء وجود نموذج الطالب مفتوح لا نغلقه قسرياً
-        setIsStudentsListDialogOpen(open);
-        if (!open) {
-          setEditingFromStudentsList(false);
-        }
-      }}>
-        <DialogContent dir="rtl" className="bg-gradient-to-r from-green-100 via-green-200 to-green-100 sm:max-w-[750px] max-h-[70vh] overflow-y-auto">
-          <DialogHeader className="border-b border-green-200">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="text-sm text-islamic-green flex items-center gap-2">
-                <span className="bg-green-100 p-1.5 rounded-full">
-                  <UserCircle className="h-5 w-5 text-green-600" />
-                </span>
-                {guardiansLabels.studentsListTitle}: {selectedGuardianName}
-              </DialogTitle>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={reloadGuardianStudents}
-                  disabled={isLoadingGuardianStudents}
-                  className="h-7 w-7 p-0 rounded-lg"
-                  title={guardiansLabels.refresh}
-                >
-                  <RefreshCw className={`h-4 w-4 ${isLoadingGuardianStudents ? 'animate-spin text-green-500' : 'text-green-600 dark:text-green-300'}`} />
-                </Button>
-              </div>
-            </div>
-          </DialogHeader>
-
-
-          <div className="py-2">
-            {isLoadingGuardianStudents ? (
-              <div className="flex flex-col items-center justify-center py-8">
-                <RefreshCw className="h-8 w-8 animate-spin text-green-600 mb-3" />
-                <p className="text-sm text-muted-foreground">{commonLabels.loading || '...'} </p>
-              </div>
-            ) : selectedGuardianStudents.length > 0 ? (
-              <GenericTable<typeof selectedGuardianStudents[0] & { id: string }>
-                data={selectedGuardianStudents.map((student, index) => ({
-                  ...student,
-                  id: student.id.toString(),
-                  serial: index + 1,
-                  index: index + 1
-                }))}
-                defaultView="table"
-                enablePagination
-                defaultPageSize={3}
-                pageSizeOptions={[3, 6, 12, 24, 50]}
-                hideSortToggle={false}
-                columns={[
-                  {
-                    key: 'row_index',
-                    header: '🔢',
-                    align: 'center' as const,
-                    render: (_student, globalIndex) => (globalIndex ?? 0) + 1,
-                  },
-                  {
-                    key: 'full_name',
-                    header: `👤 ${studentsLabels.name}`,
-                    align: 'center' as const,
-                    important: true,
-                    render: (student) => (
-                      <span className="font-medium whitespace-pre-line leading-snug">{student.full_name}</span>
-                    ),
-                  },
-                  {
-                    key: 'grade',
-                    header: guardiansLabels.studentGradeHeader,
-                    align: 'center' as const,
-                    render: (student) => getGradeLabel(student.grade_level ?? student.grade ?? null),
-                  },
-                  {
-                    key: 'gender',
-                    header: guardiansLabels.studentGenderHeader,
-                    align: 'center' as const,
-                    render: (student) =>
-                      student.gender === 'male'
-                        ? studentsLabels.genderMale
-                        : student.gender === 'female'
-                          ? studentsLabels.genderFemale
-                          : '-',
-                  },
-                  {
-                    key: 'memorized_parts',
-                    header: guardiansLabels.studentLastQuranHeader,
-                    align: 'center' as const,
-                    render: (student) => getMemorizedPartsLabel(student.memorized_parts),
-                  },
-                  {
-                    key: 'teacher_name',
-                    header: guardiansLabels.studentTeacherHeader,
-                    align: 'center' as const,
-                    render: (student) => student.teacher_name || commonLabels.none,
-                  },
-                  {
-                    key: 'circle_name',
-                    header: guardiansLabels.studentCircleHeader,
-                    align: 'center' as const,
-                    render: (student) => student.circle_name || commonLabels.none,
-                  },
-                  ...(userRole === 'superadmin'
-                    ? [
-                      {
-                        key: 'actions',
-                        header: guardiansLabels.studentActionsHeader,
-                        align: 'center' as const,
-                        render: (student: any) => (
-                          <div className="flex justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEditStudentFromGuardianList(student)}
-                              title={guardiansLabels.studentEditTooltip}
-                              className="h-6 w-6 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                              data-stop="true"
-                            >
-                              <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => requestDeleteStudent(student.id)}
-                              title={guardiansLabels.studentDeleteTooltip}
-                              className="h-6 w-6 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                              data-stop="true"
-                            >
-                              <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                            </button>
-                          </div>
-                        ),
-                      } as const,
-                    ]
-                    : []),
-                ]}
-                emptyMessage={guardiansLabels.noStudentsForGuardian}
-                className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
-                getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
-              />
-
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8">
-                <Database className="h-10 w-10 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">{guardiansLabels.noStudentsForGuardian}</p>
-              </div>
-            )}
+      <FormDialog
+        open={isStudentsListDialogOpen}
+        onOpenChange={(open) => {
+          setIsStudentsListDialogOpen(open);
+          if (!open) {
+            setEditingFromStudentsList(false);
+          }
+        }}
+        title={`${guardiansLabels.studentsListTitle}: ${selectedGuardianName}`}
+        maxWidth="750px"
+        onSave={() => { /* no-op (list dialog) */ }}
+        showSaveButton={false}
+        hideCancelButton={true}
+        headerContent={(
+          <div className="border-b border-green-200 pb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-islamic-green flex items-center gap-2">
+              <span className="bg-green-100 p-1.5 rounded-full">
+                <UserCircle className="h-5 w-5 text-green-600" />
+              </span>
+              {guardiansLabels.studentsListTitle}: {selectedGuardianName}
+            </h3>
           </div>
-
-          <DialogFooter dir="rtl">
-            <Button variant="outline" onClick={() => setIsStudentsListDialogOpen(false)}>
-              {guardiansLabels.closeDialog}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      >
+        <div className="py-1">
+          {isLoadingGuardianStudents ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <RefreshCw className="h-8 w-8 animate-spin text-green-600 mb-3" />
+              <p className="text-sm text-muted-foreground">{commonLabels.loading || '...'} </p>
+            </div>
+          ) : selectedGuardianStudents.length > 0 ? (
+            <GenericTable<typeof selectedGuardianStudents[0] & { id: string }>
+              data={selectedGuardianStudents.map((student, index) => ({
+                ...student,
+                id: student.id.toString(),
+                serial: index + 1,
+                index: index + 1
+              }))}
+              defaultView="table"
+              enablePagination
+              defaultPageSize={3}
+              pageSizeOptions={[3, 6, 12, 24, 50]}
+              hideSortToggle={false}
+              columns={[
+                {
+                  key: 'row_index',
+                  header: '🔢',
+                  align: 'center' as const,
+                  render: (_student, globalIndex) => (globalIndex ?? 0) + 1,
+                },
+                {
+                  key: 'full_name',
+                  header: `👤 ${studentsLabels.name}`,
+                  align: 'center' as const,
+                  important: true,
+                  render: (student) => (
+                    <span className="font-medium whitespace-pre-line leading-snug">{student.full_name}</span>
+                  ),
+                },
+                {
+                  key: 'grade',
+                  header: guardiansLabels.studentGradeHeader,
+                  align: 'center' as const,
+                  render: (student) => getGradeLabel(student.grade_level ?? student.grade ?? null),
+                },
+                {
+                  key: 'gender',
+                  header: guardiansLabels.studentGenderHeader,
+                  align: 'center' as const,
+                  render: (student) =>
+                    student.gender === 'male'
+                      ? studentsLabels.genderMale
+                      : student.gender === 'female'
+                        ? studentsLabels.genderFemale
+                        : '-',
+                },
+                {
+                  key: 'memorized_parts',
+                  header: guardiansLabels.studentLastQuranHeader,
+                  align: 'center' as const,
+                  render: (student) => getMemorizedPartsLabel(student.memorized_parts),
+                },
+                {
+                  key: 'teacher_name',
+                  header: guardiansLabels.studentTeacherHeader,
+                  align: 'center' as const,
+                  render: (student) => student.teacher_name || commonLabels.none,
+                },
+                {
+                  key: 'circle_name',
+                  header: guardiansLabels.studentCircleHeader,
+                  align: 'center' as const,
+                  render: (student) => student.circle_name || commonLabels.none,
+                },
+                ...(userRole === 'superadmin'
+                  ? [
+                    {
+                      key: 'actions',
+                      header: guardiansLabels.studentActionsHeader,
+                      align: 'center' as const,
+                      render: (student: any) => (
+                        <div className="flex justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditStudentFromGuardianList(student)}
+                            title={guardiansLabels.studentEditTooltip}
+                            className="h-6 w-6 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            data-stop="true"
+                          >
+                            <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => requestDeleteStudent(student.id)}
+                            title={guardiansLabels.studentDeleteTooltip}
+                            className="h-6 w-6 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            data-stop="true"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                          </button>
+                        </div>
+                      ),
+                    } as const,
+                  ]
+                  : []),
+              ]}
+              emptyMessage={guardiansLabels.noStudentsForGuardian}
+              className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
+              getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Database className="h-10 w-10 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">{guardiansLabels.noStudentsForGuardian}</p>
+            </div>
+          )}
+        </div>
+      </FormDialog>
 
       {/* حوار تأكيد حذف طالب (داخل قائمة طلاب ولي الأمر) */}
       <DeleteConfirmationDialog
