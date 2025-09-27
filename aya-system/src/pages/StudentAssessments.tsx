@@ -47,7 +47,8 @@ import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from '@radix-ui/react-tabs';
+// تمت إزالة مكونات Tabs لصالح معالج خطوات بسيط (Wizard)
 
 interface StudentAssessmentsProps {
   onNavigate: (path: string) => void;
@@ -58,13 +59,12 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [filteredAssessments, setFilteredAssessments] = useState<Assessment[]>([]);
   const [students, setStudents] = useState<any[]>([]);
-  const [teachers, setTeachers] = useState<{
+  const [teachers, setTeachers] = useState<Array<{
     id: string;
     full_name: string;
     role?: 'teacher' | 'admin' | 'superadmin' | string;
-  }[]>([]);
+  }>>([]);
   const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
-  // اختيار متعدد للطلاب في الفلاتر (الواجهة الرئيسية) - إذا كانت القائمة فارغة نعتبره "الجميع"
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all-teachers');
   const [selectedCircleId, setSelectedCircleId] = useState<string>('all-circles');
@@ -76,18 +76,42 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [currentUser, setCurrentUser] = useState<any>(propCurrentUser);
   const [activeTab, setActiveTab] = useState(propCurrentUser?.role === 'teacher' ? 'my-assessments' : 'all-assessments');
   const [tableExists, setTableExists] = useState<boolean>(true);
-  // إظهار/إخفاء أدوات الفلترة الإضافية
   const [showFilters, setShowFilters] = useState<boolean>(false);
-  // اتجاه الترتيب (حسب اسم الطالب)
   const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc' | null>(null);
-  // حوارات اختيار
   const [isTeacherPickerOpen, setIsTeacherPickerOpen] = useState(false);
   const [isStudentPickerOpen, setIsStudentPickerOpen] = useState(false);
   const [isCirclePickerOpen, setIsCirclePickerOpen] = useState(false);
-  // مصطلحات البحث داخل الحوارات
   const [teacherSearchTerm, setteacherSearchTerm] = useState('');
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [circlePickerSearch, setCirclePickerSearch] = useState('');
+  const [wizardStep, setWizardStep] = useState<number>(0);
+
+  // دالة تحقق بسيطة لكل خطوة قبل الانتقال
+  const validateWizardStep = (): boolean => {
+    // إعادة تعيين أخطاء الحقول التي تخص الخطوة الحالية فقط
+    const newErrors: any = {};
+    if (wizardStep === 0) {
+      if (!formData.student_id) newErrors.student_id = 'الطالب مطلوب';
+      if (!formData.recorded_by) newErrors.recorded_by = 'المسجل مطلوب';
+      if (!formData.date) newErrors.date = 'التاريخ مطلوب';
+      if (!formData.type) newErrors.type = 'نوع الاختبار مطلوب';
+    } else if (wizardStep === 1) {
+      if (!formData.from_surah) newErrors.from_surah = 'السورة مطلوبة';
+      if (!formData.from_ayah) newErrors.from_ayah = 'الآية مطلوبة';
+      if (!formData.to_surah) newErrors.to_surah = 'السورة مطلوبة';
+      if (!formData.to_ayah) newErrors.to_ayah = 'الآية مطلوبة';
+      // تحقق إضافي: النطاق منطقي
+      if (formData.from_surah && formData.to_surah) {
+        const fromPair = `${formData.from_surah}-${formData.from_ayah || 0}`;
+        const toPair = `${formData.to_surah}-${formData.to_ayah || 0}`;
+        if (fromPair === toPair) {
+          newErrors.to_ayah = 'يجب أن يختلف نطاق البداية عن النهاية';
+        }
+      }
+    }
+    setFormErrors((prev: any) => ({ ...prev, ...newErrors }));
+    return Object.keys(newErrors).length === 0;
+  };
 
   // اشتقاقات مساعدة
   const isAllStudentsSelected = selectedStudentIds.length === 0; // فارغ يعني الجميع
@@ -144,6 +168,18 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const toggleListSort = () => {
     setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
   };
+
+  // تمرير لأعلى محتوى الحوار عند تغيير الخطوة لتحسين التجربة
+  useEffect(() => {
+    if (!isDialogOpen) return;
+    try {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (dialog) {
+        const scrollable = dialog.querySelector('.custom-scrollbar');
+        (scrollable as HTMLElement | null)?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (_) { /* تجاهل أية أخطاء DOM */ }
+  }, [wizardStep, isDialogOpen]);
 
   const handleAddNewRecord = () => {
     handleAddAssessment();
@@ -245,29 +281,29 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             assessmentService.getAllAssessments(),
             getAllStudyCircles()
           ]);
-          
+
           // تحليل بيانات الطلاب للتشخيص
           if (studentsData && studentsData.length > 0) {
             console.log(`تم تحميل ${studentsData.length} طالب`);
-            
+
             // تحقق من وجود study_circle_id للطلاب
             const studentsWithCircle = studentsData.filter(s => s.study_circle_id);
             console.log(`عدد الطلاب المرتبطين بحلقات: ${studentsWithCircle.length} (${Math.round(studentsWithCircle.length / studentsData.length * 100)}%)`);
-            
+
             // عرض معرفات الحلقات الفريدة
             const uniqueCircleIds = [...new Set(studentsData.map(s => s.study_circle_id).filter(Boolean))];
             console.log(`معرفات الحلقات الفريدة في بيانات الطلاب: ${uniqueCircleIds.length}`, uniqueCircleIds);
-            
+
             // تحقق من تطابق معرفات الحلقات مع الحلقات المحملة
             const circleIdsInData = circlesData.map(c => c.id);
             const matchingCircleIds = uniqueCircleIds.filter(id => circleIdsInData.includes(id));
             console.log(`عدد معرفات الحلقات المطابقة: ${matchingCircleIds.length} من أصل ${uniqueCircleIds.length}`);
-            
+
             if (matchingCircleIds.length < uniqueCircleIds.length) {
               console.warn('هناك معرفات حلقات في بيانات الطلاب غير موجودة في بيانات الحلقات!');
             }
           }
-          
+
           setStudents(studentsData);
           setTeachers(teachersData);
           setAssessments(assessmentsData);
@@ -391,7 +427,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       console.log('لا توجد بيانات طلاب متاحة');
       return [];
     }
-    
+
     // عند إضافة/تعديل تقييم، نريد عرض جميع الطلاب إذا كان النموذج مفتوحًا
     if (isDialogOpen) {
       // في حالة تحديد حلقة في النموذج، أظهر فقط طلاب تلك الحلقة
@@ -400,7 +436,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         console.log(`تم فلترة الطلاب للحلقة ${selectedCircleId} في وضع النموذج:`, filtered.length);
         return filtered;
       }
-      
+
       // في حالة تحديد معلم في النموذج، أظهر فقط طلاب ذلك المعلم
       if (selectedTeacherId !== 'all-teachers') {
         // الطلاب الذين يشرف عليهم المعلم مباشرة
@@ -409,21 +445,21 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         const teacherCircleIds = studyCircles
           .filter(circle => circle.teacher_id === selectedTeacherId)
           .map(circle => circle.id);
-        const circleStudents = students.filter(student => 
+        const circleStudents = students.filter(student =>
           student.study_circle_id && teacherCircleIds.includes(student.study_circle_id)
         );
-        
+
         // دمج القائمتين وإزالة التكرار
         const filtered = [...new Set([...teacherStudents, ...circleStudents])];
         console.log(`تم فلترة الطلاب للمعلم ${selectedTeacherId} في وضع النموذج:`, filtered.length);
         return filtered;
       }
-      
+
       // إذا لم يتم تحديد أي فلتر، أظهر جميع الطلاب
       console.log('عرض جميع الطلاب في وضع النموذج:', students.length);
       return students;
     }
-    
+
     // فلترة عادية للعرض في الواجهة الرئيسية
     const filtered = students.filter(student => {
       // إذا تم تحديد معلم، أظهر فقط طلاب هذا المعلم
@@ -431,9 +467,9 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         const teacherCircleIds = studyCircles
           .filter(circle => circle.teacher_id === selectedTeacherId)
           .map(circle => circle.id);
-          
-        if (student.teacher_id !== selectedTeacherId && 
-            !(student.study_circle_id && teacherCircleIds.includes(student.study_circle_id))) {
+
+        if (student.teacher_id !== selectedTeacherId &&
+          !(student.study_circle_id && teacherCircleIds.includes(student.study_circle_id))) {
           return false;
         }
       }
@@ -447,14 +483,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
 
       return true;
     });
-    
+
     console.log('تم فلترة الطلاب للعرض العادي:', {
       total: students.length,
       filtered: filtered.length,
       selectedTeacher: selectedTeacherId,
       selectedCircle: selectedCircleId
     });
-    
+
     return filtered;
   }, [students, selectedTeacherId, selectedCircleId, isDialogOpen, studyCircles]);
 
@@ -733,11 +769,11 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     const studentFromAssessment = assessment.student;
     // وإلا نبحث في قائمة الطلاب
     const studentFromList = students.find(s => s.id === assessment.student_id);
-    
+
     // نستخدم البيانات المتاحة
     const student = studentFromAssessment || studentFromList;
     const teacher = teachers.find(t => t.id === assessment.recorded_by);
-    
+
     // نحصل على بيانات ولي الأمر - قد تكون في student أو في student.guardian
     let guardianName;
     if (student?.guardian?.full_name) {
@@ -858,22 +894,39 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
               className="w-full md:w-[380px] bg-green-50 rounded-lg shadow-inner p-0.5"
             >
               <TabsList className="grid w-full grid-cols-2 gap-0.5 rounded-lg bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
+                {/* Tab جميع السجلات */}
                 <TabsTrigger
-                  value="all-records"
-                  className="flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                  value="all-assessments"
+                  className="
+                        flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+                        rounded-md text-green-800 py-1.5 px-2
+                        hover:bg-green-100 hover:text-green-900
+                        data-[state=active]:bg-islamic-green
+                        data-[state=active]:text-white
+                        transition-all duration-200
+                "
                   title='جميع السجلات'
                 >
                   📋 <span className="hidden sm:inline">جميع السجلات</span>
                 </TabsTrigger>
                 <TabsTrigger
                   value="my-records"
-                  className="flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                  className="
+                            flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+                            rounded-md text-green-800 py-1.5 px-2
+                            hover:bg-green-100 hover:text-green-900
+                            data-[state=active]:bg-islamic-green
+                            data-[state=active]:text-white
+                            transition-all duration-200
+                "
                   title='سجلاتي فقط'
                 >
                   👤 <span className="hidden sm:inline">سجلاتي</span>
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+
+
             <div className="flex gap-2 items-center">
               {/* زر الفلتر */}
               <Button
@@ -912,7 +965,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
               <Button
                 onClick={handleAddNewRecord}
                 variant="outline"
-                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 
+                dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                 title='إضافة سجل جديد'
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -1089,42 +1143,49 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                 defaultView="table"
                 enablePagination
                 defaultPageSize={10}
-                pageSizeOptions={[10,20,50,100]}
+                pageSizeOptions={[10, 20, 50, 100]}
                 hideSortToggle
                 data={tableData as any}
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
                 getRowClassName={(_: any, index: number) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`}
                 columns={([
                   { key: '__index', header: '🔢', align: 'center', render: (r: any) => <span className="text-[11px] font-bold text-gray-600">{r.__index}</span> },
-                  { key: 'student', header: '👦 الطالب', align: 'right', render: (r: any) => (
+                  {
+                    key: 'student', header: '👦 الطالب', align: 'right', render: (r: any) => (
                       <div className="font-medium text-right">
                         {r.__display.student}
                         {r.__display.hasGuardian && (
                           <div className="text-[10px] text-red-800 dark:text-red-700">{r.__display.guardian}</div>
                         )}
                       </div>
-                    ) },
+                    )
+                  },
                   ...(activeTab !== 'my-records' ? [
                     { key: 'teacher', header: '👨‍🏫 المعلم', align: 'right', render: (r: any) => r.__display.teacher || 'غير معروف' }
                   ] : []),
                   { key: 'circle', header: '📚 الحلقة', align: 'right', render: (r: any) => r.student?.study_circle ? (r.student.study_circle.name || `حلقة ${r.student.study_circle.id}`) : 'غير محدد' },
                   { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
-                  { key: 'type', header: '📂 النوع', align: 'right', render: (r: any) => (
+                  {
+                    key: 'type', header: '📂 النوع', align: 'right', render: (r: any) => (
                       <Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>
                         {r.__display.type}
                       </Badge>
-                    ) },
+                    )
+                  },
                   { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir="rtl">{r.__display.range}</span> },
                   { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
-                  { key: 'details', header: '📊 تفاصيل الدرجات', align: 'center', render: (r: any) => {
+                  {
+                    key: 'details', header: '📊 تفاصيل الدرجات', align: 'center', render: (r: any) => {
                       const parts: string[] = [];
                       if (r.tajweed_score !== undefined) parts.push(`تجويد: ${formatScore(r.tajweed_score)}`);
                       if (r.memorization_score !== undefined) parts.push(`حفظ: ${formatScore(r.memorization_score)}`);
                       if (r.recitation_score !== undefined) parts.push(`تلاوة: ${formatScore(r.recitation_score)}`);
                       if (parts.length === 0) return <span className="text-[10px] text-gray-400">-</span>;
                       return <span className="text-[10px] leading-4 whitespace-pre-line text-gray-600">{parts.join('\n')}</span>;
-                    } },
-                  { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
+                    }
+                  },
+                  {
+                    key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
                       <div className="flex justify-center items-center gap-1">
                         <Button
                           variant="ghost"
@@ -1145,7 +1206,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                           <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
                         </Button>
                       </div>
-                    ) }
+                    )
+                  }
                 ]) as any}
                 emptyMessage="لا توجد تقييمات"
               />
@@ -1181,28 +1243,34 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             defaultView="table"
             enablePagination
             defaultPageSize={4}
-            pageSizeOptions={[4,8,16,48,100]}
+            pageSizeOptions={[4, 8, 16, 48, 100]}
             data={filteredTeachersForPicker as any}
             getRowClassName={(item: any, index: number) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
             hideSortToggle
             className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
             columns={([
-              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0)+1}</span>) },
-              { key: 'full_name', header: '👨‍🏫 المعلم', align: 'center', render: (item: any) => {
+              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>) },
+              {
+                key: 'full_name', header: '👨‍🏫 المعلم', align: 'center', render: (item: any) => {
                   const selected = item.id === selectedTeacherId;
                   return (
                     <button type="button" onClick={() => { setSelectedTeacherId(item.id); setSelectedCircleId('all-circles'); clearStudentSelection(); setIsTeacherPickerOpen(false); }} className="w-full flex items-center justify-center group px-1">
                       <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span>
                     </button>
-                  ); } },
-              { key: 'circles_count', header: '📘 الحلقات', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{studyCircles.filter(c=>c.teacher_id===item.id).length}</span>) },
-              { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => {
+                  );
+                }
+              },
+              { key: 'circles_count', header: '📘 الحلقات', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{studyCircles.filter(c => c.teacher_id === item.id).length}</span>) },
+              {
+                key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => {
                   const selected = item.id === selectedTeacherId;
                   return (
                     <div className="flex items-center justify-center">
                       <button type="button" onClick={() => { setSelectedTeacherId(item.id); setSelectedCircleId('all-circles'); clearStudentSelection(); setIsTeacherPickerOpen(false); }} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}>✓</button>
                     </div>
-                  ); } }
+                  );
+                }
+              }
             ]) as any}
             emptyMessage={'لا يوجد بيانات'}
           />
@@ -1243,13 +1311,13 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             defaultView="table"
             enablePagination
             defaultPageSize={6}
-            pageSizeOptions={[6,12,24,60]}
+            pageSizeOptions={[6, 12, 24, 60]}
             data={filteredStudentsForPicker as any}
             getRowClassName={(item: any, index: number) => `${selectedStudentIds.includes(item.id) ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
             hideSortToggle
             className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
             columns={([
-              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0)+1}</span>) },
+              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>) },
               { key: 'full_name', header: '👦 الطالب', align: 'center', render: (item: any) => { const selected = selectedStudentIds.includes(item.id); return (<button type="button" onClick={() => toggleStudentSelection(item.id)} className="w-full flex items-center justify-center group px-1"><span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span></button>); } },
               { key: 'guardian', header: '👪 ولي الأمر', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px]">{item.guardian?.full_name || '-'}</span>) },
               { key: 'circle', header: '📘 الحلقة', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px]">{item.study_circle?.name || '-'}</span>) },
@@ -1287,15 +1355,15 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             defaultView="table"
             enablePagination
             defaultPageSize={4}
-            pageSizeOptions={[4,8,16,48,100]}
+            pageSizeOptions={[4, 8, 16, 48, 100]}
             data={filteredCirclesForPicker as any}
             getRowClassName={(item: any, index: number) => `${item.id === selectedCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
             hideSortToggle
             className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
             columns={([
-              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0)+1}</span>) },
+              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>) },
               { key: 'name', header: '📘 الحلقة', align: 'center', render: (item: any) => { const selected = item.id === selectedCircleId; return (<button type="button" onClick={() => { setSelectedCircleId(item.id); clearStudentSelection(); setIsCirclePickerOpen(false); }} className="w-full flex items-center justify-center group px-1"><span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.name}</span></button>); } },
-              { key: 'students_count', header: '👥 العدد', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{students.filter(s=>s.study_circle_id===item.id).length}</span>) },
+              { key: 'students_count', header: '👥 العدد', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{students.filter(s => s.study_circle_id === item.id).length}</span>) },
               { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => { const selected = item.id === selectedCircleId; return (<div className="flex items-center justify-center"><button type="button" onClick={() => { setSelectedCircleId(item.id); clearStudentSelection(); setIsCirclePickerOpen(false); }} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`} title={selected ? 'محددة' : 'تحديد'}>✓</button></div>); } }
             ]) as any}
             emptyMessage={'لا يوجد بيانات'}
@@ -1308,369 +1376,417 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       <FormDialog
         title={assessmentToEdit ? '✏️ تعديل تقييم الطالب' : '✨ إضافة تقييم طالب جديد'}
         open={isDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
+        onOpenChange={(o) => {
+          if (!o) {
             const defaultTeacherId = currentUser?.role === 'teacher' ? currentUser.id : 'all-teachers';
             if (selectedTeacherId !== defaultTeacherId) setSelectedTeacherId(defaultTeacherId);
             if (selectedCircleId !== 'all-circles') setSelectedCircleId('all-circles');
+            setIsDialogOpen(false);
+          } else {
+            setIsDialogOpen(true);
           }
-          setIsDialogOpen(open);
         }}
-        onSave={handleSaveAssessment}
         mode={assessmentToEdit ? 'edit' : 'add'}
-        saveButtonText={isLoading ? 'جاري الحفظ...' : (assessmentToEdit ? '✓ تحديث التقييم' : '✓ إضافة التقييم')}
-        isLoading={isLoading}
-        maxWidth="540px"
+        onSave={() => {
+          if (wizardStep < 2) {
+            if (validateWizardStep()) setWizardStep(prev => prev + 1);
+          } else {
+            handleSaveAssessment();
+          }
+        }}
+        saveButtonText={wizardStep < 2 ? 'التالي' : (isLoading ? 'جاري الحفظ...' : (assessmentToEdit ? '✓ تحديث التقييم' : '✓ إضافة التقييم'))}
+        isLoading={wizardStep === 2 && isLoading}
+        hideCancelButton
+        maxWidth="680px"
+        extraButtons={wizardStep > 0 && (
+          <Button type="button" variant="outline" onClick={() => setWizardStep(p => p - 1)} disabled={isLoading} className="min-w-[90px]">رجوع</Button>
+        )}
       >
-        <div className="bg-white dark:bg-gray-900 p-3 md:p-4 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700" dir="rtl">
-          {assessmentToEdit && visibleStudents.length > 0 && (
-            <div className="mt-2 p-2 mb-3 bg-blue-50 border border-blue-100 rounded-md">
-              <div className="flex flex-col gap-1 text-center">
-                <span className="text-sm font-medium">
-                  <span className="text-blue-700">الطالب:</span> {visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.full_name}
-                </span>
-                <span className="text-xs text-gray-600">
-                  <span className="text-blue-700">ولي الأمر:</span> {
-                    visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.guardian?.full_name || 'لم يتم تسجيل بيانات ولي الأمر'
-                  }
-                </span>
-              </div>
-            </div>
-          )}
-            <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="flex flex-row-reverse w-full mb-3 bg-gradient-to-r from-blue-100 to-green-100 p-1 rounded-lg">
-                <TabsTrigger value="basic" className="flex-1 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-green-800 data-[state=active]:shadow-sm">
-                  <span className="flex items-center justify-center gap-1">📋 معلومات أساسية</span>
-                </TabsTrigger>
-                <TabsTrigger value="range" className="flex-1 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-green-800 data-[state=active]:shadow-sm">
-                  <span className="flex items-center justify-center gap-1">📖 نطاق الاختبار</span>
-                </TabsTrigger>
-                <TabsTrigger value="scores" className="flex-1 text-sm font-medium data-[state=active]:bg-white data-[state=active]:text-green-800 data-[state=active]:shadow-sm">
-                  <span className="flex items-center justify-center gap-1">🏆 الدرجات</span>
-                </TabsTrigger>
-              </TabsList>
+        {/* مؤشرات الخطوات */}
+        <div className="w-full mb-2" dir="rtl">
+          <div className="flex items-center justify-center gap-2">
+            {['معلومات', 'النطاق', 'الدرجات'].map((label, i) => {
+              const active = i === wizardStep; const done = i < wizardStep;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  aria-label={`الخطوة ${i + 1}`}
+                  onClick={() => (i < wizardStep ? setWizardStep(i) : null)}
+                  className={`w-8 h-8 flex items-center justify-center rounded-full text-[11px] font-bold border transition-colors shadow-sm ${active ? 'bg-green-600 text-white border-green-600' : done ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-100'}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-full bg-green-600 transition-all" style={{ width: `${((wizardStep + 1) / 3) * 100}%` }} />
+          </div>
+        </div>
 
-              {/* الصفحة الأولى - المعلومات الأساسية */}
-              <TabsContent value="basic" className="mt-0">
-                <div className="grid gap-3 py-2">
-                  {/* المعلم/المشرف والحلقة */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1 order-last ">
-                      <Label htmlFor="recorded_by" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">المسجل <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.recorded_by || (currentUser ? currentUser.id : '')}
-                        onValueChange={handleTeacherChange}
-                      >
-                        <SelectTrigger id="recorded_by" className="h-9 bg-white text-right"><SelectValue placeholder="اختر المعلم" /></SelectTrigger>
-                        <SelectContent className=" text-right">
-                          {visibleTeachers.length > 0 ? (
-                            visibleTeachers.map(teacher => (
-                              <SelectItem key={teacher.id} value={teacher.id} className=" text-right">
-                                <div className="flex flex-col text-right">
-                                  <span className="font-medium">{teacher.full_name ?? `المعلم ${teacher.id.slice(0, 4)}`}</span>
-                                </div>
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem disabled value="no-teachers">لا يوجد معلمين متاحين</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {formErrors.recorded_by && <p className="text-xs text-red-500 text-right">{formErrors.recorded_by}</p>}
-                    </div>
+        {/* حالة الطالب (عند التعديل) */}
+        {assessmentToEdit && visibleStudents.length > 0 && (
+          <div className="text-[11px] sm:text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden text-ellipsis mb-2 text-right" dir="rtl">
+            <span className="font-medium">الطالب: </span>
+            <span>{visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.full_name}</span>
+            <span className="mx-1 text-gray-400">|</span>
+            <span className="font-medium">ولي الأمر: </span>
+            <span>{visibleStudents.find(s => s.id === assessmentToEdit.student_id)?.guardian?.full_name || 'غير مسجل'}</span>
+          </div>
+        )}
 
-                    <div className="grid gap-1 order-first">
-                      <Label htmlFor="circle_info" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الحلقة</Label>
-                      <Select
-                        value={selectedCircleId !== 'all-circles' ? selectedCircleId : ''}
-                        onValueChange={handleCircleChange}
-                      >
-                        <SelectTrigger id="circle_info" className="h-9 bg-white text-right"><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
-                        <SelectContent className=" text-right">
-                          {visibleStudyCircles.length > 0 ? (
-                            visibleStudyCircles.map(circle => (
-                              <SelectItem key={circle.id} value={circle.id} className=" text-right">
-                                {circle.name || `حلقة ${circle.id}`}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem disabled value="no-circles">لا توجد حلقات متاحة</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* اختيار الطالب */}
-                  <div className="grid gap-1">
-                    <Label htmlFor="student_id" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الطالب <span className="text-red-500">*</span></Label>
-                    <Select
-                      value={formData.student_id}
-                      onValueChange={(value) => setFormData({ ...formData, student_id: value })}
+        {/* محتوى الخطوات */}
+        <div className="p-3 sm:p-4 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden" dir="ltr">
+          {wizardStep === 0 && (
+            <div className="grid gap-3 py-2">
+              {/* المعلم/المشرف والحلقة */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1 order-last ">
+                  <Label htmlFor="recorded_by" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">المسجل <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.recorded_by || (currentUser ? currentUser.id : '')}
+                    onValueChange={handleTeacherChange}
+                  >
+                    <SelectTrigger
+                      id="recorded_by"
+                      dir="rtl"
+                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.recorded_by || currentUser?.id)
+                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
                     >
-                      <SelectTrigger id="student_id" className="h-9 bg-white text-right">
-                      <SelectValue placeholder="اختر الطالب" />
-                      </SelectTrigger>
-                      <SelectContent className="text-right max-h-[200px]">
-                        {visibleStudents.length > 0 ? (
-                        visibleStudents.map(student => (
-                        <SelectItem key={student.id} value={student.id} className="text-right">
+                      <SelectValue placeholder="اختر المعلم" />
+                    </SelectTrigger>
+                    <SelectContent className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                      {visibleTeachers.length > 0 ? (
+                        visibleTeachers.map(teacher => (
+                          <SelectItem key={teacher.id} value={teacher.id} className="text-right cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
+                            <div className="flex flex-col text-right">
+                              <span className="font-medium">{teacher.full_name ?? `المعلم ${teacher.id.slice(0, 4)}`}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem disabled value="no-teachers">لا يوجد معلمين متاحين</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.recorded_by && <p className="text-xs text-red-500 text-right">{formErrors.recorded_by}</p>}
+                </div>
+
+                <div className="grid gap-1 order-first">
+                  <Label htmlFor="circle_info" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الحلقة</Label>
+                  <Select
+                    value={selectedCircleId !== 'all-circles' ? selectedCircleId : ''}
+                    onValueChange={handleCircleChange}
+                  >
+                    <SelectTrigger
+                      id="circle_info"
+                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(selectedCircleId !== 'all-circles')
+                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                    >
+                      <SelectValue placeholder="اختر الحلقة" />
+                    </SelectTrigger>
+                    <SelectContent className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                      {visibleStudyCircles.length > 0 ? (
+                        visibleStudyCircles.map(circle => (
+                          <SelectItem key={circle.id} value={circle.id} className="text-right cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
+                            {circle.name || `حلقة ${circle.id}`}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem disabled value="no-circles">لا توجد حلقات متاحة</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* اختيار الطالب */}
+              <div className="grid gap-1">
+                <Label htmlFor="student_id" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الطالب <span className="text-red-500">*</span></Label>
+                <Select
+                  value={formData.student_id}
+                  onValueChange={(value) => setFormData({ ...formData, student_id: value })}
+                >
+                  <SelectTrigger
+                    id="student_id"
+                    className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${formData.student_id
+                      ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                  >
+                    <SelectValue placeholder="اختر الطالب" />
+                  </SelectTrigger>
+                  <SelectContent className="text-right max-h-[200px] text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                    {visibleStudents.length > 0 ? (
+                      visibleStudents.map(student => (
+                        <SelectItem key={student.id} value={student.id} className="text-right cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
                           <div className="flex flex-col">
-                          <span className="font-medium">{student.full_name}</span>
-                          <span className="text-xs text-gray-600">
-                            <span className="text-blue-700">ولي الأمر:</span> {
-                              visibleStudents.find(s => s.id === formData.student_id)?.guardian?.full_name || 
-                              'لم يتم تسجيل بيانات ولي الأمر'
-                            }
-                          </span>
+                            <span className="font-medium">
+                              {student.full_name}
+                              {student.guardian?.full_name && (
+                                <span> {student.guardian.full_name}</span>
+                              )}
+                            </span>
                           </div>
                         </SelectItem>
-                        ))
-                        ) : (
-                        <SelectItem disabled value="no-students">
+                      ))
+                    ) : (
+                      <SelectItem disabled value="no-students">
                         {selectedCircleId !== 'all-circles'
                           ? 'لا يوجد طلاب في هذه الحلقة'
                           : selectedTeacherId !== 'all-teachers'
-                          ? 'لا يوجد طلاب لهذا المعلم'
-                          : 'لا يوجد طلاب متاحين'
+                            ? 'لا يوجد طلاب لهذا المعلم'
+                            : 'لا يوجد طلاب متاحين'
                         }
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+                {formErrors.student_id && <p className="text-xs text-red-500 text-right">{formErrors.student_id}</p>}
+              </div>
+
+              {/* تاريخ التقييم ونوع الاختبار */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1 order-last">
+                  <Label htmlFor="date" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">تاريخ الاختبار <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    className="h-9 bg-white text-right"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]} // تحديد الحد الأدنى للتاريخ هو اليوم الحالي
+                  />
+                </div>
+
+                <div className="grid gap-1 order-first">
+                  <Label htmlFor="type" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">نوع الاختبار <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(value) => setFormData({ ...formData, type: value as AssessmentType })}
+                  >
+                    <SelectTrigger
+                      id="type"
+                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${formData.type
+                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                    >
+                      <SelectValue placeholder="اختر النوع" />
+                    </SelectTrigger>
+                    <SelectContent className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                      {assessmentTypeOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
+                          {option.label}
                         </SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {formErrors.student_id && <p className="text-xs text-red-500 text-right">{formErrors.student_id}</p>}
-                  </div>
-
-                  {/* تاريخ التقييم ونوع الاختبار */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1 order-last">
-                      <Label htmlFor="date" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">تاريخ الاختبار <span className="text-red-500">*</span></Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        className="h-9 bg-white text-right"
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        min={new Date().toISOString().split('T')[0]} // تحديد الحد الأدنى للتاريخ هو اليوم الحالي
-                      />
-                    </div>
-
-                    <div className="grid gap-1 order-first">
-                      <Label htmlFor="type" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">نوع الاختبار <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.type}
-                        onValueChange={(value) => setFormData({ ...formData, type: value as AssessmentType })}
-                      >
-                        <SelectTrigger id="type" className="h-9 bg-white text-right"><SelectValue placeholder="اختر النوع" /></SelectTrigger>
-                        <SelectContent className=" text-right">
-                          {assessmentTypeOptions.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* ملاحظات */}
-                  <div className="grid gap-1">
-                    <Label htmlFor="notes" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">ملاحظات</Label>
-                    <Textarea
-                      id="notes"
-                      value={formData.notes || ''}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="أدخل ملاحظات إضافية"
-                      className="min-h-[70px] bg-white text-right"
-                    />
-                  </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </TabsContent>
+              </div>
 
-              {/* الصفحة الثانية - نطاق الاختبار */}
-              <TabsContent value="range" className="mt-0">
-                <div className="grid gap-3 py-2">
-                  {/* نطاق التقييم - من */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1 order-last">
-                      <Label htmlFor="from_ayah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">من آية <span className="text-red-500">*</span></Label>
-                      <Input
-                        id="from_ayah"
-                        type="number"
-                        className="h-9 bg-white text-right"
-                        min="1"
-                        max={quranSurahs.find(s => s.number === formData.from_surah)?.ayahs || 1}
-                        value={formData.from_ayah}
-                        onChange={(e) => setFormData({ ...formData, from_ayah: parseInt(e.target.value) })}
-                      />
-                      {formErrors.from_ayah && <p className="text-xs text-red-500 text-right">{formErrors.from_ayah}</p>}
-                    </div>
-
-                    <div className="grid gap-1 order-first">
-                      <Label htmlFor="from_surah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">من سورة <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.from_surah?.toString()}
-                        onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}
-                      >
-                        <SelectTrigger id="from_surah" className="h-9 bg-white text-right"><SelectValue placeholder="اختر السورة" /></SelectTrigger>
-                        <SelectContent className=" text-right max-h-[200px]">
-                          {quranSurahs.map(surah => (
-                            <SelectItem key={surah.number} value={surah.number.toString()}>
-                              {surah.name} ({surah.number})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {formErrors.from_surah && <p className="text-xs text-red-500 text-right">{formErrors.from_surah}</p>}
-                    </div>
-                  </div>
-
-                  {/* نطاق التقييم - إلى */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-1 order-last">
-                      <Label htmlFor="to_surah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">إلى سورة <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={formData.to_surah?.toString()}
-                        onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}
-                      >
-                        <SelectTrigger id="to_surah" className="h-9 bg-white text-right"><SelectValue placeholder="اختر السورة" /></SelectTrigger>
-                        <SelectContent className=" text-right max-h-[200px]">
-                          {quranSurahs.map(surah => (
-                            <SelectItem key={surah.number} value={surah.number.toString()}>
-                              {surah.name} ({surah.number})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {formErrors.to_surah && <p className="text-xs text-red-500 text-right">{formErrors.to_surah}</p>}
-                    </div>
-
-                    <div className="grid gap-1 order-first">
-                      <Label htmlFor="to_ayah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">إلى آية <span className="text-red-500">*</span></Label>
-                      <Input
-                        id="to_ayah"
-                        type="number"
-                        className="h-9 bg-white text-right"
-                        min="1"
-                        max={quranSurahs.find(s => s.number === formData.to_surah)?.ayahs || 1}
-                        value={formData.to_ayah}
-                        onChange={(e) => setFormData({ ...formData, to_ayah: parseInt(e.target.value) })}
-                      />
-                      {formErrors.to_ayah && <p className="text-xs text-red-500 text-right">{formErrors.to_ayah}</p>}
-                    </div>
-                  </div>
-
-                  <div dir="rtl" className="py-3 px-4 mt-2 bg-blue-50 rounded-lg text-sm border border-blue-100">
-                    <div className="flex items-center gap-2 text-blue-800">
-                      <span>📖 نطاق الاختبار:</span>
-                      <span className="font-bold">
-                        {formData.from_surah && formData.to_surah ?
-                          formatAssessmentRange(formData as Assessment) :
-                          'غير محدد بعد'
-                        }
-                      </span>
-                    </div>
-                  </div>
+              {/* ملاحظات */}
+              <div className="grid gap-1">
+                <Label htmlFor="notes" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">ملاحظات</Label>
+                <Textarea
+                  id="notes"
+                  value={formData.notes || ''}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="أدخل ملاحظات إضافية"
+                  className="min-h-[70px] bg-white text-right"
+                />
+              </div>
+            </div>
+          )}
+          {wizardStep === 1 && (
+            <div className="grid gap-3 py-2">
+              {/* نطاق التقييم - من */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1 order-last">
+                  <Label htmlFor="from_ayah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">من آية <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="from_ayah"
+                    type="number"
+                    className="h-9 bg-white text-right"
+                    min="1"
+                    max={quranSurahs.find(s => s.number === formData.from_surah)?.ayahs || 1}
+                    value={formData.from_ayah}
+                    onChange={(e) => setFormData({ ...formData, from_ayah: parseInt(e.target.value) })}
+                  />
+                  {formErrors.from_ayah && <p className="text-xs text-red-500 text-right">{formErrors.from_ayah}</p>}
                 </div>
-              </TabsContent>
 
-
-              {/* الصفحة الثالثة - درجات التقييم */}
-              <TabsContent value="scores" className="mt-0">
-                <div className="grid gap-3 py-2">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="grid gap-1 order-3">
-                      <Label htmlFor="tajweed_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
-                        <span>درجة التجويد</span>
-                      </Label>
-                      <Input
-                        id="tajweed_score"
-                        type="text"
-                        inputMode="decimal"
-                        dir="rtl"
-                        className="h-9 bg-white text-right"
-                        value={formData.tajweed_score !== undefined ? formData.tajweed_score : ''}
-                        onChange={(e) => {
-                          let val = parseFloat(e.target.value);
-                          if (isNaN(val)) val = undefined;
-                          else if (val > 100) val = 100;
-                          else if (val < 0) val = 0;
-                          setFormData({ ...formData, tajweed_score: val });
-                        }}
-                        placeholder="0 - 100"
-                      />
-                      {formErrors.tajweed_score && <p className="text-xs text-red-500 text-right">{formErrors.tajweed_score}</p>}
-                    </div>
-
-                    <div className="grid gap-1 order-2">
-                      <Label htmlFor="memorization_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
-                        <span>درجة الحفظ</span>
-                      </Label>
-                      <Input
-                        id="memorization_score"
-                        type="text"
-                        inputMode="decimal"
-                        dir="rtl"
-                        className="h-9 bg-white text-right"
-                        value={formData.memorization_score !== undefined ? formData.memorization_score : ''}
-                        onChange={(e) => {
-                          let val = parseFloat(e.target.value);
-                          if (isNaN(val)) val = undefined;
-                          else if (val > 100) val = 100;
-                          else if (val < 0) val = 0;
-                          setFormData({ ...formData, memorization_score: val });
-                        }}
-                        placeholder="0 - 100"
-                      />
-                      {formErrors.memorization_score && <p className="text-xs text-red-500 text-right">{formErrors.memorization_score}</p>}
-                    </div>
-
-                    <div className="grid gap-1 order-1">
-                      <Label htmlFor="recitation_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
-                        <span>درجة التلاوة</span>
-                      </Label>
-                      <Input
-                        id="recitation_score"
-                        type="text"
-                        inputMode="decimal"
-                        dir="rtl"
-                        className="h-9 bg-white text-right"
-                        value={formData.recitation_score !== undefined ? formData.recitation_score : ''}
-                        onChange={(e) => {
-                          let val = parseFloat(e.target.value);
-                          if (isNaN(val)) val = undefined;
-                          else if (val > 100) val = 100;
-                          else if (val < 0) val = 0;
-                          setFormData({ ...formData, recitation_score: val });
-                        }}
-                        placeholder="0 - 100"
-                      />
-                      {formErrors.recitation_score && <p className="text-xs text-red-500 text-right">{formErrors.recitation_score}</p>}
-                    </div>
-                  </div>
-
-
-                  <div dir="rtl" className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg mt-3 border border-amber-100">
-                    <div className="flex flex-row-reverse justify-between items-center">
-                      <span className="text-lg font-bold text-amber-700 px-3 py-1 bg-white rounded-lg shadow-sm">
-                        {calculateTotalScore() !== undefined ? calculateTotalScore() : '-'}
-                      </span>
-                      <Label htmlFor="total_score" className="font-bold text-right text-sm text-amber-800">
-                        الدرجة الكلية:
-                      </Label>
-                    </div>
-                    <p className="text-xs text-amber-700 mt-2 text-right">
-                      (يتم حساب الدرجة الكلية تلقائيًا كمتوسط للدرجات المدخلة)
-                    </p>
-                  </div>
+                <div className="grid gap-1 order-first">
+                  <Label htmlFor="from_surah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">من سورة <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.from_surah?.toString()}
+                    onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}
+                  >
+                    <SelectTrigger
+                      id="from_surah"
+                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${formData.from_surah
+                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                    >
+                      <SelectValue placeholder="اختر السورة" />
+                    </SelectTrigger>
+                    <SelectContent className="text-right max-h-[200px] text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                      {quranSurahs.map(surah => (
+                        <SelectItem key={surah.number} value={surah.number.toString()} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
+                          {surah.name} ({surah.number})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.from_surah && <p className="text-xs text-red-500 text-right">{formErrors.from_surah}</p>}
                 </div>
-              </TabsContent>
+              </div>
+
+              {/* نطاق التقييم - إلى */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-1 order-last">
+                  <Label htmlFor="to_surah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">إلى سورة <span className="text-red-500">*</span></Label>
+                  <Select
+                    value={formData.to_surah?.toString()}
+                    onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}
+                  >
+                    <SelectTrigger
+                      id="to_surah"
+                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${formData.to_surah
+                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                    >
+                      <SelectValue placeholder="اختر السورة" />
+                    </SelectTrigger>
+                    <SelectContent className="text-right max-h-[200px] text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                      {quranSurahs.map(surah => (
+                        <SelectItem key={surah.number} value={surah.number.toString()} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
+                          {surah.name} ({surah.number})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.to_surah && <p className="text-xs text-red-500 text-right">{formErrors.to_surah}</p>}
+                </div>
+
+                <div className="grid gap-1 order-first">
+                  <Label htmlFor="to_ayah" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">إلى آية <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="to_ayah"
+                    type="number"
+                    className="h-9 bg-white text-right"
+                    min="1"
+                    max={quranSurahs.find(s => s.number === formData.to_surah)?.ayahs || 1}
+                    value={formData.to_ayah}
+                    onChange={(e) => setFormData({ ...formData, to_ayah: parseInt(e.target.value) })}
+                  />
+                  {formErrors.to_ayah && <p className="text-xs text-red-500 text-right">{formErrors.to_ayah}</p>}
+                </div>
+              </div>
+
+              <div dir="rtl" className="py-3 px-4 mt-2 bg-blue-50 rounded-lg text-sm border border-blue-100">
+                <div className="flex items-center gap-2 text-blue-800">
+                  <span>📖 نطاق الاختبار:</span>
+                  <span className="font-bold">
+                    {formData.from_surah && formData.to_surah ?
+                      formatAssessmentRange(formData as Assessment) :
+                      'غير محدد بعد'
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+          {wizardStep === 2 && (
+            <div className="grid gap-3 py-2">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="grid gap-1 order-3">
+                  <Label htmlFor="tajweed_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
+                    <span>درجة التجويد</span>
+                  </Label>
+                  <Input
+                    id="tajweed_score"
+                    type="text"
+                    inputMode="decimal"
+                    dir="rtl"
+                    className="h-9 bg-white text-right"
+                    value={formData.tajweed_score !== undefined ? formData.tajweed_score : ''}
+                    onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (isNaN(val)) val = undefined;
+                      else if (val > 100) val = 100;
+                      else if (val < 0) val = 0;
+                      setFormData({ ...formData, tajweed_score: val });
+                    }}
+                    placeholder="0 - 100"
+                  />
+                  {formErrors.tajweed_score && <p className="text-xs text-red-500 text-right">{formErrors.tajweed_score}</p>}
+                </div>
+
+                <div className="grid gap-1 order-2">
+                  <Label htmlFor="memorization_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
+                    <span>درجة الحفظ</span>
+                  </Label>
+                  <Input
+                    id="memorization_score"
+                    type="text"
+                    inputMode="decimal"
+                    dir="rtl"
+                    className="h-9 bg-white text-right"
+                    value={formData.memorization_score !== undefined ? formData.memorization_score : ''}
+                    onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (isNaN(val)) val = undefined;
+                      else if (val > 100) val = 100;
+                      else if (val < 0) val = 0;
+                      setFormData({ ...formData, memorization_score: val });
+                    }}
+                    placeholder="0 - 100"
+                  />
+                  {formErrors.memorization_score && <p className="text-xs text-red-500 text-right">{formErrors.memorization_score}</p>}
+                </div>
+
+                <div className="grid gap-1 order-1">
+                  <Label htmlFor="recitation_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
+                    <span>درجة التلاوة</span>
+                  </Label>
+                  <Input
+                    id="recitation_score"
+                    type="text"
+                    inputMode="decimal"
+                    dir="rtl"
+                    className="h-9 bg-white text-right"
+                    value={formData.recitation_score !== undefined ? formData.recitation_score : ''}
+                    onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (isNaN(val)) val = undefined;
+                      else if (val > 100) val = 100;
+                      else if (val < 0) val = 0;
+                      setFormData({ ...formData, recitation_score: val });
+                    }}
+                    placeholder="0 - 100"
+                  />
+                  {formErrors.recitation_score && <p className="text-xs text-red-500 text-right">{formErrors.recitation_score}</p>}
+                </div>
+              </div>
 
 
-
-
-            </Tabs>
-
+              <div dir="rtl" className="p-4 bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg mt-3 border border-amber-100">
+                <div className="flex flex-row-reverse justify-between items-center">
+                  <span className="text-lg font-bold text-amber-700 px-3 py-1 bg-white rounded-lg shadow-sm">
+                    {calculateTotalScore() !== undefined ? calculateTotalScore() : '-'}
+                  </span>
+                  <Label htmlFor="total_score" className="font-bold text-right text-sm text-amber-800">
+                    الدرجة الكلية:
+                  </Label>
+                </div>
+                <p className="text-xs text-amber-700 mt-2 text-right">
+                  (يتم حساب الدرجة الكلية تلقائيًا كمتوسط للدرجات المدخلة)
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </FormDialog>
 

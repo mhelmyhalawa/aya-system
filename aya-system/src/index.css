@@ -124,6 +124,34 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+    /* دعم الإتجاه العربي الافتراضي */
+    html[lang='ar'], body[dir='rtl'] {
+      direction: rtl;
+    }
+    /* محاذاة تلقائية للنص داخل الحقول عند RTL */
+    html[lang='ar'] input,
+    html[lang='ar'] textarea,
+    html[lang='ar'] select,
+    body[dir='rtl'] input,
+    body[dir='rtl'] textarea,
+    body[dir='rtl'] select {
+      text-align: right;
+    }
+    /* تحسين اتجاه حقول التاريخ والأرقام في RTL */
+    html[lang='ar'] input[type='date'],
+    body[dir='rtl'] input[type='date'],
+    html[lang='ar'] input[type='number'],
+    body[dir='rtl'] input[type='number'] {
+      direction: rtl;
+      text-align: right;
+    }
+    /* مكونات راديكس المختارة */
+    body[dir='rtl'] [role='listbox'],
+    body[dir='rtl'] .radix-select-content {
+      direction: rtl;
+      text-align: right;
+    }
 }
 
 .flex-1\/3 {

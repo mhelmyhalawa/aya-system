@@ -1218,12 +1218,12 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <TabsTrigger
                   value="all-records"
                   className="
-              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
-              rounded-md text-green-800 py-1.5 px-2
-              hover:bg-green-100 hover:text-green-900
-              data-[state=active]:bg-islamic-green
-              data-[state=active]:text-white
-              transition-all duration-200
+                              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+                              rounded-md text-green-800 py-1.5 px-2
+                              hover:bg-green-100 hover:text-green-900
+                              data-[state=active]:bg-islamic-green
+                              data-[state=active]:text-white
+                              transition-all duration-200
                 "
                   title='جميع السجلات'
                 >
@@ -1232,12 +1232,12 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <TabsTrigger
                   value="my-records"
                   className="
-              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
-              rounded-md text-green-800 py-1.5 px-2
-              hover:bg-green-100 hover:text-green-900
-              data-[state=active]:bg-islamic-green
-              data-[state=active]:text-white
-              transition-all duration-200
+                            flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+                            rounded-md text-green-800 py-1.5 px-2
+                            hover:bg-green-100 hover:text-green-900
+                            data-[state=active]:bg-islamic-green
+                            data-[state=active]:text-white
+                            transition-all duration-200
                 "
                   title='سجلاتي فقط'
                 >
@@ -1747,11 +1747,21 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <div className="grid gap-1.5 sm:gap-2">
                   <Label htmlFor="teacher" className="flex items-center gap-1">المعلم <span className="text-red-500">*</span></Label>
                   <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
-                    <SelectTrigger id="teacher" dir="rtl" className="text-right truncate max-w-full min-w-0"><SelectValue placeholder="اختر المعلم" /></SelectTrigger>
-                    <SelectContent position="popper" dir="rtl">
+                    <SelectTrigger
+                      id="teacher"
+                      dir="rtl"
+                      className={`h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs 
+                        rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.recorded_by || currentUser?.id)
+                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                    >
+                      <SelectValue placeholder="اختر المعلم" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" dir="rtl" className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                       {visibleTeachers && visibleTeachers.length > 0 ? (
                         visibleTeachers.map(teacher => (
-                          <SelectItem key={teacher.id} value={teacher.id}>
+                          <SelectItem key={teacher.id} value={teacher.id} 
+                          className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 rounded-md">
                             {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0,4)}`}
                             {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
                           </SelectItem>
@@ -1766,10 +1776,25 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <div className="grid gap-1.5 sm:gap-2">
                   <Label htmlFor="circle">الحلقة</Label>
                   <Select value={formData.circle_id || ''} onValueChange={(value) => handleCircleChange(value)} disabled={!formData.recorded_by}>
-                    <SelectTrigger id="circle" dir="rtl" className="text-right truncate max-w-full min-w-0"><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
-                    <SelectContent position="popper" dir="rtl">
+                    <SelectTrigger
+                      id="circle"
+                      dir="rtl"
+                      className={`h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.circle_id)
+                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${!formData.recorded_by ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <SelectValue placeholder="اختر الحلقة" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" dir="rtl" className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                       {formFilteredCircles.length > 0 ? (
-                        formFilteredCircles.map(circle => (<SelectItem key={circle.id} value={circle.id}>{circle.name || `حلقة ${circle.id.slice(0,4)}`}</SelectItem>))
+                        formFilteredCircles.map(circle => (
+                          <SelectItem
+                            key={circle.id}
+                            value={circle.id}
+                            className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 rounded-md">
+                            {circle.name || `حلقة ${circle.id.slice(0,4)}`}
+                          </SelectItem>
+                        ))
                       ) : (
                         <SelectItem value="no-circles" disabled>لا توجد حلقات للمعلم المحدد</SelectItem>
                       )}
@@ -1779,11 +1804,19 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <div className="grid gap-1.5 sm:gap-2">
                   <Label htmlFor="student" className="flex items-center gap-1">الطالب <span className="text-red-500">*</span></Label>
                   <Select value={formData.student_id || ''} onValueChange={(value) => handleInputChange('student_id', value)} disabled={!formData.recorded_by}>
-                    <SelectTrigger id="student" dir="rtl" className="text-right truncate max-w-full min-w-0"><SelectValue placeholder="اختر الطالب" /></SelectTrigger>
-                    <SelectContent position="popper" dir="rtl" className="max-h-[300px]">
+                    <SelectTrigger
+                      id="student"
+                      dir="rtl"
+                      className={`h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.student_id)
+                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${!formData.recorded_by ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                      <SelectValue placeholder="اختر الطالب" />
+                    </SelectTrigger>
+                    <SelectContent position="popper" dir="rtl" className="max-h-[300px] text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                       {formFilteredStudents.length > 0 ? (
                         formFilteredStudents.map(student => (
-                          <SelectItem key={student.id} value={student.id}>{student.full_name || 'طالب بدون اسم'}{student.guardian?.full_name ? ` - ${student.guardian.full_name}` : ''}</SelectItem>
+                          <SelectItem key={student.id} value={student.id} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">{student.full_name || 'طالب بدون اسم'}{student.guardian?.full_name ? ` - ${student.guardian.full_name}` : ''}</SelectItem>
                         ))
                       ) : (
                         <SelectItem value="no-students" disabled>{formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}</SelectItem>
@@ -1819,8 +1852,16 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   <div>
                     <Label htmlFor="from_surah" className="flex items-center gap-1 mb-1 text-xs">من سورة <span className="text-red-500">*</span></Label>
                     <Select value={formData.from_surah ? formData.from_surah.toString() : ''} onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}>
-                      <SelectTrigger id="from_surah" dir="rtl" className="text-right truncate h-9 text-xs"><SelectValue placeholder="اختر السورة">{formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : 'اختر السورة'}</SelectValue></SelectTrigger>
-                      <SelectContent className="max-h-[200px]" dir="rtl">{quranSurahs.map(surah => (<SelectItem key={surah.number} value={surah.number.toString()}>{surah.number}. {getSurahName(surah.number)}</SelectItem>))}</SelectContent>
+                      <SelectTrigger
+                        id="from_surah"
+                        dir="rtl"
+                        className={`h-9 text-right truncate text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.from_surah)
+                          ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                      >
+                        <SelectValue placeholder="اختر السورة">{formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : 'اختر السورة'}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px] text-right text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900" dir="rtl">{quranSurahs.map(surah => (<SelectItem key={surah.number} value={surah.number.toString()} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">{surah.number}. {getSurahName(surah.number)}</SelectItem>))}</SelectContent>
                     </Select>
                     {formErrors.from_surah && <p className="text-xs text-red-500 mt-1">{formErrors.from_surah}</p>}
                   </div>
@@ -1834,8 +1875,16 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   <div>
                     <Label htmlFor="to_surah" className="flex items-center gap-1 mb-1 text-xs">إلى سورة <span className="text-red-500">*</span></Label>
                     <Select value={formData.to_surah ? formData.to_surah.toString() : ''} onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}>
-                      <SelectTrigger id="to_surah" dir="rtl" className="text-right truncate h-9 text-xs"><SelectValue placeholder="اختر السورة">{formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : 'اختر السورة'}</SelectValue></SelectTrigger>
-                      <SelectContent className="max-h-[200px]" dir="rtl">{quranSurahs.map(surah => (<SelectItem key={surah.number} value={surah.number.toString()}>{surah.number}. {getSurahName(surah.number)}</SelectItem>))}</SelectContent>
+                      <SelectTrigger
+                        id="to_surah"
+                        dir="rtl"
+                        className={`h-9 text-right truncate text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.to_surah)
+                          ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                      >
+                        <SelectValue placeholder="اختر السورة">{formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : 'اختر السورة'}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[200px] text-right text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900" dir="rtl">{quranSurahs.map(surah => (<SelectItem key={surah.number} value={surah.number.toString()} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">{surah.number}. {getSurahName(surah.number)}</SelectItem>))}</SelectContent>
                     </Select>
                     {formErrors.to_surah && <p className="text-xs text-red-500 mt-1">{formErrors.to_surah}</p>}
                   </div>
