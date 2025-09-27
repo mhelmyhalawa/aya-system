@@ -18,7 +18,7 @@ export interface Column<T> {
     header: string; // عنوان العمود
     width?: string; // عرض العمود (اختياري)
     align?: 'left' | 'center' | 'right'; // محاذاة العمود (اختياري)
-    render?: (item: T) => React.ReactNode; // دالة لتخصيص عرض الخلية (اختياري)
+    render?: (item: T, index?: number) => React.ReactNode; // دالة لتخصيص عرض الخلية (اختياري) (نمرر index المعروض)
     important?: boolean; // لتحديد الأعمدة المهمة للعرض في البطاقات
 }
 
@@ -66,6 +66,12 @@ export function GenericTable<T extends { id: string }>(props: {
     hideSortToggle?: boolean;
     /** تمكين/تعطيل الترتيب من الأساس (حتى لو أظهرنا الزر). افتراضياً مفعّل. */
     enableSorting?: boolean;
+    /** تعويض (offset) للفهرس العام إن أردنا عرض رقم الصف العالمي */
+    rowNumberOffset?: number;
+    /** التحكم الخارجي في الصفحة الحالية (اختياري) */
+    currentPageExternal?: number;
+    /** رد نداء عند تغيير الصفحة داخلياً */
+    onPageChange?: (page: number) => void;
 }) {
     const {
         data,
@@ -104,7 +110,8 @@ export function GenericTable<T extends { id: string }>(props: {
     const [mobileCardIndex, setMobileCardIndex] = useState(0);
     // الترقيم
     const [pageSize, setPageSize] = useState<number>(defaultPageSize);
-    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [internalPage, setInternalPage] = useState<number>(1);
+    const currentPage = props.currentPageExternal ?? internalPage;
 
     // فرض نمط البطاقات على الموبايل
     useEffect(() => {
@@ -117,8 +124,9 @@ export function GenericTable<T extends { id: string }>(props: {
 
     // إعادة ضبط الصفحة عند تغيير نمط العرض لتفادي بقاء مؤشر خارج النطاق خاصة في وضع بطاقة واحدة
     useEffect(() => {
-        setCurrentPage(1);
-    }, [viewMode]);
+        // لا نعيد التعيين إذا كان التحكم خارجي لتجنب القفز
+        if (props.currentPageExternal === undefined) setInternalPage(1);
+    }, [viewMode, props.currentPageExternal]);
 
     const goNext = () => {
         // حساب حجم الصفحة الحالي اعتماداً على السياق (موبايل أو سطح مكتب)
@@ -195,14 +203,36 @@ export function GenericTable<T extends { id: string }>(props: {
     }, [enablePagination, sortedData.length, effectivePageSize]);
 
     useEffect(() => {
-        if (currentPage > totalPages) setCurrentPage(totalPages);
-    }, [totalPages, currentPage]);
+        if (currentPage > totalPages) {
+            if (props.currentPageExternal === undefined) setInternalPage(totalPages);
+            else props.onPageChange && props.onPageChange(totalPages);
+        }
+    }, [totalPages, currentPage, props]);
 
     useEffect(() => {
-        setCurrentPage(1);
-    }, [pageSize, data]);
+            // لا نعيد الصفحة للأولى إلا إذا أصبح نطاق الصفحة الحالية خارج البيانات بعد تغيير الحجم أو التصفية
+            if (!enablePagination) return;
+            const effectiveSize = (isMobile && viewMode === 'card') ? 1 : pageSize;
+            const startIndex = (currentPage - 1) * effectiveSize; // صفرية
+            if (startIndex >= sortedData.length && sortedData.length > 0) {
+                const newLastPage = Math.max(1, Math.ceil(sortedData.length / effectiveSize));
+                if (props.currentPageExternal === undefined) setInternalPage(newLastPage);
+                else props.onPageChange && props.onPageChange(newLastPage);
+                return;
+            }
+            // إذا قلّ عدد الصفحات وأصبح currentPage > totalPages سيتم ضبطه في تأثير آخر أعلاه
+            // لذا لا حاجة لإعادة ضبطه هنا إلى 1 إلا في حالة تفريغ البيانات بالكامل
+            if (sortedData.length === 0 && currentPage !== 1) {
+                if (props.currentPageExternal === undefined) setInternalPage(1);
+                else props.onPageChange && props.onPageChange(1);
+            }
+        }, [pageSize, data, sortedData.length, currentPage, enablePagination, isMobile, viewMode, props.currentPageExternal]);
 
     const paginatedData = React.useMemo(() => {
+        if (enablePagination) {
+            // Debug: مراقبة عملية التقطيع للصفحات
+            try { console.debug('[GenericTable] paginate', { currentPage, pageSize, total: sortedData.length }); } catch {}
+        }
         if (!enablePagination) return sortedData;
         // في حالة الموبايل + عرض البطاقات نعرض بطاقة واحدة فقط لكل صفحة
         if (isMobile && viewMode === 'card') {
@@ -344,7 +374,9 @@ export function GenericTable<T extends { id: string }>(props: {
 
                             <div className="flex items-center gap-1">
                                 <button
-                                    onClick={() => setCurrentPage(1)}
+                                    onClick={() => {
+                                        if (props.currentPageExternal === undefined) setInternalPage(1); else props.onPageChange && props.onPageChange(1);
+                                    }}
                                     disabled={currentPage === 1}
                                     aria-label='الأولى'
                                     className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-teal-700 hover:bg-teal-100 transform hover:scale-110"
@@ -352,7 +384,10 @@ export function GenericTable<T extends { id: string }>(props: {
                                     <ChevronsRight className='h-4 w-4' />
                                 </button>
                                 <button
-                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    onClick={() => {
+                                        const target = Math.max(1, currentPage - 1);
+                                        if (props.currentPageExternal === undefined) setInternalPage(target); else props.onPageChange && props.onPageChange(target);
+                                    }}
                                     disabled={currentPage === 1}
                                     aria-label='السابق'
                                     className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-teal-700 hover:bg-teal-100 transform hover:scale-110"
@@ -360,7 +395,10 @@ export function GenericTable<T extends { id: string }>(props: {
                                     <ChevronRight className='h-4 w-4' />
                                 </button>
                                 <button
-                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    onClick={() => {
+                                        const target = Math.min(totalPages, currentPage + 1);
+                                        if (props.currentPageExternal === undefined) setInternalPage(target); else props.onPageChange && props.onPageChange(target);
+                                    }}
                                     disabled={currentPage === totalPages || totalPages === 0}
                                     aria-label='التالي'
                                     className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-teal-700 hover:bg-teal-100 transform hover:scale-110"
@@ -368,7 +406,9 @@ export function GenericTable<T extends { id: string }>(props: {
                                     <ChevronLeft className='h-4 w-4' />
                                 </button>
                                 <button
-                                    onClick={() => setCurrentPage(totalPages)}
+                                    onClick={() => {
+                                        if (props.currentPageExternal === undefined) setInternalPage(totalPages); else props.onPageChange && props.onPageChange(totalPages);
+                                    }}
                                     disabled={currentPage === totalPages || totalPages === 0}
                                     aria-label='الأخيرة'
                                     className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-teal-700 hover:bg-teal-100 transform hover:scale-110"
@@ -475,7 +515,7 @@ export function GenericTable<T extends { id: string }>(props: {
                 dark:bg-green-950/20 shadow-[0_4px_6px_rgba(0,0,0,0.1),0_8px_15px_rgba(0,0,0,0.1)]">
                     {/* تمت إزالة شريط الترقيم العلوي المستقل - تم دمجه في الهيدر */}
                     <div className="overflow-x-auto max-h-[calc(100vh-200px)] overflow-auto custom-scrollbar">
-                        <Table className="direction-rtl w-full border-collapse">
+                        <Table className="direction-rtl w-full border-collapse text-[11px] sm:text-[12px]">
                             <TableHeader className="bg-gradient-to-b from-green-700 via-green-600 to-green-500 
                             dark:from-green-900 dark:via-green-800 dark:to-green-700 sticky top-0 z-10 shadow-inner">
                                 <TableRow>
@@ -491,7 +531,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 key={column.key}
                                                 className={cn(
                                                     alignClass,
-                                                    'font-bold text-white py-3 px-4 border-r border-green-600/50 dark:border-green-800/50',
+                                                    'font-bold text-white py-2 sm:py-3 px-2 sm:px-4 border-r border-green-600/50 dark:border-green-800/50',
                                                     !hideSortToggle && enableSorting && colIdx === 0 && 'cursor-pointer select-none hover:bg-green-600/60',
                                                     hideSortToggle && enableSorting && colIdx === 0 && 'pointer-events-none'
                                                 )}
@@ -528,7 +568,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                             rowClassName
                                         )}
                                     >
-                                        {columns.map((column) => {
+                                            {columns.map((column) => {
                                             const alignClass =
                                                 column.align === 'center'
                                                     ? 'text-center'
@@ -540,11 +580,16 @@ export function GenericTable<T extends { id: string }>(props: {
                                                     key={`${item.id}-${column.key}`}
                                                     className={cn(
                                                         alignClass,
-                                                        'py-3 px-4 font-medium text-green-900 dark:text-green-200 border-r border-green-200/70 dark:border-green-800/30'
+                                                        'py-1.5 sm:py-2.5 px-2 sm:px-4 font-medium text-green-900 dark:text-green-200 border-r border-green-200/70 dark:border-green-800/30'
                                                     )}
                                                 >
                                                     {column.render ? (
-                                                        column.render(item)
+                                                        (() => {
+                                                                                                                                                                                    const vm: any = viewMode; // workaround TS comparison quirk
+                                                                                                                                                                                    const pageSpan = (vm === 'card' && isMobile) ? 1 : pageSize;
+                                                            const globalIndex = (currentPage - 1) * pageSpan + index;
+                                                            return column.render!(item, globalIndex);
+                                                        })()
                                                     ) : (item as any)[column.key] ? (
                                                         <span>{(item as any)[column.key]}</span>
                                                     ) : (
@@ -634,7 +679,7 @@ export function GenericTable<T extends { id: string }>(props: {
                         {!enablePagination && totalItems > 1 && <Dots />}
                         <div className={containerClass}>
                             {(() => {
-                                const CardItem = ({ item }: { item: T }) => {
+                                const CardItem = ({ item, globalIndex }: { item: T; globalIndex: number }) => {
                                     const [expanded, setExpanded] = useState(false);
                                     const importantColumn = columns.find((c) => c.important);
                                     // دعم كل من row_index و __index كأعمدة فهرس
@@ -677,13 +722,13 @@ export function GenericTable<T extends { id: string }>(props: {
                                             style={cardWidth ? { width: cardWidth } : undefined}
                                         >
                                             {/* الرأس */}
-                                            <div className="px-3 py-2 sm:py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
+                        <div className="px-2 sm:px-3 py-1.5 sm:py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
                                                     dark:from-green-800 dark:via-green-700 dark:to-green-600 
                                                     text-white rounded-t-lg shadow-md flex items-center justify-between">
                                                 <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1 flex items-center gap-2">
                                                     {indexColumn && (
                                                         <span className="inline-flex items-center justify-center min-w-[26px] h-[26px] rounded-full bg-white/15 border border-white/30 text-xs font-semibold shadow-inner backdrop-blur-sm">
-                                                            {indexColumn.render ? indexColumn.render(item) : (item as any)[indexColumn.key]}
+                                                            {indexColumn.render ? indexColumn.render(item, globalIndex) : (item as any)[indexColumn.key] ?? (globalIndex + 1)}
                                                         </span>
                                                     )}
                                                     <span className="truncate">
@@ -695,7 +740,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                             {/* المحتوى */}
                                             <div className="w-full">
                                                 {/* نسخة الجدول - تظهر من sm وفوق */}
-                                                <table className="hidden sm:table w-full border border-green-300 dark:border-green-700 text-[12px] sm:text-xs table-fixed">
+                                                <table className="hidden sm:table w-full border border-green-300 dark:border-green-700 text-[11px] sm:text-xs table-fixed">
                                                     <tbody>
                                                         {visibleColumns.map((column) => {
                                                             const value = column.render
@@ -707,7 +752,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                                         {column.header}
                                                                     </td>
                                                                     <td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 text-green-800 dark:text-green-100 text-right bg-green-50 dark:bg-green-900/50">
-                                                                        <div className="w-full sm:max-w-xs text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30 border border-green-200 dark:border-green-700 rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center">
+                                                                        <div className="w-full sm:max-w-xs text-[11px] sm:text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30 border border-green-200 dark:border-green-700 rounded-md px-2 py-1 min-h-[24px] sm:min-h-[26px] flex items-center justify-center">
                                                                             {value !== null && value !== undefined ? (
                                                                                 typeof value === "object" && React.isValidElement(value) ? (
                                                                                     value
@@ -726,7 +771,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 </table>
 
                                                 {/* نسخة الفورم - تظهر فقط على الموبايل (أصغر من sm) */}
-                                                <div className="sm:hidden space-y-3">
+                                                <div className="sm:hidden space-y-2">
                                                     {visibleColumns.map((column) => {
                                                         const value = column.render
                                                             ? column.render(item)
@@ -734,20 +779,17 @@ export function GenericTable<T extends { id: string }>(props: {
                                                         return (
                                                             <div
                                                                 key={`${item.id}-${column.key}-form`}
-                                                                className="p-2 border-b border-green-200 dark:border-green-700"
+                                                                className="p-1.5 border-b border-green-200 dark:border-green-700"
                                                             >
                                                                 {/* العنوان */}
-                                                                <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1 text-right">
+                                                                <div className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mb-0.5 text-right">
                                                                     {column.header}
                                                                 </div>
 
                                                                 {/* القيمة */}
                                                                 <div className="flex justify-center">
                                                                     <div
-                                                                        className="w-full sm:max-w-xs text-sm text-green-800 dark:text-green-100 
-                                                                    bg-green-50 dark:bg-green-800/30  
-                                                                    border border-green-200 dark:border-green-700 
-                                                                    rounded-md px-2 py-1 min-h-[28px] flex items-center justify-center"
+                                                                        className="w-full sm:max-w-xs text-[11px] sm:text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30 border border-green-200 dark:border-green-700 rounded-md px-2 py-1 min-h-[24px] flex items-center justify-center"
                                                                     >
                                                                         {value !== null && value !== undefined ? (
                                                                             typeof value === "object" && React.isValidElement(value) ? (
@@ -790,7 +832,11 @@ export function GenericTable<T extends { id: string }>(props: {
                                         </div>
                                     );
                                 };
-                                return visibleSlice.map((d) => <CardItem key={d.id} item={d} />);
+                                // احسب globalIndex لكل عنصر في وضع البطاقات (مع الترقيم الصفحي إن وُجد)
+                                const baseIndex = enablePagination ? (currentPage - 1) * cardLogicalPageSize : 0;
+                                return visibleSlice.map((d, idx) => (
+                                    <CardItem key={d.id} item={d} globalIndex={baseIndex + idx} />
+                                ));
                             })()}
                         </div>
                         {/* النقاط أسفل الشبكة أيضاً (اختياري يمكن الإبقاء على واحدة فقط، سنترك نسخة سفلية للتوازن على الشاشات الكبيرة) */}

@@ -1,23 +1,11 @@
+import { AlertCircle, Database, FileDown, Mail, Pencil, Phone, RefreshCw, Trash2, UserCircle, UserPlus, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA, Plus } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import {
-  UserPlus,
-  Search,
-  FileDown,
-  RefreshCw,
-  AlertCircle,
-  Pencil,
-  Phone,
-  Mail,
-  MapPin,
-  Trash2,
-  Database,
-  UserCircle,
-  GraduationCap
-} from "lucide-react";
+// Removed manual pagination components (now using GenericTable internal pagination)
+import { Search, MapPin, GraduationCap } from 'lucide-react';
 import { useState, useEffect, useMemo } from "react";
 import { getAllGuardians, searchGuardians, deleteGuardian, exportGuardiansToJson } from "@/lib/guardian-service";
 import { getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
@@ -131,7 +119,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
+  // Removed external currentPage state (using internal GenericTable pagination)
   const [error, setError] = useState<string | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
 
@@ -230,6 +218,20 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   const [studentsListGuardianId, setStudentsListGuardianId] = useState<string | null>(null);
   // عدد الحقول المبدئية في بطاقات الطلاب على الموبايل (يُضبط حسب عرض الشاشة)
   const [mobileCollapsedFields, setMobileCollapsedFields] = useState(3);
+  // حالة عامة لمنع الضغط المتكرر وإظهار لودينج (لأزرار الأكشن في الصفوف)
+  const [pendingActionKey, setPendingActionKey] = useState<string | null>(null);
+  const startAction = async (key: string, fn: () => Promise<void> | void) => {
+    if (pendingActionKey) return; // منع تداخل أكشن آخر
+    setPendingActionKey(key);
+    try { await fn(); } finally { setPendingActionKey(null); }
+  };
+  // شريط الأدوات الجديد: التابات + الفلترة + الترتيب
+  const [activeTab, setActiveTab] = useState<'all-records' | 'my-records'>('all-records');
+  const [showFilters, setShowFilters] = useState(false);
+  const [listSortDirection, setListSortDirection] = useState<null | 'asc' | 'desc'>(null);
+  const toggleListSort = () => {
+    setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+  };
 
   useEffect(() => {
     // تحديث العدد بناءً على عرض الشاشة الفعلي
@@ -247,6 +249,9 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // Pagination config
   const itemsPerPage = 10;
+
+  // حالة تحميل زر الحفظ في نموذج إضافة/تعديل ولي الأمر
+  const [isSavingGuardian, setIsSavingGuardian] = useState(false);
 
   // تحميل البيانات
   useEffect(() => {
@@ -304,7 +309,6 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
     try {
       const results = await searchGuardians(searchTerm);
       setGuardians(results);
-      setCurrentPage(1);
 
       // إظهار رسالة عند عدم وجود نتائج للبحث
       if (searchTerm && results.length === 0) {
@@ -565,6 +569,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
     }
 
     try {
+      setIsSavingGuardian(true);
       if (dialogMode === "add") {
         // إنشاء ولي أمر جديد
         const newGuardian: GuardianCreate = {
@@ -632,6 +637,8 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         description: guardiansLabels.unexpectedError,
         variant: "destructive",
       });
+    } finally {
+      setIsSavingGuardian(false);
     }
   };
 
@@ -782,27 +789,26 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
 
   // Filter and paginate guardians
   const filteredGuardians = useMemo(() => {
-    return guardians.filter(guardian => {
-      // If no search term, return all guardians
+    let list = guardians.filter(guardian => {
+      // تبويب "سجلاتي" (مبدئياً يعتمد على userId إذا المعلم أو المسؤول) يمكن تخصيصه لاحقاً
+      if (activeTab === 'my-records' && userRole === 'teacher' && userId) {
+        // نفترض وجود teacher_id في guardian لو مرتبط (إن لم يوجد لا يتم التصفية الآن)
+        if ((guardian as any).teacher_id && (guardian as any).teacher_id !== userId) return false;
+      }
       if (!searchTerm) return true;
-
-      // Search in name, phone, and email
       return (
         guardian.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         guardian.phone_number.includes(searchTerm) ||
         (guardian.email && guardian.email.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     });
-  }, [guardians, searchTerm]);
+    if (listSortDirection) {
+      list = [...list].sort((a, b) => a.full_name.localeCompare(b.full_name, 'ar', { sensitivity: 'base' }) * (listSortDirection === 'asc' ? 1 : -1));
+    }
+    return list;
+  }, [guardians, searchTerm, listSortDirection, activeTab, userRole, userId]);
 
-  // Paginate the filtered results
-  const paginatedGuardians = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredGuardians.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredGuardians, currentPage]);
-
-  // Calculate total pages
-  const totalPages = Math.max(1, Math.ceil(filteredGuardians.length / itemsPerPage));
+  // تمت إزالة حالة tablePage السابقة بعد الاعتماد على الترقيم الصفحي الداخلي للمكون العام
 
   // ===== Helpers: تطبيع قيم المرحلة الدراسية والأجزاء المحفوظة =====
   const normalizeKey = (v: string) => v.toString().toLowerCase().replace(/[^a-z0-9]+/g, '');
@@ -882,71 +888,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
     return rawStr;
   };
 
-  // Render page numbers for pagination
-  const renderPageNumbers = () => {
-    const pages = [];
-
-    // Always show first page
-    pages.push(
-      <PaginationItem key="first">
-        <PaginationLink
-          onClick={() => setCurrentPage(1)}
-          isActive={currentPage === 1}
-        >
-          1
-        </PaginationLink>
-      </PaginationItem>
-    );
-
-    // If we're past page 3, show an ellipsis
-    if (currentPage > 3) {
-      pages.push(
-        <PaginationItem key="ellipsis1">
-          <span className="px-3">...</span>
-        </PaginationItem>
-      );
-    }
-
-    // Show current page -1 and +1 if they exist
-    for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-      if (i === 1 || i === totalPages) continue; // Skip first and last as they're always shown
-      pages.push(
-        <PaginationItem key={i}>
-          <PaginationLink
-            onClick={() => setCurrentPage(i)}
-            isActive={currentPage === i}
-          >
-            {i}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    // If we're more than 1 page away from the last page, show an ellipsis
-    if (currentPage < totalPages - 2) {
-      pages.push(
-        <PaginationItem key="ellipsis2">
-          <span className="px-3">...</span>
-        </PaginationItem>
-      );
-    }
-
-    // Always show last page if there is more than one page
-    if (totalPages > 1) {
-      pages.push(
-        <PaginationItem key="last">
-          <PaginationLink
-            onClick={() => setCurrentPage(totalPages)}
-            isActive={currentPage === totalPages}
-          >
-            {totalPages}
-          </PaginationLink>
-        </PaginationItem>
-      );
-    }
-
-    return pages;
-  };
+  // Removed custom renderPageNumbers (GenericTable handles pagination UI)
 
   // التحقق من الصلاحيات
   if (userRole !== 'superadmin' && userRole !== 'admin' && userRole !== 'teacher') {
@@ -963,15 +905,16 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-0 sm:px-0 py-1 sm:py-2">
-
-      <Card>
+    <div className="w-full max-w-[1600px] mx-auto">
+      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
+                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-green-50 flex items-center gap-2">
+              {/* العنوان والوصف */}
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
                 <UserCircle className="h-5 w-5 text-yellow-300" />
                 {guardiansLabels.title}
               </CardTitle>
@@ -979,36 +922,9 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 {guardiansLabels.description}
               </CardDescription>
             </div>
-
-            <div className="flex gap-2">
-
-              <Button
-                className="flex items-center gap-2 rounded-3xl bg-green-600 dark:bg-green-700 text-white shadow-lg px-4 py-1.5 font-semibold"
-                onClick={handleAddGuardian}
-                title={guardiansLabels.addGuardian}
-              >
-                {/* الأيقونة */}
-                <span className="text-lg">👤</span>
-                {/* النص يظهر فقط في الديسكتوب */}
-                <span className="hidden sm:inline">{guardiansLabels.addGuardian}</span>
-              </Button>
-
-              <Button
-                className="flex items-center gap-2 rounded-3xl bg-blue-600 dark:bg-blue-700 text-white shadow-lg px-4 py-1.5 font-semibold"
-                onClick={() => handleAddStudent("", true)}
-                title={guardiansLabels.addStudent}
-              >
-                {/* الأيقونة */}
-                <span className="text-lg">🧒</span>
-                {/* النص يظهر فقط في الديسكتوب */}
-                <span className="hidden sm:inline">{guardiansLabels.addStudent}</span>
-              </Button>
-
-
-            </div>
           </div>
         </CardHeader>
-        <CardContent className="pb-2">
+        <CardContent className="pt-0.5 pb-0 px-0 sm:px-0">
           {error && (
             <div className="flex flex-col md:flex-row justify-between items-center 
               gap-0 mb-1 bg-white dark:bg-gray-900 p-1 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
@@ -1018,61 +934,121 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               </Alert>
             </div>
           )}
-          <div className="flex flex-col md:flex-row gap-3 mb-0">
-            {/* حقل البحث */}
-            <div className="relative flex-1">
-              <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={guardiansLabels.searchPlaceholder}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-3 pr-10 w-full"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-            </div>
-
-            {/* الأزرار */}
-            <div className="hidden sm:flex gap-2">
+          {/* التابات + أزرار الأدوات */}
+          <div className="flex flex-col md:flex-row justify-end items-center gap-3 mb-1 rounded-lg
+            bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
+            {/* أزرار الأدوات */}
+            <div className="flex gap-2 items-center flex-wrap justify-center md:justify-end">
+              {/* زر الفلتر */}
               <Button
-              variant="outline"
-              size="icon"
-              onClick={() => loadGuardians()}
-              title={guardiansLabels.refresh}
-              className="shrink-0"
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-2xl
+                  ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}
+                  dark:bg-green-700 dark:hover:bg-green-600 shadow-md hover:scale-105 transition-transform duration-200
+                  px-3 py-1.5 text-xs font-semibold h-8`}
+                onClick={() => setShowFilters(p => !p)}
+                title={showFilters ? 'إخفاء أدوات الفلترة' : 'إظهار أدوات الفلترة'}
               >
-              <RefreshCw className="h-4 w-4" />
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
               </Button>
+              {/* زر الترتيب */}
               <Button
-              variant="outline"
-              size="icon"
-              onClick={handleExportData}
-              title={guardiansLabels.export}
-              className="shrink-0"
-              disabled={exportLoading || guardians.length === 0}
+                type="button"
+                variant={listSortDirection ? 'default' : 'outline'}
+                onClick={toggleListSort}
+                title={listSortDirection === null ? 'ترتيب تصاعدي حسب الاسم' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
+                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200
+                  ${listSortDirection === null
+                    ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600'
+                    : listSortDirection === 'asc'
+                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
               >
-              <FileDown className="h-4 w-4" />
+                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
+                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
+                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">
+                  {listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
+                </span>
+              </Button>
+              {/* زر التحديث */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                onClick={() => loadGuardians()}
+                title={guardiansLabels.refresh}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
+              {/* زر التصدير */}
+              {(userRole === 'superadmin') && (
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-2xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                  onClick={handleExportData}
+                  title={guardiansLabels.export}
+                  disabled={exportLoading || guardians.length === 0}
+                >
+                  <FileDown className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">تصدير</span>
+                </Button>
+              )}
+              {(userRole === 'superadmin' || userRole === 'admin') && (
+                <Button
+                  onClick={handleAddGuardian}
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                  title={guardiansLabels.addGuardian}
+                >
+                  <span className="text-lg">👤</span>
+                  <span className="hidden sm:inline"> {guardiansLabels.addGuardian}</span>
+                </Button>
+              )}
+              <Button
+                onClick={() => handleAddStudent("", true)}
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                title={guardiansLabels.addStudent}
+              >
+                {/* الأيقونة */}
+                <span className="text-lg">🧒</span>
+                {/* النص يظهر فقط في الديسكتوب */}
+                <span className="hidden sm:inline">{guardiansLabels.addStudent}</span>
               </Button>
             </div>
           </div>
+          {showFilters && (
+            <div className="mt-2 mb-2 w-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3 flex flex-col md:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
+                <Input
+                  placeholder={guardiansLabels.searchPlaceholder}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-3 pr-10 w-full bg-white dark:bg-green-950"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
       <GenericTable
-        data={paginatedGuardians}
+        data={filteredGuardians}
         columns={[
           {
             key: 'row_index',
-            header: '#',
+            header: '🔢',
             align: 'center' as const,
-            render: (item) => {
-              const itemIndex = paginatedGuardians.findIndex(g => g.id === item.id);
-              return (currentPage - 1) * itemsPerPage + itemIndex + 1;
-            }
+            render: (_item: any, globalIndex?: number) => (globalIndex ?? 0) + 1
           },
           {
             key: 'full_name',
             header: `👤 ${guardiansLabels.fullName}`,
-            align: 'center' as const,
+            align: 'right' as const,
             important: true,
             render: (item) => (
               <span className="font-medium whitespace-pre-line leading-snug">
@@ -1101,7 +1077,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             align: 'center' as const,
             render: (guardian) =>
               guardian.email ? (
-                <div className="flex items-center justify-center gap-1">
+                <div className="flex items-center justify-end gap-1">
                   <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-islamic-green/60" />
                   <span dir="ltr" className="text-islamic-green/80 text-xs truncate block">
                     {guardian.email}
@@ -1120,21 +1096,20 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             render: (guardian) => (
               <div className="w-full flex items-center justify-center">
                 {guardian.students_count > 0 ? (
-                  <Button
+                  <button
                     type="button"
                     data-stop="true"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (!(isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id)) {
-                        handleShowGuardianStudents(guardian.id, guardian.full_name);
-                      }
+                      startAction('view-students-' + guardian.id, () => handleShowGuardianStudents(guardian.id, guardian.full_name));
                     }}
-                    disabled={isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id}
-                    className="h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={pendingActionKey === 'view-students-' + guardian.id || (isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id)}
+                    className="h-6 px-3 rounded-full font-bold text-white bg-green-600 text-sm 
+                    flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-70 disabled:cursor-not-allowed"
                     title={guardiansLabels.viewStudents}
                   >
-                    {isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id ? (
+                    {(pendingActionKey === 'view-students-' + guardian.id) || (isLoadingGuardianStudents && studentsListLoadingGuardianId === guardian.id) ? (
                       <span className="flex items-center gap-1">
                         <RefreshCw className="h-3 w-3 animate-spin" />
                         <span>...</span>
@@ -1142,17 +1117,25 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     ) : (
                       guardian.students_count
                     )}
-                  </Button>
+                  </button>
                 ) : (
-                  <Button
+                  <button
                     type="button"
                     data-stop="true"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleAddStudent(guardian.id); }}
-                    className="h-6 px-3 rounded-full font-semibold text-green-700 border border-green-300 dark:text-green-200 dark:border-green-600 text-xs bg-white dark:bg-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); startAction('add-student-empty-' + guardian.id, () => handleAddStudent(guardian.id)); }}
+                    disabled={pendingActionKey === 'add-student-empty-' + guardian.id}
+                    className="h-6 px-3 rounded-full font-semibold text-green-700 border border-green-300 dark:text-green-200 dark:border-green-600 text-xs bg-white dark:bg-green-900/30 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-70"
                     title={guardiansLabels.addStudent}
                   >
-                    + {guardiansLabels.addStudent}
-                  </Button>
+                    {pendingActionKey === 'add-student-empty-' + guardian.id ? (
+                      <span className="flex items-center gap-1">
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                        <span>...</span>
+                      </span>
+                    ) : (
+                      <>+ {guardiansLabels.addStudent}</>
+                    )}
+                  </button>
                 )}
               </div>
             ),
@@ -1165,31 +1148,46 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
               <div className="flex justify-center items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleEditGuardian(guardian)}
+                  onClick={() => startAction('edit-guardian-' + guardian.id, () => handleEditGuardian(guardian))}
                   title={guardiansLabels.editTooltip}
-                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                   data-stop="true"
+                  disabled={pendingActionKey === 'edit-guardian-' + guardian.id}
                 >
-                  <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                  {pendingActionKey === 'edit-guardian-' + guardian.id ? (
+                    <RefreshCw className="h-4 w-4 animate-spin text-green-600" />
+                  ) : (
+                    <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                  )}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleAddStudent(guardian.id)}
+                  onClick={() => startAction('inline-add-student-' + guardian.id, () => handleAddStudent(guardian.id))}
                   title={guardiansLabels.addStudentTooltip}
-                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                   data-stop="true"
+                  disabled={pendingActionKey === 'inline-add-student-' + guardian.id}
                 >
-                  <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
+                  {pendingActionKey === 'inline-add-student-' + guardian.id ? (
+                    <RefreshCw className="h-4 w-4 animate-spin text-green-600" />
+                  ) : (
+                    <UserPlus className="h-4 w-4 text-green-600 dark:text-green-300" />
+                  )}
                 </button>
                 {userRole === 'superadmin' && (
                   <button
                     type="button"
-                    onClick={() => handleDeleteGuardian(guardian)}
+                    onClick={() => startAction('delete-guardian-' + guardian.id, () => handleDeleteGuardian(guardian))}
                     title={guardiansLabels.deleteTooltip}
-                    className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="h-8 w-8 p-0 rounded-lg flex items-center justify-center bg-white dark:bg-green-900/40 border border-green-300 dark:border-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                     data-stop="true"
+                    disabled={pendingActionKey === 'delete-guardian-' + guardian.id}
                   >
-                    <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                    {pendingActionKey === 'delete-guardian-' + guardian.id ? (
+                      <RefreshCw className="h-4 w-4 animate-spin text-red-500" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                    )}
                   </button>
                 )}
               </div>
@@ -1197,9 +1195,16 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           },
         ]}
         emptyMessage={searchTerm ? guardiansLabels.noSearchResults : guardiansLabels.noGuardians}
-        // تفعيل طي الحقول وعرض زر "عرض المزيد" على الموبايل فقط
+        onRefresh={loadGuardians}
+        onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddGuardian : undefined}
+        enablePagination
+        defaultPageSize={8}
+        pageSizeOptions={[8, 16, 48, 100]}
+        cardMaxFieldsCollapsed={4}
         enableCardExpand={isMobile}
-        cardMaxFieldsCollapsed={isMobile ? Math.max(2, mobileCollapsedFields) : undefined}
+        className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+        getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
+        hideSortToggle={true}
       />
       {/* حوار إضافة ولي أمر */}
       <FormDialog
@@ -1207,6 +1212,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         onSave={handleSaveGuardian}
+        isLoading={isSavingGuardian}
         saveButtonText={dialogMode === "add"
           ? guardiansLabels.addGuardian
           : guardiansLabels.editGuardian}
@@ -1352,21 +1358,20 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 data={selectedGuardianStudents.map((student, index) => ({
                   ...student,
                   id: student.id.toString(),
-                  // serial kept for backward compatibility; new explicit index field added
                   serial: index + 1,
                   index: index + 1
                 }))}
-                defaultView="card"
-                cardPageSize={2}
-                showCardNavInHeader
-                cardMobilePageSize={1}
+                defaultView="table"
+                enablePagination
+                defaultPageSize={3}
+                pageSizeOptions={[3, 6, 12, 24, 50]}
+                hideSortToggle={false}
                 columns={[
                   {
                     key: 'row_index',
-                    header: '#',
+                    header: '🔢',
                     align: 'center' as const,
-                    // Prefer the explicit index field; fallback to serial if needed
-                    render: (student) => (student.index ?? student.serial),
+                    render: (_student, globalIndex) => (globalIndex ?? 0) + 1,
                   },
                   {
                     key: 'full_name',
@@ -1445,11 +1450,8 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                     : []),
                 ]}
                 emptyMessage={guardiansLabels.noStudentsForGuardian}
-                className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-                getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50' : 'bg-white'} cursor-pointer`}
-                // تمكين زر "عرض المزيد" على الموبايل فقط وعرض عدد حقول يعتمد على عرض الشاشة
-                enableCardExpand={isMobile}
-                cardMaxFieldsCollapsed={isMobile ? mobileCollapsedFields : undefined}
+                className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
+                getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
               />
 
             ) : (

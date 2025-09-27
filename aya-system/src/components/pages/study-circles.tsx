@@ -579,9 +579,17 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
   // تعريف أعمدة جدول الجدولة
   const tableColumns: Column<StudyCircleSchedule>[] = [
+        {
+      key: 'row_index',
+      header: '🔢',
+      align: 'center' as const,
+      render: (s: any) => (
+        <span className="text-xs font-semibold text-green-700">{s.row_index}</span>
+      )
+    },
     {
       key: 'weekday',
-      header: studyCirclesLabels.schedule.table.weekday,
+      header: '📅 ' + studyCirclesLabels.schedule.table.weekday,
       render: (schedule) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-green-700 dark:text-green-300" />
@@ -591,17 +599,24 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     },
     {
       key: 'time',
-      header: studyCirclesLabels.schedule.table.time,
+      header: '⏰ ' + studyCirclesLabels.schedule.table.time,
+      align: 'right' as const,
       render: (schedule) => (
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-blue-700 dark:text-blue-300" />
-          <span dir="ltr">{formatTime(schedule.start_time)} - {formatTime(schedule.end_time)}</span>
+        <div className="flex items-center gap-1 flex-wrap max-w-full">
+          <div className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-0.5 rounded-lg text-[11px] whitespace-nowrap">
+            <Clock className="h-3 w-3" />
+            <span className="font-medium">{formatTime(schedule.start_time)}</span>
+          </div>
+          <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-2 py-0.5 rounded-lg text-[11px] whitespace-nowrap">
+            <Clock className="h-3 w-3" />
+            <span className="font-medium">{formatTime(schedule.end_time)}</span>
+          </div>
         </div>
       )
     },
     {
       key: 'location',
-      header: studyCirclesLabels.schedule.table.location,
+      header: '📍 ' + studyCirclesLabels.schedule.table.location,
       render: (schedule) => (
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-orange-700 dark:text-orange-300" />
@@ -611,7 +626,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     },
     ...(userRole === 'superadmin' || userRole === 'admin' ? [{
       key: 'actions',
-      header: studyCirclesLabels.schedule.table.actions,
+      header: '⚙️ ' + studyCirclesLabels.schedule.table.actions,
       align: 'center' as const,
       render: (schedule) => (
         <div className="flex items-center justify-center gap-2">
@@ -1086,7 +1101,11 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 columns={tableColumns}
                 className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
                 defaultView="table"
-                hideSortToggle={true}
+                hideSortToggle={false}
+                enablePagination={true}
+                defaultPageSize={3}
+                pageSizeOptions={[3,6,12,24,50]}
+                getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
               />
             )}
           </div>
