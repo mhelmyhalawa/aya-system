@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { Button } from '@/components/ui/button';
@@ -93,6 +93,10 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
   const [studyCircleId, setStudyCircleId] = useState(initialData?.study_circle_id || '');
   const [teacherSearch, setTeacherSearch] = useState('');
   const [showValidation, setShowValidation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // track circles loading for teacher context so we trigger only once per dialog open
+  const circlesLoadedRef = useRef(false);
 
   // reset when opens
   useEffect(() => {
@@ -112,8 +116,25 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       setGuardianSearch('');
       setTeacherSearch('');
       setShowValidation(false);
+      // allow re-trigger next open
+      circlesLoadedRef.current = false;
     }
   }, [open, initialData, isTeacher, currentTeacherId, fixedGuardianId]);
+
+  // Auto load circles for teacher context (since teacher select is fixed and we never call onLoadTeacherCircles in UI)
+  useEffect(() => {
+    if (open && isTeacher && currentTeacherId && !circlesLoadedRef.current) {
+      onLoadTeacherCircles?.(currentTeacherId);
+      circlesLoadedRef.current = true;
+    }
+  }, [open, isTeacher, currentTeacherId, onLoadTeacherCircles]);
+
+  // Auto select single circle if only one available (teacher context) and none chosen yet
+  useEffect(() => {
+    if (isTeacher && studyCircles.length === 1) {
+      setStudyCircleId(prev => prev || studyCircles[0].id);
+    }
+  }, [isTeacher, studyCircles]);
 
   const filteredGuardians = useMemo(() => {
     return guardians.filter(g => !guardianSearch || g.full_name.includes(guardianSearch) || (g.phone_number && g.phone_number.includes(guardianSearch)));
@@ -132,9 +153,9 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       if (!guardianId) return false;
     }
     if (s === 1) {
-      // المعلم والحلقة الآن إجباريان
+      // المعلم مطلوب في الوضع الإداري فقط، الحلقة مطلوبة فقط إذا لم يكن المستخدم معلماً
       if (!isTeacher && !teacherId) return false;
-      if (!studyCircleId) return false;
+      if (!isTeacher && !studyCircleId) return false; // optional for teacher mode
     }
     return true;
   };
@@ -151,7 +172,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
         if (!guardianId) missing.push('ولي الأمر');
       } else if (step === 1) {
         if (!isTeacher && !teacherId) missing.push('المعلم');
-        if (!studyCircleId) missing.push('الحلقة');
+        if (!isTeacher && !studyCircleId) missing.push('الحلقة');
       }
       if (missing.length) {
         toast({
@@ -167,6 +188,8 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
 
   const submit = async () => {
+    if (isSubmitting) return; // guard
+    setIsSubmitting(true);
     const payload: StudentFormData = {
       id: initialData?.id,
       full_name: fullName,
@@ -181,8 +204,18 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       study_circle_id: studyCircleId || undefined,
       teacher_id: (isTeacher ? (currentTeacherId || undefined) : (teacherId || undefined))
     };
-    await onSubmit(payload);
-    onAfterSubmit?.();
+    try {
+      await onSubmit(payload);
+      onAfterSubmit?.();
+      onOpenChange(false); // close dialog on success
+    } catch (err: any) {
+      // show toast if available
+      try {
+        toast({ title: 'تعذر الحفظ', description: err?.message || 'حدث خطأ أثناء حفظ بيانات الطالب', variant: 'destructive' });
+      } catch { /* ignore */ }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const title = mode === 'add' ? studentsLabels.addStudent : studentsLabels.editStudent;
@@ -196,6 +229,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       onSave={isLast ? submit : handleNext}
       mode={mode}
       saveButtonText={isLast ? studentsLabels.save : 'التالي'}
+  isLoading={isSubmitting}
       maxWidth="360px"
       hideCancelButton
       extraButtons={(
@@ -350,22 +384,38 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
               )}
             </div>
             <div>
-              <Label className="mb-2 block">{studentsLabels.studyCircleName} <span className="text-destructive">*</span></Label>
+              <Label className="mb-2 block">
+                {studentsLabels.studyCircleName}
+                {!isTeacher && <span className="text-destructive"> *</span>}
+                {isTeacher && <span className="text-muted-foreground text-[10px] ml-1">(اختياري)</span>}
+              </Label>
               {isLoadingCircles ? (
                 <div className="h-9 rounded-md bg-gray-200 animate-pulse flex items-center justify-center text-xs text-gray-500">جار التحميل...</div>
+              ) : isTeacher && studyCircles.length === 1 ? (
+                <div className="flex items-center gap-2 p-2 border rounded-md bg-muted">
+                  <UserCircle className="h-4 w-4 text-islamic-green/60" />
+                  <span>{studyCircles[0]?.name || 'حلقة واحدة'}</span>
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-islamic-green text-white">ثابت</span>
+                </div>
               ) : (
-                <Select value={studyCircleId} onValueChange={val => setStudyCircleId(val)} disabled={(!teacherId && !isTeacher) || !!isLoadingCircles}>
-                  <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}><SelectValue placeholder={teacherId || isTeacher ? studentsLabels.studyCirclePlaceholder : 'اختر معلم أولاً'} /></SelectTrigger>
+                <Select
+                  value={studyCircleId}
+                  onValueChange={val => setStudyCircleId(val)}
+                  disabled={(!teacherId && !isTeacher) || !!isLoadingCircles || (isTeacher && studyCircles.length === 0)}
+                >
+                  <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}>
+                    <SelectValue placeholder={(teacherId || isTeacher) ? (studentsLabels.studyCirclePlaceholder || 'اختر حلقة') : 'اختر معلم أولاً'} />
+                  </SelectTrigger>
                   <SelectContent position="item-aligned" align="start" side="bottom">
                     {studyCircles.length > 0 ? (
                       studyCircles.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)
                     ) : (
-                      <div className="p-2 text-center text-muted-foreground">{teacherId || isTeacher ? 'لا توجد حلقات' : 'اختر معلم أولاً'}</div>
+                      <div className="p-2 text-center text-muted-foreground">{(teacherId || isTeacher) ? 'لا توجد حلقات' : 'اختر معلم أولاً'}</div>
                     )}
                   </SelectContent>
                 </Select>
               )}
-              {showValidation && step === 1 && !studyCircleId && <p className="text-[11px] text-destructive mt-1">مطلوب اختيار الحلقة</p>}
+              {showValidation && step === 1 && !studyCircleId && !isTeacher && <p className="text-[11px] text-destructive mt-1">مطلوب اختيار الحلقة</p>}
             </div>
             <div>
               <Label className="mb-2 block">{studentsLabels.lastQuranProgress} <span className="text-muted-foreground text-xs">{studentsLabels.optionalField}</span></Label>

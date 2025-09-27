@@ -941,6 +941,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   const filteredGuardiansForPicker = useMemo(() => {
     return guardians.filter(g => !guardianPickerSearch || (g.full_name || '').toLowerCase().includes(guardianPickerSearch.toLowerCase()));
   }, [guardians, guardianPickerSearch]);
+  // اختيار الكل أولياء (حسب الظاهر في الفلترة)
+  const isAllGuardiansSelected = useMemo(() => {
+    if (!filteredGuardiansForPicker.length) return false;
+    return filteredGuardiansForPicker.every(g => selectedGuardianIds.includes(g.id) || selectedGuardianIds.includes(g.phone_number || ''));
+  }, [filteredGuardiansForPicker, selectedGuardianIds]);
+
+  const toggleSelectAllGuardians = () => {
+    const ids = filteredGuardiansForPicker.map(g => g.id || g.phone_number).filter(Boolean) as string[];
+    const allSelected = ids.every(id => selectedGuardianIds.includes(id));
+    if (allSelected) {
+      // إزالة الظاهرين فقط
+      setSelectedGuardianIds(prev => prev.filter(id => !ids.includes(id)));
+    } else {
+      setSelectedGuardianIds(prev => Array.from(new Set([...prev, ...ids])));
+    }
+    setTimeout(() => handleSearch(), 60);
+  };
   // عدد الحلقات لكل معلم (نعتمد على studyCircles العامة، أو teacherStudyCircles عند الحاجة)
   const teacherCirclesCountMap = useMemo(() => {
     const map: Record<string, number> = {};
@@ -1531,17 +1548,48 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         maxWidth="640px"
       >
         <div className="flex flex-col gap-3 py-1">
-          <div className="relative">
-            <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
-            <Input
-              placeholder={guardiansLabels.searchPlaceholder || 'ابحث عن ولي أمر'}
-              value={guardianPickerSearch}
-              onChange={(e) => setGuardianPickerSearch(e.target.value)}
-              className="pl-3 pr-10 bg-white dark:bg-green-950"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder={guardiansLabels.searchPlaceholder || '🔍 اسم ولي الأمر'}
+                value={guardianPickerSearch}
+                onChange={(e) => setGuardianPickerSearch(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleSelectAllGuardians}
+                className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-green-600 hover:bg-green-700 text-white shadow transition"
+                title="تحديد/إلغاء تحديد المعروض"
+              >
+                الكل
+              </button>
+              {!isAllGuardiansSelected && selectedGuardianIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => { clearAllGuardians(); }}
+                  className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-red-500 hover:bg-red-600 text-white shadow transition"
+                  title="إزالة جميع التحديد"
+                >
+                  مسح
+                </button>
+              )}
+              <div
+                className={`h-8 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center
+                  ${isAllGuardiansSelected
+                    ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                    : 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'}`}
+                title="عدد المحددين"
+              >
+                {isAllGuardiansSelected ? 'الجميع' : selectedGuardianIds.length}
+              </div>
+            </div>
           </div>
           <GenericTable
-            title={guardiansLabels.guardian}
+            title={guardiansLabels.guardian || 'أولياء الأمور'}
             defaultView="table"
             enablePagination
             defaultPageSize={5}
@@ -1549,7 +1597,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             data={filteredGuardiansForPicker}
             getRowClassName={(item: any, index) => `${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
             hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-xs"
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
             columns={([
               {
                 key: 'row_index',
@@ -1568,7 +1616,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     className="flex items-center justify-between w-full group"
                   >
                     <span className={`text-sm font-medium group-hover:text-green-700 ${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'text-green-700' : ''}`}>{item.full_name}</span>
-                    {(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محدد</span>}
+                    {(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || ''))}
                   </button>
                 )
               },
@@ -1582,15 +1630,22 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 key: 'actions',
                 header: `⚙️ ${studentsLabels.actions}`,
                 align: 'center',
-                render: (item: any) => (
-                  <Button
-                    size="sm"
-                    className={`h-7 px-3 rounded-full text-white ${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'bg-red-500 hover:bg-red-600' : 'bg-green-600 hover:bg-green-700'}`}
-                    onClick={() => handleSelectGuardian(item)}
-                  >
-                    {(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'ازالة' : 'اختيار'}
-                  </Button>
-                )
+                render: (item: any) => {
+                  const sel = (selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || ''));
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectGuardian(item)}
+                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
+                          ${sel ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                        title={sel ? 'إزالة من التحديد' : 'تحديد'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  );
+                }
               }
             ]) as Column<any>[]}
             emptyMessage={guardiansLabels.noGuardians || 'لا يوجد بيانات'}
@@ -1609,14 +1664,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         maxWidth="640px"
       >
         <div className="flex flex-col gap-3 py-1">
-          <div className="relative">
-            <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
-            <Input
-              placeholder={studentsLabels.teacherPlaceholder || 'ابحث عن معلم'}
-              value={teacherSearchTerm}
-              onChange={(e) => setteacherSearchTerm(e.target.value)}
-              className="pl-3 pr-10 bg-white dark:bg-green-950"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder={studentsLabels.teacherPlaceholder || '🔍 اسم المعلم'}
+                value={teacherSearchTerm}
+                onChange={(e) => setteacherSearchTerm(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
           </div>
           <GenericTable
             title={studentsLabels.teacherColumn}
@@ -1627,7 +1684,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             data={filteredTeachersForPicker}
             getRowClassName={(item: any, index) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
             hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-xs"
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
             columns={([
               {
                 key: 'row_index',
@@ -1647,7 +1704,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     className="flex items-center justify-between w-full text-right group"
                   >
                     <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === selectedTeacherId ? 'text-green-700' : ''}`}>{item.full_name}</span>
-                    {item.id === selectedTeacherId && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محدد</span>}
+                    {item.id === selectedTeacherId}
                   </button>
                 )
               },
@@ -1664,16 +1721,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 key: 'actions',
                 header: `⚙️ ${studentsLabels.actions}`,
                 align: 'center',
-                render: (item: any) => (
-                  <Button
-                    size="sm"
-                    disabled={item.id === selectedTeacherId}
-                    className={`h-7 px-3 rounded-full text-white ${item.id === selectedTeacherId ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'}`}
-                    onClick={() => handleSelectTeacher(item)}
-                  >
-                    {item.id === selectedTeacherId ? '✓' : 'اختيار'}
-                  </Button>
-                )
+                render: (item: any) => {
+                  const sel = item.id === selectedTeacherId;
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        disabled={sel}
+                        onClick={() => handleSelectTeacher(item)}
+                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
+                          ${sel ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                        title={sel ? 'محدد' : 'تحديد'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  );
+                }
               }
             ]) as Column<any>[]}
             emptyMessage={studentsLabels.noStudents || 'لا يوجد بيانات'}
@@ -1692,14 +1756,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         maxWidth="640px"
       >
         <div className="flex flex-col gap-3 py-1">
-          <div className="relative">
-            <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
-            <Input
-              placeholder={studentsLabels.studyCirclePlaceholder || 'ابحث عن حلقة'}
-              value={circlePickerSearch}
-              onChange={(e) => setCirclePickerSearch(e.target.value)}
-              className="pl-3 pr-10 bg-white dark:bg-green-950"
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder={studentsLabels.studyCirclePlaceholder || '🔍 اسم الحلقة'}
+                value={circlePickerSearch}
+                onChange={(e) => setCirclePickerSearch(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
           </div>
           <GenericTable
             title={studentsLabels.studyCircleShort}
@@ -1710,7 +1776,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             data={filteredCirclesForPicker}
             getRowClassName={(item: any, index) => `${item.id === studyCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
             hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-xs"
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
             columns={([
               {
                 key: 'row_index',
@@ -1729,7 +1795,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     className="flex items-center justify-between w-full group"
                   >
                     <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === studyCircleId ? 'text-green-700' : ''}`}>{item.name}</span>
-                    {item.id === studyCircleId && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white">محددة</span>}
+                    {item.id === studyCircleId}
                   </button>
                 )
               },
@@ -1753,16 +1819,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 key: 'actions',
                 header: `⚙️ ${studentsLabels.actions}`,
                 align: 'center',
-                render: (item: any) => (
-                  <Button
-                    size="sm"
-                    disabled={item.id === studyCircleId}
-                    className={`h-7 px-3 rounded-full text-white ${item.id === studyCircleId ? 'bg-green-400' : 'bg-green-600 hover:bg-green-700'}`}
-                    onClick={() => handleSelectCircle(item)}
-                  >
-                    {item.id === studyCircleId ? '✓' : 'اختيار'}
-                  </Button>
-                )
+                render: (item: any) => {
+                  const sel = item.id === studyCircleId;
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        disabled={sel}
+                        onClick={() => handleSelectCircle(item)}
+                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
+                          ${sel ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                        title={sel ? 'محددة' : 'تحديد'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  );
+                }
               }
             ]) as Column<any>[]}
             emptyMessage={studentsLabels.noStudents || 'لا يوجد بيانات'}

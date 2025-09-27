@@ -20,7 +20,9 @@ import {
 } from '../types/assessment';
 import { Profile } from '../types/profile';
 import { StudyCircle } from '../types/study-circle';
-import { Table2, LayoutGrid, Plus, Pencil, Trash2, Award, Trophy, ClipboardList, RefreshCwIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, ClipboardList, RefreshCwIcon, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA, GraduationCap, BookOpen, User, ChevronDown, Search } from 'lucide-react';
+import { FormDialog } from '@/components/ui/form-dialog';
+import { GenericTable } from '@/components/ui/generic-table';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 
 import {
@@ -69,7 +71,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     role?: 'teacher' | 'admin' | 'superadmin' | string;
   }[]>([]);
   const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('all-students');
+  // اختيار متعدد للطلاب في الفلاتر (الواجهة الرئيسية) - إذا كانت القائمة فارغة نعتبره "الجميع"
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all-teachers');
   const [selectedCircleId, setSelectedCircleId] = useState<string>('all-circles');
   const [assessmentToEdit, setAssessmentToEdit] = useState<Assessment | null>(null);
@@ -80,7 +83,78 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [currentUser, setCurrentUser] = useState<any>(propCurrentUser);
   const [activeTab, setActiveTab] = useState(propCurrentUser?.role === 'teacher' ? 'my-assessments' : 'all-assessments');
   const [tableExists, setTableExists] = useState<boolean>(true);
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
+  // إظهار/إخفاء أدوات الفلترة الإضافية
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  // اتجاه الترتيب (حسب اسم الطالب)
+  const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc' | null>(null);
+  // حوارات اختيار
+  const [isTeacherPickerOpen, setIsTeacherPickerOpen] = useState(false);
+  const [isStudentPickerOpen, setIsStudentPickerOpen] = useState(false);
+  const [isCirclePickerOpen, setIsCirclePickerOpen] = useState(false);
+  // مصطلحات البحث داخل الحوارات
+  const [teacherSearchTerm, setteacherSearchTerm] = useState('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [circlePickerSearch, setCirclePickerSearch] = useState('');
+
+  // اشتقاقات مساعدة
+  const isAllStudentsSelected = selectedStudentIds.length === 0; // فارغ يعني الجميع
+
+  // دوال مساعدة للتعامل مع التحديد المتعدد
+  const clearStudentSelection = () => setSelectedStudentIds([]);
+  const toggleStudentSelection = (id: string) => {
+    setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+  const selectedTeacher = useMemo(() => selectedTeacherId === 'all-teachers' ? null : teachers.find(t => t.id === selectedTeacherId) || null, [selectedTeacherId, teachers]);
+  const selectedCircle = useMemo(() => selectedCircleId === 'all-circles' ? null : studyCircles.find(c => c.id === selectedCircleId) || null, [selectedCircleId, studyCircles]);
+
+  // ترشيح بيانات الحوارات
+  const filteredTeachersForPicker = useMemo(() => {
+    const term = teacherSearchTerm.trim().toLowerCase();
+    return teachers.filter(t => !term || (t.full_name || '').toLowerCase().includes(term));
+  }, [teachers, teacherSearchTerm]);
+
+  const filteredStudentsForPicker = useMemo(() => {
+    const term = studentSearchTerm.trim().toLowerCase();
+    return students.filter(s => {
+      // تطبيق نفس فلاتر المعلم والحلقة الحالية (كما في المرئيين) لتقليل التشويش
+      if (selectedTeacherId !== 'all-teachers') {
+        const teacherCircleIds = studyCircles.filter(c => c.teacher_id === selectedTeacherId).map(c => c.id);
+        if (s.teacher_id !== selectedTeacherId && !(s.study_circle_id && teacherCircleIds.includes(s.study_circle_id))) return false;
+      }
+      if (selectedCircleId !== 'all-circles' && s.study_circle_id !== selectedCircleId) return false;
+      if (!term) return true;
+      const name = (s.full_name || '').toLowerCase();
+      const guardian = (s.guardian?.full_name || '').toLowerCase();
+      return name.includes(term) || guardian.includes(term);
+    });
+  }, [students, studentSearchTerm, selectedTeacherId, selectedCircleId, studyCircles]);
+
+  const filteredCirclesForPicker = useMemo(() => {
+    const term = circlePickerSearch.trim().toLowerCase();
+    return studyCircles.filter(c => {
+      if (selectedTeacherId !== 'all-teachers' && c.teacher_id !== selectedTeacherId) return false;
+      if (!term) return true;
+      return (c.name || '').toLowerCase().includes(term);
+    });
+  }, [studyCircles, circlePickerSearch, selectedTeacherId]);
+
+  // الترتيب حسب اسم الطالب بعد التصفية
+  const applyListSorting = (list: Assessment[]) => {
+    if (!listSortDirection) return list;
+    return [...list].sort((a, b) => {
+      const studentA = students.find(s => s.id === a.student_id)?.full_name || '';
+      const studentB = students.find(s => s.id === b.student_id)?.full_name || '';
+      return listSortDirection === 'asc' ? studentA.localeCompare(studentB, 'ar') : studentB.localeCompare(studentA, 'ar');
+    });
+  };
+
+  const toggleListSort = () => {
+    setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+  };
+
+  const handleAddNewRecord = () => {
+    handleAddAssessment();
+  };
   // متغيرات مربع حوار تأكيد الحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [assessmentToDelete, setAssessmentToDelete] = useState<Assessment | null>(null);
@@ -234,9 +308,9 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       filtered = filtered.filter(a => a.recorded_by === selectedTeacherId);
     }
 
-    // فلترة حسب الطالب المحدد
-    if (selectedStudentId !== 'all-students') {
-      filtered = filtered.filter(a => a.student_id === selectedStudentId);
+    // فلترة حسب الطلاب المحددين (تحديد متعدد) - إذا القائمة فارغة يعني الجميع
+    if (selectedStudentIds.length > 0) {
+      filtered = filtered.filter(a => selectedStudentIds.includes(a.student_id));
     }
 
     // فلترة حسب الحلقة المحددة
@@ -281,8 +355,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       });
     }
 
-    setFilteredAssessments(filtered);
-  }, [assessments, selectedTeacherId, selectedStudentId, selectedCircleId, filterType, searchQuery, students, teachers]);
+    setFilteredAssessments(applyListSorting(filtered));
+  }, [assessments, selectedTeacherId, selectedStudentIds, selectedCircleId, filterType, searchQuery, students, teachers, listSortDirection]);
 
   // حساب الدرجة الكلية
   const calculateTotalScore = () => {
@@ -763,14 +837,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   };
 
   return (
-    <div className="container mx-auto py-6" dir="rtl">
-      <Card className="border border-green-300 shadow-xl rounded-2xl overflow-hidden">
-
-        <CardHeader className="pb-3 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+    <div className="w-full max-w-[1600px] mx-auto">
+      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
+        {/* الهيدر */}
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-xl md:text-2xl font-extrabold text-blue-50 flex items-center gap-2">
+              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-yellow-300" />
                 تقييمات الطلاب
               </CardTitle>
@@ -778,445 +852,463 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                 هنا يمكنك عرض وتسجيل تقييمات الطلاب بشكل تفصيلي
               </CardDescription>
             </div>
-
-            {/* زر العودة */}
-            <Button
-              variant="outline"
-              className="flex items-center gap-2 rounded-3xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-4 py-1.5 font-semibold"
-              onClick={refreshData}
-            >
-              <RefreshCwIcon className="h-4 w-4" />
-              تحديث
-            </Button>
           </div>
         </CardHeader>
 
         <CardContent>
-          {/* Content goes here */}
-          <>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
-              <div className="flex-1 min-w-[180px]">
+          {/* شريط علوي مضغوط مشابه للمطلوب */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-1 rounded-lg bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
+            {/* التابات */}
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full md:w-[380px] bg-green-50 rounded-lg shadow-inner p-0.5"
+            >
+              <TabsList className="grid w-full grid-cols-2 gap-0.5 rounded-lg bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
+                <TabsTrigger
+                  value="all-records"
+                  className="flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                  title='جميع السجلات'
+                >
+                  📋 <span className="hidden sm:inline">جميع السجلات</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="my-records"
+                  className="flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                  title='سجلاتي فقط'
+                >
+                  👤 <span className="hidden sm:inline">سجلاتي</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <div className="flex gap-2 items-center">
+              {/* زر الفلتر */}
+              <Button
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-2xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8`}
+                onClick={() => setShowFilters(p => !p)}
+                title={showFilters ? 'إخفاء أدوات الفلترة' : 'إظهار أدوات الفلترة'}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
+              </Button>
+              {/* زر الترتيب */}
+              <Button
+                type="button"
+                variant={listSortDirection ? 'default' : 'outline'}
+                onClick={toggleListSort}
+                title={listSortDirection === null ? 'ترتيب تصاعدي حسب اسم الطالب' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
+                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200 ${listSortDirection === null ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600' : listSortDirection === 'asc' ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500' : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
+              >
+                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
+                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
+                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</span>
+              </Button>
+              {/* زر التحديث */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                onClick={refreshData}
+                title='تحديث البيانات'
+              >
+                <RefreshCwIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
+              {/* زر إضافة سجل */}
+              <Button
+                onClick={handleAddNewRecord}
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                title='إضافة سجل جديد'
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">إضافة سجل جديد</span>
+              </Button>
+            </div>
+          </div>
+          {showFilters && (
+            <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 rounded-lg animate-fade-in">
+              {/* البحث */}
+              <div className="w-full md:flex-1 min-w-0 md:min-w-[180px]">
                 <Input
+                  title='🔍 بحث عن طالب أو ولي أمر أو سورة أو ملاحظات...'
                   placeholder="🔍 بحث عن طالب أو ولي أمر أو سورة أو ملاحظات..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green focus:border-islamic-green text-sm text-gray-800 dark:text-gray-200 transition-all duration-200"
                 />
               </div>
-
-              {/* اختيار المعلم */}
-              <div className="min-w-[140px]">
-                <Select
-                  value={selectedTeacherId}
-                  onValueChange={(value) => {
-                    setSelectedTeacherId(value);
-                    setSelectedCircleId('all-circles');
-                    setSelectedStudentId('all-students');
-                  }}
-                >
-                  <SelectTrigger className="rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder="👨‍🏫 اختر معلماً" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-teachers">جميع المعلمين</SelectItem>
-                    {visibleTeachers.length > 0
-                      ? visibleTeachers.map(teacher => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.full_name ?? `المعلم ${teacher.id.slice(0, 4)}`}
-                          {teacher.role && (
-                            teacher.role === 'teacher'
-                              ? ' (معلم)'
-                              : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`
-                          )}
-                        </SelectItem>
-                      ))
-                      : <SelectItem disabled value="__no__">لا يوجد معلمين أو مشرفين</SelectItem>
-                    }
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* اختيار الحلقة */}
-              <div className="min-w-[140px]">
-                <Select
-                  value={selectedCircleId}
-                  onValueChange={(value) => {
-                    console.log('تم اختيار الحلقة:', value);
-                    setSelectedCircleId(value);
-                    setSelectedStudentId('all-students');
-                    
-                    // طباعة معلومات تشخيصية عن الطلاب في الحلقة المحددة
-                    if (value !== 'all-circles') {
-                      const studentsInCircle = students.filter(s => s.study_circle_id === value);
-                      console.log(`الطلاب في الحلقة المحددة (${value}):`, studentsInCircle.length);
-                      console.log('معرفات الطلاب في الحلقة:', studentsInCircle.map(s => s.id));
-                      
-                      if (studentsInCircle.length === 0) {
-                        console.log('لا يوجد طلاب في هذه الحلقة!');
-                        console.log('جميع معرفات الحلقات المتاحة في الطلاب:', 
-                          [...new Set(students.map(s => s.study_circle_id))]
-                            .filter(Boolean)
-                            .join(', ')
-                        );
-                      }
-                    }
-                  }}
-                  disabled={selectedTeacherId === 'all-teachers' && visibleStudyCircles.length === 0}
-                >
-                  <SelectTrigger className="rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder={
-                      selectedTeacherId === 'all-teachers'
-                        ? "📚 جميع الحلقات"
-                        : visibleStudyCircles.length === 0
-                          ? "لا توجد حلقات"
-                          : "اختر حلقة"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-circles">جميع الحلقات</SelectItem>
-                    {visibleStudyCircles.map(circle => (
-                      <SelectItem key={circle.id} value={circle.id}>
-                        {circle.name || `حلقة ${circle.id}`} {selectedTeacherId === 'all-teachers' && circle.teacher ? ` - ${circle.teacher.full_name}` : ''} ({circle.students_count} طالب)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* اختيار الطالب */}
-              {/* اختيار الطالب */}
-              <div className="min-w-[140px]">
-                <Select
-                  value={selectedStudentId}
-                  onValueChange={(value) => {
-                    console.log('تم اختيار الطالب:', value);
-                    setSelectedStudentId(value);
-                    
-                    // إذا تم اختيار طالب محدد، اطبع معلومات عنه للتشخيص
-                    if (value !== 'all-students') {
-                      const selectedStudent = students.find(s => s.id === value);
-                      console.log('معلومات الطالب المحدد:', {
-                        id: selectedStudent?.id,
-                        name: selectedStudent?.full_name,
-                        study_circle_id: selectedStudent?.study_circle_id,
-                        teacher_id: selectedStudent?.teacher_id
-                      });
-                    }
-                  }}
-                  disabled={visibleStudents.length === 0}
-                >
-                  <SelectTrigger className="rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder={visibleStudents.length === 0 ? "لا يوجد طلاب" : "👦 جميع الطلاب"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-students">جميع الطلاب</SelectItem>
-                    {visibleStudents.map(student => (
-                      <SelectItem key={student.id} value={student.id}>
-                        <div className="flex flex-col text-sm">
-                          <span className="font-medium">{student.full_name}</span>
-                          {student.guardian && student.guardian.full_name && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">ولي الأمر: {student.guardian.full_name}</span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* اختيار نوع التقييم */}
-
-              <div className="min-w-[140px]">
-                <Select
-                  value={filterType}
-                  onValueChange={setFilterType}
-                  disabled={visibleStudents.length === 0}
-                >
-                  <SelectTrigger className="rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder="اختر نوع التقييم" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">جميع الأنواع</SelectItem>
-                    {assessmentTypeOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                onClick={handleAddAssessment}
-                className="bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center gap-2 px-3 py-1.5 shadow-md hover:scale-105 transition-transform duration-200 text-sm font-semibold ring-1 ring-green-500/30 hover:ring-2 hover:ring-green-500/50 active:scale-95"
-              >
-                <Plus className="w-3 h-3" />
-                إضافة سجل جديد
-              </Button>
-
-            </div>
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 bg-white dark:bg-gray-900 p-4 rounded-2xl shadow-md border border-green-200 dark:border-green-700">
-              {/* التابات */}
-              <Tabs
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="w-full md:w-[420px] bg-green-50 rounded-xl shadow-inner p-1"
-              >
-                <TabsList className="grid w-full grid-cols-2 rounded-xl bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300">
-                  <TabsTrigger
-                    value="all-records"
-                    className="
-                                flex items-center justify-center gap-2 text-sm font-medium
-                                rounded-lg
-                                text-green-800
-                                hover:bg-green-100 hover:text-green-900
-                                data-[state=active]:bg-islamic-green
-                                data-[state=active]:text-white
-                                transition-all duration-300
-                              "
-                  >
-                    📋 جميع السجلات
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="my-records"
-                    className="
-                              flex items-center justify-center gap-2 text-sm font-medium
-                              rounded-lg
-                              text-green-800
-                              hover:bg-green-100 hover:text-green-900
-                              data-[state=active]:bg-islamic-green
-                              data-[state=active]:text-white
-                              transition-all duration-300
-                            "
-                  >
-                    👤 سجلاتي
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
-              {/* أزرار تبديل العرض */}
-              <div className="flex items-center gap-2 border rounded-lg p-1 bg-green-50 dark:bg-green-900 shadow-sm">
-                <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className="flex items-center justify-center w-10 h-10 p-0 rounded-lg hover:bg-green-100 hover:scale-105 transition-transform duration-200"
-                  title="عرض جدول"
-                >
-                  <Table2 className="w-5 h-5 text-green-800" />
-                </Button>
-                <Button
-                  variant={viewMode === 'cards' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('cards')}
-                  className="flex items-center justify-center w-10 h-10 p-0 rounded-lg hover:bg-green-100 hover:scale-105 transition-transform duration-200"
-                  title="عرض بطاقات"
-                >
-                  <LayoutGrid className="w-5 h-5 text-green-800" />
-                </Button>
-              </div>
-            </div>
-            {/* عرض التقييمات */}
-            {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-                <p className="mt-4">جاري تحميل البيانات...</p>
-              </div>
-            ) : (
-              <>
-                {filteredAssessments.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <p className="text-xl text-gray-600">لا توجد تقييمات متطابقة مع معايير التصفية</p>
-                    <Button variant="outline" className="mt-4" onClick={() => {
-                      setSelectedTeacherId(currentUser?.role === 'teacher' ? currentUser.id : 'all-teachers');
-                      setSelectedStudentId('all-students');
-                      setSelectedCircleId('all-circles');
-                      setFilterType('all');
-                      setSearchQuery('');
-                    }}>
-                      إعادة تعيين الفلاتر
-                    </Button>
-                  </div>
-                ) : viewMode === 'table' ? (
-                  <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="text-right">الطالب</TableHead>
-                          <TableHead className="text-right">المعلم</TableHead>
-                          <TableHead className="text-right">النوع</TableHead>
-                          <TableHead className="text-right">النطاق</TableHead>
-                          <TableHead className="text-right">الدرجة</TableHead>
-                          <TableHead className="text-right">التاريخ</TableHead>
-                          <TableHead className="text-right">الإجراءات</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredAssessments.map((assessment) => {
-                          const display = formatAssessmentDisplay(assessment);
-                          return (
-                            <TableRow key={assessment.id}>
-                              <TableCell className="font-medium">
-                                <div className="flex flex-col">
-                                  <span>{display.student}</span>
-                                  {display.hasGuardian && (
-                                    <span className="text-xs text-gray-500 flex items-center gap-1 mt-1">
-                                      <span className="font-medium text-blue-600">ولي الأمر:</span>
-                                      <span>{display.guardian}</span>
-                                    </span>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>{display.teacher}</TableCell>
-                              <TableCell>
-                                <Badge className={`bg-${display.typeColor}-100 text-${display.typeColor}-800 border-${display.typeColor}-200`}>
-                                  {display.type}
-                                </Badge>
-                              </TableCell>
-                              <TableCell dir="rtl">{display.range}</TableCell>
-                              <TableCell>
-                                <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-                                  {display.score}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{display.date}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleEditAssessment(assessment)}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => handleDeleteAssessment(assessment)}
-                                  >
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+              {/* اختيار المعلم - زر يفتح حوار */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                {currentUser?.role === 'teacher' ? (
+                  <div className="relative w-full h-10 px-3 rounded-xl border flex items-center gap-2 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900 border-green-400" title="المعلم">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
+                    <span className="truncate text-sm text-green-700 font-medium">{currentUser?.full_name || 'المعلم'}</span>
+                    <div className="ml-auto flex items-center gap-1"><span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span></div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredAssessments.map((assessment) => {
-                      const display = formatAssessmentDisplay(assessment);
-                      const student = students.find(s => s.id === assessment.student_id);
-
-                      return (
-                        <Card key={assessment.id} className="overflow-hidden border border-gray-200 hover:border-gray-300 transition-all duration-200">
-                          <CardHeader className="pb-2">
-                            <div className="flex justify-between items-start">
-                              <Badge className={`bg-${display.typeColor}-100 text-${display.typeColor}-800 border-${display.typeColor}-200`}>
-                                {display.type}
-                              </Badge>
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditAssessment(assessment)}
-                                  className="h-8 w-8"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteAssessment(assessment)}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </div>
-                            </div>
-                            <CardTitle className="text-xl mt-1">{display.student}</CardTitle>
-                            {display.hasGuardian && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
-                                <span className="font-medium text-blue-600">ولي الأمر:</span> 
-                                <span>{display.guardian}</span>
-                              </div>
-                            )}
-                          </CardHeader>
-                          <CardContent className="pb-4">
-                            <div className="grid grid-cols-2 gap-3 mb-2 text-sm">
-                              <div>
-                                <p className="text-gray-500">المعلم</p>
-                                <p className="font-medium">{display.teacher}</p>
-                              </div>
-                              <div>
-                                <p className="text-gray-500">التاريخ</p>
-                                <p className="font-medium">{display.date}</p>
-                              </div>
-                              <div className="col-span-2">
-                                <p className="text-gray-500">النطاق</p>
-                                <p className="font-medium" dir="rtl">{display.range}</p>
-                              </div>
-                            </div>
-
-                            {/* عرض درجات التقييم */}
-                            <div className="mt-3 border-t pt-3">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1">
-                                  <Trophy className="w-5 h-5 text-yellow-500" />
-                                  <span className="font-semibold">الدرجة الكلية</span>
-                                </div>
-                                <Badge className="text-lg py-1 px-3 bg-yellow-100 text-yellow-800 border-yellow-200">
-                                  {display.score}
-                                </Badge>
-                              </div>
-
-                              {/* عرض الدرجات التفصيلية إذا كانت متوفرة */}
-                              {(assessment.tajweed_score !== undefined ||
-                                assessment.memorization_score !== undefined ||
-                                assessment.recitation_score !== undefined) && (
-                                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                                    {assessment.tajweed_score !== undefined && (
-                                      <div className="text-center">
-                                        <p className="text-gray-500">التجويد</p>
-                                        <p className="font-medium">{formatScore(assessment.tajweed_score)}</p>
-                                      </div>
-                                    )}
-                                    {assessment.memorization_score !== undefined && (
-                                      <div className="text-center">
-                                        <p className="text-gray-500">الحفظ</p>
-                                        <p className="font-medium">{formatScore(assessment.memorization_score)}</p>
-                                      </div>
-                                    )}
-                                    {assessment.recitation_score !== undefined && (
-                                      <div className="text-center">
-                                        <p className="text-gray-500">التلاوة</p>
-                                        <p className="font-medium">{formatScore(assessment.recitation_score)}</p>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-
-                            {/* عرض الملاحظات إذا كانت موجودة */}
-                            {assessment.notes && (
-                              <div className="mt-3 border-t pt-3">
-                                <p className="text-gray-500 text-sm">ملاحظات</p>
-                                <p className="text-sm mt-1 text-gray-700">{assessment.notes}</p>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsTeacherPickerOpen(true)}
+                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden ${selectedTeacher ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                    title="اختر معلماً"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
+                      <span className={`truncate text-sm ${selectedTeacher ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedTeacher ? selectedTeacher.full_name : 'اختر معلماً'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-1">
+                      {selectedTeacher && (
+                        <span onClick={(e) => { e.stopPropagation(); setSelectedTeacherId('all-teachers'); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                  </button>
                 )}
-              </>
-            )}
-          </>
+              </div>
+              {/* اختيار الحلقة */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                <button
+                  type="button"
+                  disabled={selectedTeacherId === 'all-teachers' && visibleStudyCircles.length === 0}
+                  onClick={() => {
+                    if (visibleStudyCircles.length === 0) {
+                      toast({ title: 'لا توجد حلقات متاحة', description: 'لا توجد حلقات مرتبطة بالمعلم الحالي', variant: 'destructive' });
+                      return;
+                    }
+                    setIsCirclePickerOpen(true);
+                  }}
+                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                  title="اختر حلقة"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><BookOpen className="h-4 w-4" /></div>
+                    <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedCircle ? selectedCircle.name : (visibleStudyCircles.length === 0 ? 'لا توجد حلقات' : 'اختر حلقة')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-1">
+                    {selectedCircle && (
+                      <span onClick={(e) => { e.stopPropagation(); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
+                    )}
+                    <ChevronDown className="h-4 w-4 text-green-500" />
+                  </div>
+                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                </button>
+              </div>
+              {/* اختيار الطلاب */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                <button
+                  type="button"
+                  disabled={visibleStudents.length === 0}
+                  onClick={() => { if (visibleStudents.length > 0) setIsStudentPickerOpen(true); }}
+                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed ${!isAllStudentsSelected ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                  title="اختر طلاباً"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><User className="h-4 w-4" /></div>
+                    <span className={`truncate text-sm ${!isAllStudentsSelected ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                      {isAllStudentsSelected ? (visibleStudents.length === 0 ? 'لا يوجد طلاب' : 'اختر طلاباً / الجميع') : (selectedStudentIds.length === 1 ? (visibleStudents.find(s => s.id === selectedStudentIds[0])?.full_name || 'طالب') : `عدد (${selectedStudentIds.length}) طالب`)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-1">
+                    {!isAllStudentsSelected && (
+                      <span onClick={(e) => { e.stopPropagation(); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
+                    )}
+                    <ChevronDown className="h-4 w-4 text-green-500" />
+                  </div>
+                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                </button>
+              </div>
+              {/* اختيار النوع */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                <div className="w-full">
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger className={`w-full h-10 ps-3 pe-2 rounded-xl border text-right flex items-center gap-2 overflow-hidden text-sm transition-colors ${filterType !== 'all' ? 'border-green-500 bg-green-50/70 dark:bg-green-900/40' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:bg-green-50 hover:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-400`}>
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600 text-base">۝</div>
+                      <span className={`truncate flex-1 ${filterType !== 'all' ? 'text-green-700 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {filterType === 'all' ? 'جميع الأنواع' : assessmentTypeOptions.find(o => o.value === filterType)?.label || 'نوع'}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent dir="rtl" className="text-sm bg-white dark:bg-green-950 border border-green-200 dark:border-green-700 rounded-lg shadow-lg p-1">
+                      <SelectItem value="all" className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors">جميع الأنواع</SelectItem>
+                      {assessmentTypeOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value} className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors">
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* تم نقل عرض التقييمات إلى خارج الـ Card حسب الطلب */}
         </CardContent>
 
       </Card>
+
+      {/* عرض التقييمات (خارج البطاقة) */}
+      <div className="mt-4">
+        {isLoading ? (
+          <div className="text-center py-10">جاري التحميل...</div>
+        ) : filteredAssessments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 px-4 bg-gradient-to-br from-green-50 to-blue-50 rounded-xl border border-green-200 shadow-md mt-2">
+            <div className="text-center max-w-xl">
+              <div className="mb-4">
+                <BookOpen className="h-16 w-16 text-green-300 mx-auto" />
+              </div>
+              <h2 className="text-xl font-semibold text-green-800 mb-2">لا توجد تقييمات متطابقة مع معايير البحث</h2>
+              <p className="text-green-600 text-sm mb-4">جرب تغيير معايير التصفية أو إضافة تقييم جديد</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                <Button
+                  onClick={handleAddNewRecord}
+                  className="bg-islamic-green hover:bg-green-700 text-white px-6 py-2 rounded-lg transition-all shadow-md"
+                >
+                  <Plus className="w-4 h-4 ml-2" />
+                  إضافة تقييم
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedTeacherId(currentUser?.role === 'teacher' ? currentUser.id : 'all-teachers');
+                    clearStudentSelection();
+                    setSelectedCircleId('all-circles');
+                    setFilterType('all');
+                    setSearchQuery('');
+                  }}
+                  className="border-green-300 text-green-700 hover:bg-green-100"
+                >إعادة تعيين الفلاتر</Button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          (() => {
+            const tableData = filteredAssessments.map((a, idx) => ({
+              ...a,
+              id: String(a.id),
+              __index: idx + 1,
+              __display: formatAssessmentDisplay(a)
+            }));
+            return (
+              <GenericTable
+                title="تقييمات الطلاب"
+                defaultView="table"
+                enablePagination
+                defaultPageSize={10}
+                pageSizeOptions={[10,20,50,100]}
+                hideSortToggle
+                data={tableData as any}
+                className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+                getRowClassName={(_: any, index: number) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`}
+                columns={([
+                  { key: '__index', header: '🔢', align: 'center', render: (r: any) => <span className="text-[11px] font-bold text-gray-600">{r.__index}</span> },
+                  { key: 'student', header: '👦 الطالب', align: 'right', render: (r: any) => (
+                      <div className="font-medium text-right">
+                        {r.__display.student}
+                        {r.__display.hasGuardian && (
+                          <div className="text-[10px] text-red-800 dark:text-red-700">{r.__display.guardian}</div>
+                        )}
+                      </div>
+                    ) },
+                  ...(activeTab !== 'my-records' ? [
+                    { key: 'teacher', header: '👨‍🏫 المعلم', align: 'right', render: (r: any) => r.__display.teacher || 'غير معروف' }
+                  ] : []),
+                  { key: 'circle', header: '📚 الحلقة', align: 'right', render: (r: any) => r.student?.study_circle ? (r.student.study_circle.name || `حلقة ${r.student.study_circle.id}`) : 'غير محدد' },
+                  { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
+                  { key: 'type', header: '📂 النوع', align: 'right', render: (r: any) => (
+                      <Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>
+                        {r.__display.type}
+                      </Badge>
+                    ) },
+                  { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir="rtl">{r.__display.range}</span> },
+                  { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
+                  { key: 'details', header: '📊 تفاصيل الدرجات', align: 'center', render: (r: any) => {
+                      const parts: string[] = [];
+                      if (r.tajweed_score !== undefined) parts.push(`تجويد: ${formatScore(r.tajweed_score)}`);
+                      if (r.memorization_score !== undefined) parts.push(`حفظ: ${formatScore(r.memorization_score)}`);
+                      if (r.recitation_score !== undefined) parts.push(`تلاوة: ${formatScore(r.recitation_score)}`);
+                      if (parts.length === 0) return <span className="text-[10px] text-gray-400">-</span>;
+                      return <span className="text-[10px] leading-4 whitespace-pre-line text-gray-600">{parts.join('\n')}</span>;
+                    } },
+                  { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
+                      <div className="flex justify-center items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditAssessment(r)}
+                          className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 rounded-lg"
+                          title="تعديل"
+                        >
+                          <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteAssessment(r)}
+                          className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 rounded-lg"
+                          title="حذف"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                        </Button>
+                      </div>
+                    ) }
+                ]) as any}
+                emptyMessage="لا توجد تقييمات"
+              />
+            );
+          })()
+        )}
+      </div>
+
+      {/* حوار اختيار المعلم */}
+      <FormDialog
+        title={'المعلم'}
+        open={isTeacherPickerOpen}
+        onOpenChange={setIsTeacherPickerOpen}
+        onSave={() => setIsTeacherPickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder="🔍 اسم المعلم"
+                value={teacherSearchTerm}
+                onChange={(e) => setteacherSearchTerm(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          <GenericTable
+            title=""
+            defaultView="table"
+            enablePagination
+            defaultPageSize={4}
+            pageSizeOptions={[4,8,16,48,100]}
+            data={filteredTeachersForPicker as any}
+            getRowClassName={(item: any, index: number) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            columns={([
+              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0)+1}</span>) },
+              { key: 'full_name', header: '👨‍🏫 المعلم', align: 'center', render: (item: any) => {
+                  const selected = item.id === selectedTeacherId;
+                  return (
+                    <button type="button" onClick={() => { setSelectedTeacherId(item.id); setSelectedCircleId('all-circles'); clearStudentSelection(); setIsTeacherPickerOpen(false); }} className="w-full flex items-center justify-center group px-1">
+                      <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span>
+                    </button>
+                  ); } },
+              { key: 'circles_count', header: '📘 الحلقات', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{studyCircles.filter(c=>c.teacher_id===item.id).length}</span>) },
+              { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => {
+                  const selected = item.id === selectedTeacherId;
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button type="button" onClick={() => { setSelectedTeacherId(item.id); setSelectedCircleId('all-circles'); clearStudentSelection(); setIsTeacherPickerOpen(false); }} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}>✓</button>
+                    </div>
+                  ); } }
+            ]) as any}
+            emptyMessage={'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار الطلاب */}
+      <FormDialog
+        title={'بحث وتحديد الطلاب'}
+        open={isStudentPickerOpen}
+        onOpenChange={setIsStudentPickerOpen}
+        onSave={() => setIsStudentPickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="680px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder="🔍 اسم الطالب / ولي الأمر"
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => { const ids = filteredStudentsForPicker.map((s: any) => s.id); const allSelected = ids.every((id: string) => selectedStudentIds.includes(id)); if (allSelected) { setSelectedStudentIds(prev => prev.filter(id => !ids.includes(id))); } else { setSelectedStudentIds(prev => Array.from(new Set([...prev, ...ids]))); } }} className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-green-600 hover:bg-green-700 text-white shadow transition" title="تحديد/إلغاء تحديد المعروض">الكل</button>
+              {!isAllStudentsSelected && (
+                <button type="button" onClick={clearStudentSelection} className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-red-500 hover:bg-red-600 text-white shadow transition" title="إزالة جميع التحديد">مسح</button>
+              )}
+              <div className={`h-8 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center ${isAllStudentsSelected ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300' : 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'}`} title="عدد المحددين">{isAllStudentsSelected ? 'الجميع' : selectedStudentIds.length}</div>
+            </div>
+          </div>
+          <GenericTable
+            title=""
+            defaultView="table"
+            enablePagination
+            defaultPageSize={6}
+            pageSizeOptions={[6,12,24,60]}
+            data={filteredStudentsForPicker as any}
+            getRowClassName={(item: any, index: number) => `${selectedStudentIds.includes(item.id) ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            columns={([
+              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0)+1}</span>) },
+              { key: 'full_name', header: '👦 الطالب', align: 'center', render: (item: any) => { const selected = selectedStudentIds.includes(item.id); return (<button type="button" onClick={() => toggleStudentSelection(item.id)} className="w-full flex items-center justify-center group px-1"><span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span></button>); } },
+              { key: 'guardian', header: '👪 ولي الأمر', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px]">{item.guardian?.full_name || '-'}</span>) },
+              { key: 'circle', header: '📘 الحلقة', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px]">{item.study_circle?.name || '-'}</span>) },
+              { key: 'actions', header: '⚙️ إجراءات', align: 'center', render: (item: any) => { const selected = selectedStudentIds.includes(item.id); return (<div className="flex items-center justify-center"><button type="button" onClick={() => toggleStudentSelection(item.id)} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`} title={selected ? 'إزالة من التحديد' : 'تحديد'}>✓</button></div>); } }
+            ]) as any}
+            emptyMessage={'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار الحلقة */}
+      <FormDialog
+        title={'الحلقة'}
+        open={isCirclePickerOpen}
+        onOpenChange={setIsCirclePickerOpen}
+        onSave={() => setIsCirclePickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder="🔍 اسم الحلقة"
+                value={circlePickerSearch}
+                onChange={(e) => setCirclePickerSearch(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          <GenericTable
+            title=""
+            defaultView="table"
+            enablePagination
+            defaultPageSize={4}
+            pageSizeOptions={[4,8,16,48,100]}
+            data={filteredCirclesForPicker as any}
+            getRowClassName={(item: any, index: number) => `${item.id === selectedCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            columns={([
+              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0)+1}</span>) },
+              { key: 'name', header: '📘 الحلقة', align: 'center', render: (item: any) => { const selected = item.id === selectedCircleId; return (<button type="button" onClick={() => { setSelectedCircleId(item.id); clearStudentSelection(); setIsCirclePickerOpen(false); }} className="w-full flex items-center justify-center group px-1"><span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.name}</span></button>); } },
+              { key: 'students_count', header: '👥 العدد', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{students.filter(s=>s.study_circle_id===item.id).length}</span>) },
+              { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => { const selected = item.id === selectedCircleId; return (<div className="flex items-center justify-center"><button type="button" onClick={() => { setSelectedCircleId(item.id); clearStudentSelection(); setIsCirclePickerOpen(false); }} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`} title={selected ? 'محددة' : 'تحديد'}>✓</button></div>); } }
+            ]) as any}
+            emptyMessage={'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
 
 
       {/* حوار إضافة/تعديل تقييم */}

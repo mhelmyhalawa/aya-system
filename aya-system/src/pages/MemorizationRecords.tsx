@@ -54,7 +54,8 @@ import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { User, BookOpen, Music } from 'lucide-react';
+import { User, BookOpen, Music, GraduationCap, ChevronDown, Search } from 'lucide-react';
+import { FormDialog } from '@/components/ui/form-dialog';
 import { GenericTable } from '@/components/ui/generic-table';
 
 interface MemorizationRecordsProps {
@@ -73,7 +74,13 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
     role?: 'teacher' | 'admin' | 'superadmin' | string;
   }[]>([]);
   const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>('all-students');
+  // Multi-student selection: empty array => all students
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const isAllStudentsSelected = selectedStudentIds.length === 0;
+  const toggleStudentSelection = (id: string) => {
+    setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
+  };
+  const clearStudentSelection = () => setSelectedStudentIds([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all-teachers');
   const [selectedCircleId, setSelectedCircleId] = useState<string>('all-circles');
   const [recordToEdit, setRecordToEdit] = useState<MemorizationRecord | null>(null);
@@ -90,6 +97,17 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc' | null>(null);
   // اظهار/اخفاء فلاتر البحث
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  // قوائم منسدلة مخصصة (بديلة عن Select) لنمط الستايل المطلوب
+  // Dialog pickers (بدلاً من القوائم المنسدلة المطلوبة الآن)
+
+  const [isTeacherPickerOpen, setIsTeacherPickerOpen] = useState(false);
+  const [isCirclePickerOpen, setIsCirclePickerOpen] = useState(false);
+  const [teacherSearchTerm, setteacherSearchTerm] = useState('');
+  const [circlePickerSearch, setCirclePickerSearch] = useState('');
+  const [isStudentPickerOpen, setIsStudentPickerOpen] = useState(false);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+
+  // سيتم تعريف الميموز الخاصة بالجداول بعد تعريف visibleTeachers و visibleStudyCircles بالأسفل
   // متغيرات للتحكم في النموذج
   const [formSelectedTeacherId, setFormSelectedTeacherId] = useState<string>('');
   const [formSelectedCircleId, setFormSelectedCircleId] = useState<string>('');
@@ -104,6 +122,26 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   // NOTE: تم نقل الترقيم (Pagination) إلى المكون العام GenericTable لإعادة الاستخدام عبر النظام.
 
   const { toast } = useToast();
+
+  // اشتقاقات مساعدة للستايل الجديد
+  const userRole = currentUser?.role;
+  const selectedTeacher = useMemo(() => {
+    if (selectedTeacherId === 'all-teachers') return null;
+    return teachers.find(t => t.id === selectedTeacherId) || null;
+  }, [selectedTeacherId, teachers]);
+  const teacherStudyCircles = useMemo(() => {
+    if (userRole === 'teacher') {
+      return studyCircles.filter(c => c.teacher_id === currentUser?.id);
+    }
+    if (selectedTeacherId !== 'all-teachers') {
+      return studyCircles.filter(c => c.teacher_id === selectedTeacherId);
+    }
+    return studyCircles;
+  }, [studyCircles, userRole, currentUser, selectedTeacherId]);
+  const selectedCircle = useMemo(() => {
+    if (!selectedCircleId || selectedCircleId === 'all-circles') return null;
+    return studyCircles.find(c => c.id === selectedCircleId) || null;
+  }, [selectedCircleId, studyCircles]);
 
   // بيانات النموذج
   const [formData, setFormData] = useState<MemorizationRecordCreate & { circle_id?: string }>({
@@ -264,22 +302,18 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
     fetchData();
   }, [toast, refreshTrigger]);
 
-  // تصفية الطلاب عند تغيير الحلقة
+  // تصفية الطلاب عند تغيير الحلقة (تحديث قائمة الطلاب المختارين وإزالة غير المتوافق)
   useEffect(() => {
-    // إذا تم اختيار حلقة محددة، قم بتصفية الطلاب بناءً على الحلقة المختارة
-    if (selectedCircleId && selectedCircleId !== 'all-circles') {
-      const studentsInCircle = students.filter(student =>
-        student.study_circle_id === selectedCircleId ||
-        (student.study_circle && student.study_circle.id === selectedCircleId)
-      );
-
-      // إذا كان الطالب المحدد حاليًا غير موجود في الحلقة المختارة، أعد تعيينه
-      if (selectedStudentId !== 'all-students' &&
-        !studentsInCircle.some(student => student.id === selectedStudentId)) {
-        setSelectedStudentId('all-students');
+    if (selectedCircleId && selectedCircleId !== 'all-circles' && selectedStudentIds.length > 0) {
+      const studentsInCircleIds = students
+        .filter(student => student.study_circle_id === selectedCircleId || (student.study_circle && student.study_circle.id === selectedCircleId))
+        .map(s => s.id);
+      const remaining = selectedStudentIds.filter(id => studentsInCircleIds.includes(id));
+      if (remaining.length !== selectedStudentIds.length) {
+        setSelectedStudentIds(remaining);
       }
     }
-  }, [selectedCircleId, students, selectedStudentId]);
+  }, [selectedCircleId, students, selectedStudentIds]);
 
   // تصفية السجلات عند تغيير المعايير
   useEffect(() => {
@@ -287,7 +321,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
     console.log('Records to filter:', records.length);
     console.log('Filter criteria:', {
       circleId: selectedCircleId,
-      studentId: selectedStudentId,
+      studentIds: selectedStudentIds,
       teacherId: selectedTeacherId,
       type: filterType,
       searchQuery: searchQuery ? searchQuery.substring(0, 20) + '...' : '',
@@ -308,9 +342,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
       }
     }
 
-    // تصفية حسب الطالب
-    if (selectedStudentId && selectedStudentId !== 'all-students') {
-      result = result.filter(record => record.student_id === selectedStudentId);
+    // تصفية حسب الطلاب المختارين (متعدد)
+    if (selectedStudentIds.length > 0) {
+      result = result.filter(record => selectedStudentIds.includes(record.student_id));
     }
 
     // تصفية حسب المعلم
@@ -341,7 +375,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
     console.log(`Filtered to ${result.length} records`);
     setFilteredRecords(result);
-  }, [records, selectedStudentId, selectedTeacherId, selectedCircleId, filterType, searchQuery, activeTab, currentUser, students]);
+  }, [records, selectedStudentIds, selectedTeacherId, selectedCircleId, filterType, searchQuery, activeTab, currentUser, students]);
 
   // استعادة بيانات سورة من القرآن
   const handleSurahChange = (field: 'from_surah' | 'to_surah', value: number) => {
@@ -473,8 +507,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         }
       }
 
-      if (selectedStudentId && selectedStudentId !== 'all-students') {
-        filteredResult = filteredResult.filter(record => record.student_id === selectedStudentId);
+      if (selectedStudentIds.length > 0) {
+        filteredResult = filteredResult.filter(record => selectedStudentIds.includes(record.student_id));
       }
 
       if (selectedTeacherId && selectedTeacherId !== 'all-teachers') {
@@ -613,8 +647,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         }
       }
 
-      if (selectedStudentId && selectedStudentId !== 'all-students') {
-        result = result.filter(record => record.student_id === selectedStudentId);
+      if (selectedStudentIds.length > 0) {
+        result = result.filter(record => selectedStudentIds.includes(record.student_id));
       }
 
       if (selectedTeacherId && selectedTeacherId !== 'all-teachers') {
@@ -1027,6 +1061,47 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
     return filteredStudents;
   }, [students, selectedTeacherId, selectedCircleId, visibleStudyCircles, searchQuery]);
 
+  // ===== ميموز حوارات الاختيار (تعتمد على visibleTeachers و visibleStudyCircles) =====
+  const filteredTeachersForPicker = useMemo(() => {
+    const term = teacherSearchTerm.trim();
+    let list = visibleTeachers;
+    if (term) list = list.filter(t => (t.full_name || '').includes(term));
+    return list.map((t, idx) => ({ ...t, row_index: idx + 1 }));
+  }, [teacherSearchTerm, visibleTeachers]);
+
+  const teacherCirclesCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    studyCircles.forEach(c => {
+      if (c.teacher_id) map[c.teacher_id] = (map[c.teacher_id] || 0) + 1;
+    });
+    return map;
+  }, [studyCircles]);
+
+  const filteredCirclesForPicker = useMemo(() => {
+    const term = circlePickerSearch.trim();
+    let list = visibleStudyCircles;
+    if (term) list = list.filter(c => (c.name || '').includes(term));
+    return list.map((c, idx) => ({ ...c, row_index: idx + 1 }));
+  }, [circlePickerSearch, visibleStudyCircles]);
+
+  const circleStudentsCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    students.forEach(s => {
+      if (s.study_circle_id) map[s.study_circle_id] = (map[s.study_circle_id] || 0) + 1;
+    });
+    return map;
+  }, [students]);
+
+  // طلاب للحوار
+  const filteredStudentsForPicker = useMemo(() => {
+    const term = studentSearchTerm.trim().toLowerCase();
+    let list = visibleStudents;
+    if (term) {
+      list = list.filter(st => (st.full_name || '').toLowerCase().includes(term) || (st.guardian?.full_name || '').toLowerCase().includes(term));
+    }
+    return list.map((s, idx) => ({ ...s, row_index: idx + 1 }));
+  }, [studentSearchTerm, visibleStudents]);
+
   // خريطة سجلات الطلاب (حسب الطالب) بعد تطبيق كل الفلاتر الحالية
   const studentRecordsMap = useMemo(() => {
     const map: Record<string, MemorizationRecord[]> = {};
@@ -1115,8 +1190,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
     <div className="w-full max-w-[1600px] mx-auto">
       <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
-        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b 
-        border-green-300 duration-300 rounded-t-2xl shadow-md">
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
@@ -1254,104 +1328,159 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green focus:border-islamic-green text-sm text-gray-800 dark:text-gray-200 transition-all duration-200"
                 />
               </div>
-              {/* اختيار المعلم */}
-              <div className="w-full md:min-w-[140px]">
-                <Select
-                  value={selectedTeacherId}
-                  onValueChange={(value) => {
-                    setSelectedTeacherId(value);
-                    setSelectedCircleId('all-circles');
-                    setSelectedStudentId('all-students');
-                  }}
-                >
-                  <SelectTrigger className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder="👨‍🏫 اختر معلماً" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-teachers">جميع المعلمين</SelectItem>
-                    {visibleTeachers.length > 0
-                      ? visibleTeachers.map(teacher => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.full_name ?? `المعلم ${teacher.id.slice(0, 4)}`}
-                          {teacher.role && (
-                            teacher.role === 'teacher'
-                              ? ' (معلم)'
-                              : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`
-                          )}
-                        </SelectItem>
-                      ))
-                      : <SelectItem disabled value="__no__">لا يوجد معلمين أو مشرفين</SelectItem>
-                    }
-                  </SelectContent>
-                </Select>
+              {/* اختيار المعلم - زر يفتح حوار */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                {userRole === 'teacher' ? (
+                  <div className="relative w-full h-10 px-3 rounded-xl border flex items-center gap-2 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900 border-green-400" title="المعلم">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
+                    <span className="truncate text-sm text-green-700 font-medium">{currentUser?.full_name || 'المعلم'}</span>
+                    <div className="ml-auto flex items-center gap-1"><span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span><span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">{teacherStudyCircles.length}</span></div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsTeacherPickerOpen(true)}
+                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden
+                    ${selectedTeacher ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                    hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                    title="اختر معلماً"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
+                      <span className={`truncate text-sm ${selectedTeacher ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedTeacher ? selectedTeacher.full_name : 'اختر معلماً'}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-1">
+                      {selectedTeacher && (
+                        <span onClick={(e) => { e.stopPropagation(); setSelectedTeacherId('all-teachers'); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                  </button>
+                )}
               </div>
 
-              {/* اختيار الحلقة */}
-              <div className="w-full md:min-w-[140px]">
-                <Select
-                  value={selectedCircleId}
-                  onValueChange={(value) => {
-                    setSelectedCircleId(value);
-                    if (value !== 'all-circles') setSelectedStudentId('all-students');
-                  }}
-                  disabled={selectedTeacherId === 'all-teachers' && visibleStudyCircles.length === 0}
-                >
-                  <SelectTrigger className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder={
-                      selectedTeacherId === 'all-teachers'
-                        ? "📚 جميع الحلقات"
-                        : visibleStudyCircles.length === 0
-                          ? "لا توجد حلقات"
-                          : "اختر حلقة"
-                    } />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-circles">جميع الحلقات</SelectItem>
-                    {visibleStudyCircles.map(circle => (
-                      <SelectItem key={circle.id} value={circle.id}>
-                        {circle.name || `حلقة ${circle.id}`} {selectedTeacherId === 'all-teachers' && circle.teacher ? ` - ${circle.teacher.full_name}` : ''} ({circle.students_count} طالب)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* اختيار الحلقة - زر يفتح حوار */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                {userRole === 'teacher' && teacherStudyCircles.length === 1 ? (
+                  <div className="relative w-full h-10 px-3 rounded-xl border border-green-300 dark:border-green-700 bg-white dark:bg-green-950 flex items-center gap-2">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><BookOpen className="h-4 w-4" /></div>
+                    <span className="truncate text-sm text-green-700 font-medium">{teacherStudyCircles[0]?.name || 'حلقة'}</span>
+                    <div className="ml-auto flex items-center gap-1"><span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span><span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">1</span></div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={selectedTeacherId === 'all-teachers' && visibleStudyCircles.length === 0}
+                    onClick={() => {
+                      if (visibleStudyCircles.length === 0) {
+                        toast({ title: 'لا توجد حلقات متاحة', description: 'لا توجد حلقات مرتبطة بالمعلم الحالي', variant: 'destructive' });
+                        return;
+                      }
+                      setIsCirclePickerOpen(true);
+                    }}
+                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
+                    ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                    hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                    title="اختر حلقة"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><BookOpen className="h-4 w-4" /></div>
+                      <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedCircle ? selectedCircle.name : (visibleStudyCircles.length === 0 ? 'لا توجد حلقات' : 'اختر حلقة')}</span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-1">
+                      {selectedCircle && (
+                        <span onClick={(e) => { e.stopPropagation(); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-green-500" />
+                    </div>
+                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                  </button>
+                )}
               </div>
 
-              {/* اختيار الطالب */}
-              <div className="w-full md:min-w-[140px]">
-                <Select
-                  value={selectedStudentId}
-                  onValueChange={setSelectedStudentId}
+              {/* اختيار الطالب - زر يفتح حوار */}
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                <button
+                  type="button"
                   disabled={visibleStudents.length === 0}
+                  onClick={() => {
+                    if (visibleStudents.length === 0) return;
+                    setIsStudentPickerOpen(true);
+                  }}
+                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
+                  ${!isAllStudentsSelected ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                  hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                  title="اختر طالباً"
                 >
-                  <SelectTrigger className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder={visibleStudents.length === 0 ? "لا يوجد طلاب" : "👦 جميع الطلاب"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all-students">جميع الطلاب</SelectItem>
-                    {visibleStudents.map(student => (
-                      <SelectItem key={student.id} value={student.id}>
-                        <div className="flex flex-col text-sm">
-                          <span className="font-medium">{student.full_name} {student.guardian?.full_name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><User className="h-4 w-4" /></div>
+                    <span className={`truncate text-sm ${!isAllStudentsSelected ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
+                      {isAllStudentsSelected
+                        ? (visibleStudents.length === 0 ? 'لا يوجد طلاب' : 'اختر طلاباً / جميع الطلاب')
+                        : selectedStudentIds.length === 1
+                          ? (visibleStudents.find(s => s.id === selectedStudentIds[0])?.full_name || 'طالب')
+                          : `عدد (${selectedStudentIds.length}) طالب`
+                      }
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pl-1">
+                    {!isAllStudentsSelected && (
+                      <span
+                        onClick={(e) => { e.stopPropagation(); clearStudentSelection(); }}
+                        className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
+                      >ازالة</span>
+                    )}
+                    <ChevronDown className="h-4 w-4 text-green-500" />
+                  </div>
+                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
+                </button>
               </div>
 
               {/* اختيار النوع */}
-              <div className="w-full md:min-w-[120px]">
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green hover:scale-102 transition-transform duration-200 text-sm">
-                    <SelectValue placeholder="📂 جميع الأنواع" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">جميع الأنواع</SelectItem>
-                    {memorizationTypeOptions.map(option => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                {/* نسخة مُبسطة محسّنة بدون تدرجات مزعجة أو ألوان أرجوانية */}
+                <div className="w-full">
+                  <Select value={filterType} onValueChange={setFilterType}>
+                    <SelectTrigger
+                      className={`w-full h-10 ps-3 pe-2 rounded-xl border text-right flex items-center gap-2 overflow-hidden text-sm transition-colors
+                      ${filterType !== 'all'
+                        ? 'border-green-500 bg-green-50/70 dark:bg-green-900/40'
+                        : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
+                      hover:bg-green-50 hover:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-400`}
+                    >
+                      {/* أيقونة القسم (يمين) */}
+                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600 text-base">۝</div>
+                      {/* النص */}
+                      <span className={`truncate flex-1 ${filterType !== 'all' ? 'text-green-700 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                        {filterType === 'all'
+                          ? 'جميع الأنواع'
+                          : memorizationTypeOptions.find(o => o.value === filterType)?.label || 'نوع'}
+                      </span>
+                      {/* السهم (يسار) */}
+                    </SelectTrigger>
+                    <SelectContent
+                      dir="rtl"
+                      className="text-sm bg-white dark:bg-green-950 border border-green-200 dark:border-green-700 rounded-lg shadow-lg p-1"
+                    >
+                      <SelectItem
+                        value="all"
+                        className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors"
+                      >
+                        جميع الأنواع
+                      </SelectItem>
+                      {memorizationTypeOptions.map(option => (
+                        <SelectItem
+                          key={option.value}
+                          value={option.value}
+                          className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors"
+                        >
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           )}
@@ -1551,361 +1680,202 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         </>
       }
 
-      {/* معالج (Wizard) إضافة/تعديل سجل */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent dir="rtl" className="max-w-[95vw] sm:max-w-[640px] w-full overflow-hidden rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100 flex flex-col max-h-[90vh]">
-          <div className="flex-shrink-0">
-            <DialogHeader className="pb-1 sticky top-0 z-10 bg-gradient-to-r from-blue-50 to-green-50">
-              <DialogTitle className="text-xl font-bold text-center">
-                <h3 className="text-center leading-tight text-green-800 bg-gradient-to-r from-green-100 to-blue-100 py-2 px-3 rounded-lg">
-                  {recordToEdit ? '✏️ تعديل سجل الحفظ' : '👨‍🏫 إضافة سجل حفظ جديد'}
-                </h3>
-              </DialogTitle>
-            </DialogHeader>
+      {/* معالج (Wizard) إضافة/تعديل سجل باستخدام FormDialog */}
+      <FormDialog
+        title={recordToEdit ? '✏️ تعديل سجل الحفظ' : '👨‍🏫 إضافة سجل حفظ جديد'}
+        open={isDialogOpen}
+        onOpenChange={(o) => { if (!o) setIsDialogOpen(false); else setIsDialogOpen(true); }}
+        mode={recordToEdit ? 'edit' : 'add'}
+        onSave={() => {
+          if (wizardStep < wizardSteps.length - 1) {
+            goNext();
+          } else {
+            handleSaveRecord();
+          }
+        }}
+        saveButtonText={wizardStep < wizardSteps.length - 1 ? 'التالي' : (isLoading ? 'جاري الحفظ...' : (recordToEdit ? 'تحديث السجل' : 'إضافة السجل'))}
+        isLoading={isLoading}
+        hideCancelButton
+        maxWidth="680px"
+        extraButtons={wizardStep > 0 && (
+          <Button type="button" variant="outline" onClick={goBack} disabled={isLoading} className="min-w-[90px]">رجوع</Button>
+        )}
+      >
+        {/* مؤشرات الخطوات */}
+        <div className="w-full mb-2">
+          <div className="flex items-center justify-center gap-2">
+            {wizardSteps.map((s, i) => {
+              const active = i === wizardStep; const done = i < wizardStep;
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  aria-label={`الخطوة ${i + 1}`}
+                  onClick={() => (i < wizardStep ? setWizardStep(i) : null)}
+                  className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] font-bold border transition-colors ${active ? 'bg-islamic-green text-white border-islamic-green' : done ? 'bg-green-100 text-green-800 border-green-300' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-100'}`}
+                >
+                  {i + 1}
+                </button>
+              );
+            })}
           </div>
+          <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div className="h-full bg-islamic-green transition-all" style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }} />
+          </div>
+        </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 pr-1 -mr-1">
-            {/* شريط خطوات المعالج - متجاوب */}
-            <div dir="rtl" className="w-full">
-              <ol className="flex items-center w-full gap-1 sm:gap-2">
-                {wizardSteps.map((step, i) => {
-                  const active = i === wizardStep;
-                  const done = i < wizardStep;
-                  return (
-                    <li key={step.key} className="flex-1">
-                      <button type="button" onClick={() => (i < wizardStep ? setWizardStep(i) : null)} className={`w-full flex items-center justify-center sm:justify-between gap-2 p-2 rounded-lg text-xs sm:text-sm border transition-colors ${active
-                        ? 'bg-islamic-green text-white border-islamic-green'
-                        : done
-                          ? 'bg-green-100 text-green-800 border-green-200'
-                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
-                        }`} aria-current={active ? 'step' : undefined} aria-disabled={!done && !active}>
-                        <div className="flex items-center gap-2">
-                          {i === 0 && <User size={14} />}
-                          {i === 1 && <SaveIcon size={14} />}
-                          {i === 2 && <BookOpen size={14} />}
-                          <span className="hidden sm:inline">{step.label}</span>
-                        </div>
-                        <span className="sm:hidden">{i + 1}/{wizardSteps.length}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-              {/* شريط تقدم */}
-              <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                <div className="h-full bg-islamic-green transition-all" style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }} />
+        {/* شريط حالة الطالب */}
+        <div className="text-[11px] sm:text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden overflow-ellipsis mb-2">
+          {formData.student_id ? (
+            <>
+              <span>الطالب: </span>
+              <span>
+                {formFilteredStudents.find(s => s.id === formData.student_id)?.full_name ?? ''}
+                {formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name ? ` ${formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name}` : ''}
+              </span>
+            </>
+          ) : (
+            <span className="text-gray-400 dark:text-gray-500">الرجاء اختيار طالب</span>
+          )}
+        </div>
+
+        {/* محتوى الخطوات */}
+        <div className="p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
+          {wizardStep === 0 && (
+            <div className="space-y-3 sm:space-y-4">
+              <div className="grid gap-3 sm:gap-4">
+                <div className="grid gap-1.5 sm:gap-2">
+                  <Label htmlFor="teacher" className="flex items-center gap-1">المعلم <span className="text-red-500">*</span></Label>
+                  <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
+                    <SelectTrigger id="teacher" dir="rtl" className="text-right truncate max-w-full min-w-0"><SelectValue placeholder="اختر المعلم" /></SelectTrigger>
+                    <SelectContent position="popper" dir="rtl">
+                      {visibleTeachers && visibleTeachers.length > 0 ? (
+                        visibleTeachers.map(teacher => (
+                          <SelectItem key={teacher.id} value={teacher.id}>
+                            {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0,4)}`}
+                            {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value={currentUser?.id || 'initial'}>{currentUser?.full_name || 'المستخدم الحالي'}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.recorded_by && <p className="text-sm text-red-500">{formErrors.recorded_by}</p>}
+                </div>
+                <div className="grid gap-1.5 sm:gap-2">
+                  <Label htmlFor="circle">الحلقة</Label>
+                  <Select value={formData.circle_id || ''} onValueChange={(value) => handleCircleChange(value)} disabled={!formData.recorded_by}>
+                    <SelectTrigger id="circle" dir="rtl" className="text-right truncate max-w-full min-w-0"><SelectValue placeholder="اختر الحلقة" /></SelectTrigger>
+                    <SelectContent position="popper" dir="rtl">
+                      {formFilteredCircles.length > 0 ? (
+                        formFilteredCircles.map(circle => (<SelectItem key={circle.id} value={circle.id}>{circle.name || `حلقة ${circle.id.slice(0,4)}`}</SelectItem>))
+                      ) : (
+                        <SelectItem value="no-circles" disabled>لا توجد حلقات للمعلم المحدد</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5 sm:gap-2">
+                  <Label htmlFor="student" className="flex items-center gap-1">الطالب <span className="text-red-500">*</span></Label>
+                  <Select value={formData.student_id || ''} onValueChange={(value) => handleInputChange('student_id', value)} disabled={!formData.recorded_by}>
+                    <SelectTrigger id="student" dir="rtl" className="text-right truncate max-w-full min-w-0"><SelectValue placeholder="اختر الطالب" /></SelectTrigger>
+                    <SelectContent position="popper" dir="rtl" className="max-h-[300px]">
+                      {formFilteredStudents.length > 0 ? (
+                        formFilteredStudents.map(student => (
+                          <SelectItem key={student.id} value={student.id}>{student.full_name || 'طالب بدون اسم'}{student.guardian?.full_name ? ` - ${student.guardian.full_name}` : ''}</SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-students" disabled>{formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.student_id && <p className="text-sm text-red-500">{formErrors.student_id}</p>}
+                </div>
               </div>
             </div>
-
-            <div className="text-[11px] sm:text-xs text-blue-700 dark:text-blue-400 whitespace-nowrap overflow-hidden overflow-ellipsis">
-              {formData.student_id ? (
-                <>
-                  <span>الطالب: </span>
-                  <span>
-                    {formFilteredStudents.find(s => s.id === formData.student_id)?.full_name ?? ""}
-                    {formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name ? ` ${formFilteredStudents.find(s => s.id === formData.student_id)?.guardian?.full_name}` : ""}
-                  </span>
-                </>
-              ) : (
-                <span className="text-gray-400 dark:text-gray-500">الرجاء اختيار طالب</span>
-              )}
-            </div>
-
-            {/* محتوى كل خطوة */}
-            <div className="p-3 sm:p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden">
-              {wizardStep === 0 && (
-                <div className="space-y-3 sm:space-y-4">
-                  <div className="grid gap-3 sm:gap-4">
-                    <div className="grid gap-1.5 sm:gap-2">
-                      <Label htmlFor="teacher" className="flex items-center gap-1">
-                        المعلم <span className="text-red-500">*</span>
-                      </Label>
-                      <Select value={formData.recorded_by || (currentUser ? currentUser.id : '')} onValueChange={(value) => handleTeacherChange(value)}>
-                        <SelectTrigger id="teacher" dir="rtl" className="text-right truncate max-w-full min-w-0">
-                          <SelectValue placeholder="اختر المعلم" />
-                        </SelectTrigger>
-                        <SelectContent position="popper" dir="rtl">
-                          {visibleTeachers && visibleTeachers.length > 0 ? (
-                            visibleTeachers.map(teacher => (
-                              <SelectItem key={teacher.id} value={teacher.id}>
-                                {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0, 4)}`}
-                                {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value={currentUser?.id || 'initial'}>
-                              {currentUser?.full_name || 'المستخدم الحالي'}
-                              {currentUser?.role && (currentUser.role === 'teacher' ? ' (معلم)' : ` (${currentUser.role === 'admin' ? 'مشرف' : currentUser.role})`)}
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {formErrors.recorded_by && <p className="text-sm text-red-500">{formErrors.recorded_by}</p>}
-                    </div>
-
-                    <div className="grid gap-1.5 sm:gap-2">
-                      <Label htmlFor="circle">الحلقة</Label>
-                      <Select value={formData.circle_id || ''} onValueChange={(value) => handleCircleChange(value)} disabled={!formData.recorded_by}>
-                        <SelectTrigger id="circle" dir="rtl" className="text-right truncate max-w-full min-w-0">
-                          <SelectValue placeholder="اختر الحلقة" />
-                        </SelectTrigger>
-                        <SelectContent position="popper" dir="rtl">
-                          {formFilteredCircles.length > 0 ? (
-                            formFilteredCircles.map(circle => (
-                              <SelectItem key={circle.id} value={circle.id}>
-                                {circle.name || `حلقة ${circle.id.slice(0, 4)}`}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="no-circles" disabled>لا توجد حلقات للمعلم المحدد</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-1.5 sm:gap-2">
-                      <Label htmlFor="student" className="flex items-center gap-1">
-                        الطالب <span className="text-red-500">*</span>
-                      </Label>
-                      <Select value={formData.student_id || ''} onValueChange={(value) => handleInputChange('student_id', value)} disabled={!formData.recorded_by}>
-                        <SelectTrigger id="student" dir="rtl" className="text-right truncate max-w-full min-w-0">
-                          <SelectValue placeholder="اختر الطالب" />
-                        </SelectTrigger>
-                        <SelectContent position="popper" dir="rtl" className="max-h-[300px]">
-                          {formFilteredStudents.length > 0 ? (
-                            formFilteredStudents.map(student => (
-                              <SelectItem key={student.id} value={student.id}>
-                                {student.full_name || 'طالب بدون اسم'}
-                                {student.guardian?.full_name ? ` - ${student.guardian.full_name}` : ""}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <SelectItem value="no-students" disabled>{formData.circle_id ? 'لا يوجد طلاب في الحلقة المحددة' : 'اختر المعلم والحلقة أولاً'}</SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                      {formErrors.student_id && <p className="text-sm text-red-500">{formErrors.student_id}</p>}
-                    </div>
+          )}
+          {wizardStep === 1 && (
+            <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div>
+                  <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2 text-sm">نوع السجل <span className="text-red-500">*</span></Label>
+                  <div className="flex flex-nowrap pb-1 -mx-2 px-2 gap-1 sm:gap-2 sm:flex-wrap mt-1.5 sm:mt-2">
+                    {memorizationTypeOptions.map(option => (
+                      <button key={option.value} type="button" onClick={() => handleInputChange('type', option.value)} className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0 ${formData.type === option.value ? 'bg-islamic-green text-white shadow-md ring-2 ring-offset-1 ring-islamic-green' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'}`}>{option.label}</button>
+                    ))}
                   </div>
+                  {formErrors.type && <p className="text-xs text-red-500 mt-1">{formErrors.type}</p>}
                 </div>
-              )}
-
-              {wizardStep === 1 && (
-                <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-3 sm:mb-4">
-                    <div>
-                      <Label htmlFor="memorization_type" className="flex items-center gap-1 mb-2 text-sm">
-                        نوع السجل <span className="text-red-500">*</span>
-                      </Label>
-                      <div className="flex flex-nowrap pb-1 -mx-2 px-2 gap-1 sm:gap-2 sm:flex-wrap mt-1.5 sm:mt-2">
-                        {memorizationTypeOptions.map(option => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => handleInputChange('type', option.value)}
-                            className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg text-[10px] sm:text-xs font-medium transition-all whitespace-nowrap flex-shrink-0
-                          ${formData.type === option.value
-                                ? 'bg-islamic-green text-white shadow-md ring-2 ring-offset-1 ring-islamic-green'
-                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                              }`}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                      {formErrors.type && <p className="text-xs text-red-500 mt-1">{formErrors.type}</p>}
-                    </div>
-
-                    <div>
-                      <Label htmlFor="date" className="flex items-center gap-1 mb-1.5 sm:mb-2 text-sm">
-                        التاريخ <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id="date"
-                        type="date"
-                        dir="rtl"
-                        className="text-right h-9"
-                        value={formData.date || ''}
-                        onChange={(e) => handleInputChange('date', e.target.value)}
-                      />
-                      {formErrors.date && <p className="text-xs text-red-500 mt-1">{formErrors.date}</p>}
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 sm:p-3 rounded-lg border border-blue-100 dark:border-blue-800/50 mb-2.5 sm:mb-3">
-                    <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">نطاق الحفظ</h4>
-
-                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
-                      <div>
-                        <Label htmlFor="from_surah" className="flex items-center gap-1 mb-1 text-xs">
-                          من سورة <span className="text-red-500">*</span>
-                        </Label>
-                        <Select value={formData.from_surah ? formData.from_surah.toString() : ''} onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}>
-                          <SelectTrigger id="from_surah" dir="rtl" className="text-right truncate h-9 text-xs">
-                            <SelectValue placeholder="اختر السورة">{formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : 'اختر السورة'}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[200px]" dir="rtl">
-                            {quranSurahs.map(surah => (
-                              <SelectItem key={surah.number} value={surah.number.toString()}>
-                                {surah.number}. {getSurahName(surah.number)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {formErrors.from_surah && <p className="text-xs text-red-500 mt-1">{formErrors.from_surah}</p>}
-                      </div>
-
-                      <div>
-                        <Label htmlFor="from_ayah" className="flex items-center gap-1 mb-1 text-xs">
-                          من آية <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="from_ayah"
-                          type="number"
-                          min={1}
-                          dir="rtl"
-                          className="text-right h-9 text-sm"
-                          value={formData.from_ayah || ''}
-                          onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))}
-                        />
-                        {formErrors.from_ayah && <p className="text-xs text-red-500 mt-1">{formErrors.from_ayah}</p>}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-                      <div>
-                        <Label htmlFor="to_surah" className="flex items-center gap-1 mb-1 text-xs">
-                          إلى سورة <span className="text-red-500">*</span>
-                        </Label>
-                        <Select value={formData.to_surah ? formData.to_surah.toString() : ''} onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}>
-                          <SelectTrigger id="to_surah" dir="rtl" className="text-right truncate h-9 text-xs">
-                            <SelectValue placeholder="اختر السورة">{formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : 'اختر السورة'}</SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="max-h-[200px]" dir="rtl">
-                            {quranSurahs.map(surah => (
-                              <SelectItem key={surah.number} value={surah.number.toString()}>
-                                {surah.number}. {getSurahName(surah.number)}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        {formErrors.to_surah && <p className="text-xs text-red-500 mt-1">{formErrors.to_surah}</p>}
-                      </div>
-
-                      <div>
-                        <Label htmlFor="to_ayah" className="flex items-center gap-1 mb-1 text-xs">
-                          إلى آية <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id="to_ayah"
-                          type="number"
-                          min={1}
-                          dir="rtl"
-                          className="text-right h-9 text-sm"
-                          value={formData.to_ayah || ''}
-                          onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))}
-                        />
-                        {formErrors.to_ayah && <p className="text-xs text-red-500 mt-1">{formErrors.to_ayah}</p>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Optional help text */}
-                  <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-2 rounded border border-gray-200 dark:border-gray-700">
-                    <p>قم بتحديد نطاق الحفظ أو المراجعة بشكل دقيق حتى يمكن متابعة تقدم الطالب.</p>
-                  </div>
-
+                <div>
+                  <Label htmlFor="date" className="flex items-center gap-1 mb-1.5 sm:mb-2 text-sm">التاريخ <span className="text-red-500">*</span></Label>
+                  <Input id="date" type="date" dir="rtl" className="text-right h-9" value={formData.date || ''} onChange={(e) => handleInputChange('date', e.target.value)} />
+                  {formErrors.date && <p className="text-xs text-red-500 mt-1">{formErrors.date}</p>}
                 </div>
-              )}
-
-              {wizardStep === 2 && (
-                <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 sm:p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
-                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-                        {[
-                          { id: 'score', label: 'درجة التسميع', required: true, value: formData.score, onChange: (val) => handleInputChange('score', val) },
-                          { id: 'lahn_jali', label: 'اللحن الجلي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_jali, onChange: (val) => handleTajweedErrorChange('lahn_jali', val) },
-                          { id: 'lahn_khafi', label: 'اللحن الخفي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_khafi, onChange: (val) => handleTajweedErrorChange('lahn_khafi', val) },
-                        ].map((field) => (
-                          <div key={field.id} className="flex flex-col">
-                            <Label htmlFor={field.id} className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1 whitespace-nowrap">
-                              {field.label} {field.required && <span className="text-red-500">*</span>}
-                              {field.hint && <span className="text-[10px] text-gray-400 dark:text-gray-400">{field.hint}</span>}
-                            </Label>
-                            <Input
-                              id={field.id}
-                              type="number"
-                              min={0}
-                              max={field.id === 'score' ? 100 : undefined}
-                              dir="rtl"
-                              className="h-9 sm:h-10 text-right bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 sm:px-3 text-xs sm:text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:outline-none"
-                              value={field.value || ''}
-                              onChange={(e) => {
-                                let val = parseFloat(e.target.value);
-                                if (isNaN(val)) val = undefined as any;
-                                if (field.id === 'score') {
-                                  if (val > 100) val = 100;
-                                  if (val < 0) val = 0;
-                                }
-                                field.onChange(val as any);
-                              }}
-                            />
-                            {field.id === 'score' && formErrors.score && <p className="text-xs text-red-500 mt-1 text-right">{formErrors.score}</p>}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-2.5 sm:p-3 rounded-lg border border-blue-100 dark:border-blue-800/50 mb-2.5 sm:mb-3">
+                <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">نطاق الحفظ</h4>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mb-2.5 sm:mb-3">
                   <div>
-                    <Label htmlFor="notes" className="mb-1.5 sm:mb-2 text-xs sm:text-sm">ملاحظات</Label>
-                    <Textarea id="notes" dir="rtl" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-20 sm:h-24 text-right text-xs sm:text-sm" />
+                    <Label htmlFor="from_surah" className="flex items-center gap-1 mb-1 text-xs">من سورة <span className="text-red-500">*</span></Label>
+                    <Select value={formData.from_surah ? formData.from_surah.toString() : ''} onValueChange={(value) => handleSurahChange('from_surah', parseInt(value))}>
+                      <SelectTrigger id="from_surah" dir="rtl" className="text-right truncate h-9 text-xs"><SelectValue placeholder="اختر السورة">{formData.from_surah ? `${formData.from_surah}. ${getSurahName(formData.from_surah)}` : 'اختر السورة'}</SelectValue></SelectTrigger>
+                      <SelectContent className="max-h-[200px]" dir="rtl">{quranSurahs.map(surah => (<SelectItem key={surah.number} value={surah.number.toString()}>{surah.number}. {getSurahName(surah.number)}</SelectItem>))}</SelectContent>
+                    </Select>
+                    {formErrors.from_surah && <p className="text-xs text-red-500 mt-1">{formErrors.from_surah}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="from_ayah" className="flex items-center gap-1 mb-1 text-xs">من آية <span className="text-red-500">*</span></Label>
+                    <Input id="from_ayah" type="number" min={1} dir="rtl" className="text-right h-9 text-sm" value={formData.from_ayah || ''} onChange={(e) => handleInputChange('from_ayah', parseInt(e.target.value))} />
+                    {formErrors.from_ayah && <p className="text-xs text-red-500 mt-1">{formErrors.from_ayah}</p>}
                   </div>
                 </div>
-              )}
-            </div>{/* end inner step content */}
-          </div>{/* end scrollable wizard content */}
-
-          <DialogFooter dir="rtl" className="flex items-center justify-between">
-            <table className="w-full">
-              <tbody>
-                <tr>
-                  <td className="align-middle">
-                    <div className="flex gap-2 justify-end items-center">
-                      <Button type="button" variant="secondary" onClick={() => setIsDialogOpen(false)} className="bg-yellow-300 hover:bg-yellow-400 text-gray-800 text-sm px-4 py-2 rounded transition-all">
-                        إلغاء
-                      </Button>
-
-                      {wizardStep > 0 && (
-                        <Button type="button" onClick={goBack} disabled={isLoading} className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-sm px-4 py-2 rounded transition-all">
-                          رجوع
-                        </Button>
-                      )}
-
-                      {wizardStep < wizardSteps.length - 1 ? (
-                        <Button type="button" onClick={goNext} disabled={isLoading} className="bg-islamic-green hover:bg-green-700 text-white text-sm px-4 py-2 rounded transition-all">
-                          التالي
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          onClick={handleSaveRecord}
-                          disabled={isLoading}
-                          className="bg-green-700 hover:bg-green-800 text-white text-sm px-4 py-2 rounded-lg transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-green-300"
-                        >
-                          {isLoading ? 'جاري الحفظ...' : recordToEdit ? 'تحديث السجل' : 'إضافة السجل'}
-                        </Button>
-
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                  <div>
+                    <Label htmlFor="to_surah" className="flex items-center gap-1 mb-1 text-xs">إلى سورة <span className="text-red-500">*</span></Label>
+                    <Select value={formData.to_surah ? formData.to_surah.toString() : ''} onValueChange={(value) => handleSurahChange('to_surah', parseInt(value))}>
+                      <SelectTrigger id="to_surah" dir="rtl" className="text-right truncate h-9 text-xs"><SelectValue placeholder="اختر السورة">{formData.to_surah ? `${formData.to_surah}. ${getSurahName(formData.to_surah)}` : 'اختر السورة'}</SelectValue></SelectTrigger>
+                      <SelectContent className="max-h-[200px]" dir="rtl">{quranSurahs.map(surah => (<SelectItem key={surah.number} value={surah.number.toString()}>{surah.number}. {getSurahName(surah.number)}</SelectItem>))}</SelectContent>
+                    </Select>
+                    {formErrors.to_surah && <p className="text-xs text-red-500 mt-1">{formErrors.to_surah}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="to_ayah" className="flex items-center gap-1 mb-1 text-xs">إلى آية <span className="text-red-500">*</span></Label>
+                    <Input id="to_ayah" type="number" min={1} dir="rtl" className="text-right h-9 text-sm" value={formData.to_ayah || ''} onChange={(e) => handleInputChange('to_ayah', parseInt(e.target.value))} />
+                    {formErrors.to_ayah && <p className="text-xs text-red-500 mt-1">{formErrors.to_ayah}</p>}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 p-2 rounded border border-gray-200 dark:border-gray-700 mt-3"><p>قم بتحديد نطاق الحفظ أو المراجعة بشكل دقيق حتى يمكن متابعة تقدم الطالب.</p></div>
+              </div>
+            </div>
+          )}
+          {wizardStep === 2 && (
+            <div className="space-y-3 sm:space-y-4 max-h-[50vh] overflow-y-auto pr-1 pb-2">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 sm:p-5 rounded-2xl shadow-md border border-blue-200 dark:border-blue-700">
+                <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                    {[
+                      { id: 'score', label: 'درجة التسميع', required: true, value: formData.score, onChange: (val) => handleInputChange('score', val) },
+                      { id: 'lahn_jali', label: 'اللحن الجلي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_jali, onChange: (val) => handleTajweedErrorChange('lahn_jali', val) },
+                      { id: 'lahn_khafi', label: 'اللحن الخفي', hint: '(عدد الأخطاء)', value: formData.tajweed_errors?.lahn_khafi, onChange: (val) => handleTajweedErrorChange('lahn_khafi', val) },
+                    ].map((field) => (
+                      <div key={field.id} className="flex flex-col">
+                        <Label htmlFor={field.id} className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-1 whitespace-nowrap">{field.label} {field.required && <span className="text-red-500">*</span>}{field.hint && <span className="text-[10px] text-gray-400 dark:text-gray-400">{field.hint}</span>}</Label>
+                        <Input id={field.id} type="number" min={0} max={field.id === 'score' ? 100 : undefined} dir="rtl" className="h-9 sm:h-10 text-right bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 sm:px-3 text-xs sm:text-sm focus:ring-2 focus:ring-blue-300 dark:focus:ring-blue-500 focus:outline-none" value={field.value || ''} onChange={(e) => { let val = parseFloat(e.target.value); if (isNaN(val)) val = undefined as any; if (field.id === 'score') { if (val > 100) val = 100; if (val < 0) val = 0; } field.onChange(val as any); }} />
+                        {field.id === 'score' && formErrors.score && <p className="text-xs text-red-500 mt-1 text-right">{formErrors.score}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="notes" className="mb-1.5 sm:mb-2 text-xs sm:text-sm">ملاحظات</Label>
+                <Textarea id="notes" dir="rtl" value={formData.notes || ''} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="أدخل أي ملاحظات خاصة بالتسميع..." className="h-20 sm:h-24 text-right text-xs sm:text-sm" />
+              </div>
+            </div>
+          )}
+        </div>
+      </FormDialog>
 
       {/* مربع حوار تأكيد الحذف */}
       <DeleteConfirmationDialog
@@ -1918,6 +1888,385 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         deleteButtonText="نعم، احذف السجل"
         cancelButtonText="إلغاء"
       />
+
+      {/* حوار اختيار المعلم */}
+      <FormDialog
+        title={'المعلم'}
+        open={isTeacherPickerOpen}
+        onOpenChange={setIsTeacherPickerOpen}
+        onSave={() => setIsTeacherPickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          {/* شريط أدوات مصغر للمعلمين */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder="🔍 اسم المعلم"
+                value={teacherSearchTerm}
+                onChange={(e) => setteacherSearchTerm(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          <GenericTable
+            title=""
+            defaultView="table"
+            enablePagination
+            defaultPageSize={4}
+            pageSizeOptions={[4, 8, 16, 48, 100]}
+            data={filteredTeachersForPicker}
+            getRowClassName={(item: any, index: number) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            columns={([
+              {
+                key: 'row_index',
+                header: '🔢',
+                width: '32px',
+                align: 'center' as const,
+                render: (_: any, globalIndex?: number) => (
+                  <span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>
+                )
+              },
+              {
+                key: 'full_name',
+                header: '👨‍🏫 المعلم',
+                align: 'center' as const,
+                render: (item: any) => {
+                  const selected = item.id === selectedTeacherId;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTeacherId(item.id);
+                        setSelectedCircleId('all-circles');
+                        clearStudentSelection();
+                        setIsTeacherPickerOpen(false);
+                      }}
+                      className="w-full flex items-center justify-center group px-1"
+                    >
+                      <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span>
+                    </button>
+                  );
+                }
+              },
+              {
+                key: 'circles_count',
+                header: '📘 الحلقات',
+                align: 'center' as const,
+                render: (item: any) => (
+                  <span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{teacherCirclesCountMap[item.id] ?? 0}</span>
+                )
+              },
+              {
+                key: 'actions',
+                header: `⚙️ الإجراءات`,
+                align: 'center' as const,
+                render: (item: any) => {
+                  const selected = item.id === selectedTeacherId;
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTeacherId(item.id);
+                          setSelectedCircleId('all-circles');
+                          clearStudentSelection();
+                          setIsTeacherPickerOpen(false);
+                        }}
+                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                        title={selected ? 'محدد' : 'تحديد'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  );
+                }
+              }
+            ]) as any}
+            emptyMessage={'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار الطالب (منقول لأسفل بعد تعريف الحالات) */}
+      <FormDialog
+        title={'بحث وتحديد الطلاب'}
+        open={isStudentPickerOpen}
+        onOpenChange={setIsStudentPickerOpen}
+        onSave={() => setIsStudentPickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="680px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          {/* شريط أدوات مصغر لاختيار الطلاب */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder="🔍 اسم الطالب / ولي الأمر"
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  // تحديد جميع الظاهرين أو إلغاء الكل إذا كانوا كلهم محددين
+                  const ids = filteredStudentsForPicker.map((s: any) => s.id);
+                  const allSelected = ids.every((id: string) => selectedStudentIds.includes(id));
+                  if (allSelected) {
+                    // إزالة فقط الظاهرين
+                    setSelectedStudentIds(prev => prev.filter(id => !ids.includes(id)));
+                  } else {
+                    // دمج مع الحاليين
+                    setSelectedStudentIds(prev => Array.from(new Set([...prev, ...ids])));
+                  }
+                }}
+                className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-green-600 hover:bg-green-700 text-white shadow transition"
+                title="تحديد/إلغاء تحديد المعروض"
+              >
+                الكل
+              </button>
+              {!isAllStudentsSelected && (
+                <button
+                  type="button"
+                  onClick={clearStudentSelection}
+                  className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-red-500 hover:bg-red-600 text-white shadow transition"
+                  title="إزالة جميع التحديد"
+                >
+                  مسح
+                </button>
+              )}
+              <div
+                className={`h-8 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center
+                ${isAllStudentsSelected
+                    ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                    : 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'}`}
+                title="عدد المحددين"
+              >
+                {isAllStudentsSelected ? 'الجميع' : selectedStudentIds.length}
+              </div>
+            </div>
+          </div>
+
+          <GenericTable
+            title=""
+            defaultView="table"
+            enablePagination
+            defaultPageSize={6}
+            pageSizeOptions={[6, 12, 24, 60]}
+            data={filteredStudentsForPicker}
+            getRowClassName={(item: any, index: number) =>
+              `${selectedStudentIds.includes(item.id)
+                ? 'bg-green-100/70 hover:bg-green-100'
+                : index % 2 === 0
+                  ? 'bg-white hover:bg-green-50'
+                  : 'bg-green-50 hover:bg-green-100'
+              } cursor-pointer transition-colors`
+            }
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            columns={([
+              {
+                key: 'row_index',
+                header: '🔢',
+                width: '32px',
+                align: 'center' as const,
+                render: (_: any, globalIndex?: number) => (
+                  <span className="text-[10px] font-medium block text-center">
+                    {(globalIndex ?? 0) + 1}
+                  </span>
+                )
+              },
+              {
+                key: 'full_name',
+                header: '👦 الطالب',
+                align: 'center' as const,
+                render: (item: any) => {
+                  const selected = selectedStudentIds.includes(item.id);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => { toggleStudentSelection(item.id); }}
+                      className="w-full flex items-center justify-center group px-1"
+                    >
+                      <span
+                        className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}
+                      >
+                        {item.full_name}
+                      </span>
+                    </button>
+                  );
+                }
+              },
+              {
+                key: 'guardian',
+                header: '👪 ولي الأمر',
+                align: 'center' as const,
+                render: (item: any) => (
+                  <span className="block w-full text-center text-[10px] sm:text-[11px]">
+                    {item.guardian?.full_name || '-'}
+                  </span>
+                )
+              },
+              {
+                key: 'circle',
+                header: '📘 الحلقة',
+                align: 'center' as const,
+                render: (item: any) => (
+                  <span className="block w-full text-center text-[10px] sm:text-[11px]">
+                    {item.study_circle?.name || '-'}
+                  </span>
+                )
+              },
+              {
+                key: 'actions',
+                header: '⚙️ إجراءات',
+                align: 'center' as const,
+                render: (item: any) => {
+                  const selected = selectedStudentIds.includes(item.id);
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => { toggleStudentSelection(item.id); }}
+                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
+              ${selected
+                            ? 'bg-green-600 border-green-600 text-white hover:bg-green-600'
+                            : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                        title={selected ? 'إزالة من التحديد' : 'تحديد'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  );
+                }
+              }
+            ]) as any}
+            emptyMessage={'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
+
+      {/* حوار اختيار الحلقة */}
+      <FormDialog
+        title={'الحلقة'}
+        open={isCirclePickerOpen}
+        onOpenChange={setIsCirclePickerOpen}
+        onSave={() => setIsCirclePickerOpen(false)}
+        mode="edit"
+        showSaveButton={false}
+        maxWidth="640px"
+      >
+        <div className="flex flex-col gap-3 py-1">
+          {/* شريط أدوات مصغر للحلقات */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
+              <Input
+                placeholder="🔍 اسم الحلقة"
+                value={circlePickerSearch}
+                onChange={(e) => setCirclePickerSearch(e.target.value)}
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          <GenericTable
+            title=""
+            defaultView="table"
+            enablePagination
+            defaultPageSize={4}
+            pageSizeOptions={[4, 8, 16, 48, 100]}
+            data={filteredCirclesForPicker}
+            getRowClassName={(item: any, index: number) => `${item.id === selectedCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            hideSortToggle
+            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            columns={([
+              {
+                key: 'row_index',
+                header: '🔢',
+                width: '32px',
+                align: 'center' as const,
+                render: (_: any, globalIndex?: number) => (
+                  <span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>
+                )
+              },
+              {
+                key: 'name',
+                header: '📘 الحلقة',
+                align: 'center' as const,
+                render: (item: any) => {
+                  const selected = item.id === selectedCircleId;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCircleId(item.id);
+                        clearStudentSelection();
+                        setIsCirclePickerOpen(false);
+                      }}
+                      className="w-full flex items-center justify-center group px-1"
+                    >
+                      <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.name}</span>
+                    </button>
+                  );
+                }
+              },
+              {
+                key: 'students_count',
+                header: '👥 العدد',
+                align: 'center' as const,
+                render: (item: any) => (
+                  <span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{circleStudentsCountMap[item.id] ?? 0}</span>
+                )
+              },
+              {
+                key: 'max_students',
+                header: '👥 الحد',
+                align: 'center' as const,
+                render: (item: any) => (
+                  <span className="block w-full text-center text-[10px] sm:text-[11px]">{(item.max_students ?? item.capacity) || '-'}</span>
+                )
+              },
+              {
+                key: 'actions',
+                header: `⚙️ الإجراءات`,
+                align: 'center' as const,
+                render: (item: any) => {
+                  const selected = item.id === selectedCircleId;
+                  return (
+                    <div className="flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCircleId(item.id);
+                          clearStudentSelection();
+                          setIsCirclePickerOpen(false);
+                        }}
+                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                        title={selected ? 'محددة' : 'تحديد'}
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  );
+                }
+              }
+            ]) as any}
+            emptyMessage={'لا يوجد بيانات'}
+          />
+        </div>
+      </FormDialog>
 
       {/* حوار عرض جميع سجلات الطالب */}
       <Dialog open={isStudentRecordsDialogOpen} onOpenChange={setIsStudentRecordsDialogOpen}>
@@ -2022,7 +2371,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                   },
                   {
                     key: 'actions',
-                    header: '⚙️',
+                    header: `⚙️ الإجراءات`,
                     align: 'center' as const,
                     render: (record) => (
                       <div className="flex justify-center items-center gap-1">
