@@ -50,6 +50,8 @@ export type FormDialogProps = {
     saveButtonText?: string;
 
     /**
+        lightOverlay = false,
+        transparentOverlay = false
      * نص زر الإلغاء (اختياري، الافتراضي "إلغاء")
      */
     cancelButtonText?: string;
@@ -116,6 +118,10 @@ export type FormDialogProps = {
     transparentBody?: boolean;
     /** محتوى اختياري لمؤشرات خطوات (Wizard) يعرض أسفل العنوان مباشرة وخارج منطقة التمرير */
     wizardSteps?: React.ReactNode;
+    /** جعل الخلفية أخف (بدلاً من الأسود شبه الكامل) */
+    lightOverlay?: boolean;
+    /** جعل الخلفية شفافة تقريباً (لا تغطي الصفحة) */
+    transparentOverlay?: boolean;
 };
 
 /**
@@ -148,7 +154,9 @@ export function FormDialog({
     mobileFooterShadow = false,
     saveButtonFirst = false,
     transparentBody = false,
-    wizardSteps
+        wizardSteps,
+        lightOverlay = false,
+        transparentOverlay = false
 }: FormDialogProps) {
     const realShowSaveButton = showSaveButton !== false; // default true if undefined
     const hasFooterContent = realShowSaveButton || (!!extraButtons) || (!hideCancelButton && realShowSaveButton);
@@ -180,7 +188,14 @@ export function FormDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPortal>
                 {/* الخلفية */}
-                <DialogOverlay />
+                <DialogOverlay
+                    className={cn(
+                        transparentBody && 'bg-black/10',
+                        transparentOverlay && 'bg-black/5 backdrop-blur-[1px]',
+                        lightOverlay && !transparentOverlay && 'bg-black/40',
+                        'transition-colors'
+                    )}
+                />
 
                 {/* الحاوية الرئيسية */}
                 <div

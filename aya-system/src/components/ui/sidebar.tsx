@@ -196,7 +196,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden flex flex-col"
             style={
               {
                 "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -204,7 +204,12 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+            {/* Scrollable area with modern scrollbar on mobile */}
+            <div className="flex h-full w-full flex-col overflow-hidden">
+              <div className="vh-scroll modern-scrollbar overflow-y-auto overscroll-contain px-0 pb-4 pt-0 scroll-fade" data-sidebar="mobile-scroll">
+                {children}
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
       )

@@ -3,7 +3,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"; // legacy dialogs (remaining to convert)
+// Removed direct Dialog primitive usage after migrating to FormDialog
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"; // legacy
 import { FormDialog } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +30,7 @@ import {
 } from "@/lib/profile-service";
 import { getStudyCircleCountByTeacherIds, getStudyCirclesByTeacherId, updateStudyCircle, createStudyCircle, deleteStudyCircle } from '@/lib/study-circle-service';
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from '@/lib/study-circle-schedule-service';
-import { Shield, User, UserCheck, Eye, EyeOff, Pencil, UserPlus, AlertTriangle, Trash2, KeyRound, Crown, BookOpen, Calendar, Clock, MapPin, Plus, Info, NotebookPenIcon, User2Icon, RefreshCwIcon, AtSign, Lock, Users } from "lucide-react";
+import { Shield, User, UserCheck, Eye, EyeOff, Pencil, UserPlus, AlertTriangle, Trash2, KeyRound, Crown, BookOpen, Calendar, Clock, MapPin, Plus, Info, NotebookPenIcon, User2Icon, RefreshCwIcon, AtSign, Lock, Users, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA } from "lucide-react";
 import { getLabels } from '@/lib/labels';
 
 interface UserManagementProps {
@@ -40,7 +41,7 @@ interface UserManagementProps {
 }
 
 export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnly = false }: UserManagementProps) {
-  const { userManagementLabels, errorMessages, successMessages, commonLabels } = getLabels('ar');
+  const { userManagementLabels, errorMessages, successMessages, commonLabels, studyCircleSchedulesLabels: scsLabels } = getLabels('ar');
   // List state
   const [admins, setAdmins] = useState<Profile[]>([]);
   const [teachers, setteachers] = useState<Profile[]>([]);
@@ -48,6 +49,15 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
   const [teacherProfile, setTeacherProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>(teacherOnly ? "teachers" : "admins");
+  // Compact control bar state
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  // null = no sort, 'asc' | 'desc'
+  const [listSortDirection, setListSortDirection] = useState<null | 'asc' | 'desc'>(null);
+
+  const toggleListSort = () => {
+    setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
+  };
 
   // دالة إعادة تحميل أعداد الحلقات
   const refreshCircleCounts = async () => {
@@ -1035,10 +1045,28 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
     }
   };
 
+  // Filtering & sorting logic (applies to currently active dataset only at render usage)
+  const normalize = (v: string) => v.toLowerCase();
+  const matchesSearch = (u: Profile) => {
+    if (!searchQuery.trim()) return true;
+    const q = normalize(searchQuery);
+    return [u.full_name, u.username, u.role].some(f => f && normalize(f).includes(q));
+  };
+  const applySort = (arr: Profile[]) => {
+    if (!listSortDirection) return arr;
+    return [...arr].sort((a, b) => {
+      const A = a.full_name.localeCompare(b.full_name, 'ar');
+      return listSortDirection === 'asc' ? A : -A;
+    });
+  };
+  const filteredSuperadmins = applySort(superadmins.filter(matchesSearch));
+  const filteredAdmins = applySort(admins.filter(matchesSearch));
+  const filteredTeachers = applySort(teachers.filter(matchesSearch));
+
   // Render page
   return (
     <div className="w-full max-w-[1600px] mx-auto">
-      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
+      <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
         <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
@@ -1047,80 +1075,101 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
               <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
                 <User2Icon className="h-5 w-5 text-yellow-300" />
                 {teacherOnly && userRole === 'teacher'
-                  ? userManagementLabels.teacherProfileTitle || "بياناتي الشخصية"
+                  ? userManagementLabels.teacherProfileTitle || 'بياناتي الشخصية'
                   : userManagementLabels.title}
               </CardTitle>
               <CardDescription className="text-xs md:text-sm text-green-100 mt-1">
                 {teacherOnly && userRole === 'teacher'
-                  ? userManagementLabels.teacherProfileDescription || "إدارة بياناتك الشخصية وكلمة المرور"
+                  ? userManagementLabels.teacherProfileDescription || 'إدارة بياناتك الشخصية وكلمة المرور'
                   : userManagementLabels.description}
               </CardDescription>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-
-        </CardContent>
-      </Card>
-      <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-1 rounded-lg bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
-        {/* إذا كان المستخدم معلم ويريد عرض بياناته فقط */}
-        {teacherOnly && userRole === 'teacher' ? (
-          <div>
-            {loading ? (
-              <div className="text-center p-4">{userManagementLabels.loading}</div>
-            ) : (
-              <UsersTable
-                users={teachers}
-                onEdit={handleEditUser}
-                onDelete={handleDeleteUser}
-                onChangePassword={handleChangePassword}
-                userRole={userRole}
-                currentUserId={currentUserId}
-                userType="teacher"
-                showOnlyChangePassword={true}
-                teacherCircleCounts={teacherCircleCounts}
-              />
-            )}
-          </div>
-        ) : (
-          /* عرض الواجهة المعتادة لإدارة المستخدمين (مُعاد تصميم التابات) */
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
-              <TabsList
-                className="grid w-full md:w-[420px] gap-0.5 rounded-lg bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300 bg-green-50 p-0.5"
-                style={{ gridTemplateColumns: `${userRole === 'superadmin' ? 'repeat(3,1fr)' : (userRole === 'admin' ? 'repeat(2,1fr)' : 'repeat(1,1fr)')}` }}
+        <CardContent className="pt-0.5 pb-0 px-0 sm:px-0">
+          {/* شريط علوي مضغوط */}
+          {!teacherOnly && (
+            <div className="flex flex-col md:flex-row justify-between items-center gap-3 
+                            mb-1 rounded-lg bg-white dark:bg-gray-900 p-2 shadow-sm border 
+                            border-green-200 dark:border-green-700">
+              {/* التابات */}
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="w-full md:w-[380px] bg-green-50 rounded-lg shadow-inner p-0.5"
               >
-                {userRole === 'superadmin' && (
+                <TabsList className="flex w-full gap-0.5 rounded-lg bg-white dark:bg-gray-900 shadow-sm ring-1 ring-green-300 p-0.5">
+                  {userRole === 'superadmin' && (
+                    <TabsTrigger
+                      value="superadmins"
+                      className="flex flex-1 items-center justify-center gap-1 text-center text-[11px] sm:text-xs font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                      title={userManagementLabels.superadmins}
+                    >
+                      👑 <span className="hidden sm:inline">{userManagementLabels.superadmins}</span>
+                    </TabsTrigger>
+                  )}
+                  {(userRole === 'superadmin' || userRole === 'admin') && (
+                    <TabsTrigger
+                      value="admins"
+                      className="flex flex-1 items-center justify-center gap-1 text-center text-[11px] sm:text-xs font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                      title={userManagementLabels.administrators}
+                    >
+                      🛡️ <span className="hidden sm:inline">{userManagementLabels.administrators}</span>
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger
-                    value="superadmins"
-                    className="flex items-center justify-center gap-1 text-center text-[11px] sm:text-xs md:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
-                    title={userManagementLabels.superadmins}
+                    value="teachers"
+                    className="flex flex-1 items-center justify-center gap-1 text-center text-[11px] sm:text-xs font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
+                    title={userManagementLabels.teachers}
                   >
-                    👑 <span className="hidden sm:inline">{userManagementLabels.superadmins}</span>
+                    👨‍🏫 <span className="hidden sm:inline">{userManagementLabels.teachers}</span>
                   </TabsTrigger>
-                )}
-                {(userRole === 'superadmin' || userRole === 'admin') && (
-                  <TabsTrigger
-                    value="admins"
-                    className="flex items-center justify-center gap-1 text-center text-[11px] sm:text-xs md:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
-                    title={userManagementLabels.administrators}
-                  >
-                    🛡️ <span className="hidden sm:inline">{userManagementLabels.administrators}</span>
-                  </TabsTrigger>
-                )}
-                <TabsTrigger
-                  value="teachers"
-                  className="flex items-center justify-center gap-1 text-center text-[11px] sm:text-xs md:text-sm font-medium rounded-md text-green-800 py-1.5 px-2 hover:bg-green-100 hover:text-green-900 data-[state=active]:bg-islamic-green data-[state=active]:text-white transition-all duration-200"
-                  title={userManagementLabels.teachers}
+                </TabsList>
+              </Tabs>
+              <div className="flex gap-2 items-center">
+                {/* زر الفلتر */}
+                <Button
+                  variant={showFilters ? 'default' : 'outline'}
+                  className={`flex items-center gap-1.5 rounded-2xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8`}
+                  onClick={() => setShowFilters(p => !p)}
+                  title={showFilters ? 'إخفاء أدوات الفلترة' : 'إظهار أدوات الفلترة'}
                 >
-                  👨‍🏫 <span className="hidden sm:inline">{userManagementLabels.teachers}</span>
-                </TabsTrigger>
-              </TabsList>
-              <div className="flex flex-wrap gap-2">
+                  <Filter className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">فلتر</span>
+                </Button>
+                {/* زر الترتيب */}
+                <Button
+                  type="button"
+                  variant={listSortDirection ? 'default' : 'outline'}
+                  onClick={toggleListSort}
+                  title={listSortDirection === null ? 'ترتيب تصاعدي حسب الاسم' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
+                  className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200 ${listSortDirection === null ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600' : listSortDirection === 'asc' ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500' : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
+                >
+                  {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
+                  {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
+                  {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</span>
+                </Button>
+                {/* زر التحديث */}
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                  onClick={refreshData}
+                  title='تحديث البيانات'
+                >
+                  <RefreshCwIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">تحديث</span>
+                </Button>
+                {/* زر إضافة مستخدم */}
                 {(userRole === 'superadmin' || (userRole === 'admin' && activeTab === 'teachers')) && (
-                  <Button onClick={handleAddUser} className="bg-islamic-green hover:bg-islamic-green/90 h-9 rounded-2xl px-4 flex items-center gap-2 text-sm shadow">
-                    <UserPlus className="h-4 w-4" />
-                    <span>
+                  <Button
+                    onClick={handleAddUser}
+                    variant="outline"
+                    className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
+                    title='إضافة مستخدم'
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">
                       {activeTab === 'admins'
                         ? userManagementLabels.addNewAdmin
                         : activeTab === 'superadmins'
@@ -1131,85 +1180,99 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
                 )}
               </div>
             </div>
+          )}
+          {showFilters && (
+            <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 rounded-lg animate-fade-in">
+              {/* البحث */}
+              <div className="w-full md:flex-1 min-w-0 md:min-w-[180px]">
+                <Input
+                  title='🔍 بحث عن اسم أو اسم المستخدم'
+                  placeholder="🔍 بحث عن اسم أو اسم المستخدم..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green focus:border-islamic-green text-sm text-gray-800 dark:text-gray-200 transition-all duration-200"
+                />
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-            {userRole === 'superadmin' && (
-              <TabsContent value="superadmins" className="mt-0">
-                <Card>
-                  <CardContent className="p-4">
-                    {loading ? (
-                      <div className="text-center p-4">{userManagementLabels.loading}</div>
-                    ) : (
-                      <UsersTable
-                        users={superadmins}
-                        onEdit={handleEditUser}
-                        onDelete={handleDeleteUser}
-                        onChangePassword={handleChangePassword}
-                        userRole={userRole}
-                        currentUserId={currentUserId}
-                        userType="superadmin"
-                        teacherCircleCounts={teacherCircleCounts}
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
+      {/* جدول المستخدمين منفصل تحت الهيدر ويتأثر بالتاب */}
+      {teacherOnly && userRole === 'teacher' ? (
+        <div className="pt-0 pb-0 px-0 sm:px-0 w-full">
+          {loading ? (
+            <div className="text-center p-0">{userManagementLabels.loading}</div>
+          ) : (
+            <UsersTable
+              users={teachers}
+              onEdit={handleEditUser}
+              onDelete={handleDeleteUser}
+              onChangePassword={handleChangePassword}
+              userRole={userRole}
+              currentUserId={currentUserId}
+              userType="teacher"
+              showOnlyChangePassword={true}
+              teacherCircleCounts={teacherCircleCounts}
+            />
+          )}
+        </div>
+      ) : (
+        <div className="pt-0 pb-0 px-0 sm:px-0 w-full">
+          {loading ? (
+            <div className="text-center p-6">{userManagementLabels.loading}</div>
+          ) : activeTab === 'superadmins' && userRole === 'superadmin' ? (
+            <div className="p-2 sm:p-3 md:p-4 w-full">
+              <UsersTable
+                users={filteredSuperadmins}
+                onEdit={handleEditUser}
+                onDelete={handleDeleteUser}
+                onChangePassword={handleChangePassword}
+                userRole={userRole}
+                currentUserId={currentUserId}
+                userType="superadmin"
+                teacherCircleCounts={teacherCircleCounts}
+              />
+            </div>
+          ) : activeTab === 'admins' && (userRole === 'superadmin' || userRole === 'admin') ? (
+            <div className="p-2 sm:p-3 md:p-4 w-full">
+              <UsersTable
+                users={filteredAdmins}
+                onEdit={handleEditUser}
+                onDelete={handleDeleteUser}
+                onChangePassword={handleChangePassword}
+                userRole={userRole}
+                currentUserId={currentUserId}
+                userType="admin"
+                teacherCircleCounts={teacherCircleCounts}
+                onShowCircles={handleOpenCirclesDialog}
+              />
+            </div>
+          ) : (
+            <div className="p-2 sm:p-3 md:p-4 w-full">
+              <UsersTable
+                users={filteredTeachers}
+                onEdit={handleEditUser}
+                onDelete={handleDeleteUser}
+                onChangePassword={handleChangePassword}
+                userRole={userRole}
+                currentUserId={currentUserId}
+                userType="teacher"
+                teacherCircleCounts={teacherCircleCounts}
+                onShowCircles={handleOpenCirclesDialog}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
-            {(userRole === 'superadmin' || userRole === 'admin') && (
-              <TabsContent value="admins" className="mt-0">
-                <Card>
-                  <CardContent className="p-4">
-                    {loading ? (
-                      <div className="text-center p-4">{userManagementLabels.loading}</div>
-                    ) : (
-                      <UsersTable
-                        users={admins}
-                        onEdit={handleEditUser}
-                        onDelete={handleDeleteUser}
-                        onChangePassword={handleChangePassword}
-                        userRole={userRole}
-                        currentUserId={currentUserId}
-                        userType="admin"
-                        teacherCircleCounts={teacherCircleCounts}
-                        onShowCircles={handleOpenCirclesDialog} // Pass the dialog open handler for admins
-                      />
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
-
-            <TabsContent value="teachers" className="mt-0">
-              <Card>
-                <CardContent className="p-4">
-                  {loading ? (
-                    <div className="text-center p-4">{userManagementLabels.loading}</div>
-                  ) : (
-                    <UsersTable
-                      users={teachers}
-                      onEdit={handleEditUser}
-                      onDelete={handleDeleteUser}
-                      onChangePassword={handleChangePassword}
-                      userRole={userRole}
-                      currentUserId={currentUserId}
-                      userType="teacher"
-                      teacherCircleCounts={teacherCircleCounts}
-                      onShowCircles={handleOpenCirclesDialog} // Pass the dialog open handler here
-                    />
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        )}
-      </div>
       {/* User Add/Edit Dialog migrated to FormDialog */}
       <FormDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         title={dialogTitle}
         mode={dialogMode === 'edit' ? 'edit' : 'add'}
-        hideCancelButton={false}
+        hideCancelButton={true}
         saveButtonText={dialogMode === 'add' ? userManagementLabels.addUser : userManagementLabels.saveChanges}
         onSave={handleSaveUser}
       >
@@ -1283,30 +1346,54 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
           {/* اختيار الدور - Superadmin */}
           {userRole === 'superadmin' && (
             <div className="grid gap-2">
-              <Label htmlFor="role" className="flex items-center gap-1">
+              <Label htmlFor="role" className="mb-1 flex items-center gap-1 text-sm font-medium">
                 <Users className="h-4 w-4 text-green-600" />
-                {userManagementLabels.role}
+                {userManagementLabels.role} <span className="text-destructive">*</span>
               </Label>
               <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-                <SelectTrigger>
+                <SelectTrigger
+                  id="role"
+                  dir="rtl"
+                  className={`text-right truncate leading-none rounded-lg border px-2 pr-2 h-9 text-sm transition-all
+                    focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                    ${role
+                      ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                  `}
+                >
                   <SelectValue placeholder={userManagementLabels.chooseRole} />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="superadmin">
+                <SelectContent
+                  position="popper"
+                  dir="rtl"
+                  align="end"
+                  side="bottom"
+                  className="max-h-[260px] text-sm rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900"
+                >
+                  <SelectItem
+                    value="superadmin"
+                    className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                  >
                     <div className="flex items-center gap-2">
-                      <Crown className="h-4 w-4" />
+                      <Crown className="h-4 w-4 text-yellow-500" />
                       <span>{userManagementLabels.superadmin}</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="admin">
+                  <SelectItem
+                    value="admin"
+                    className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                  >
                     <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4" />
+                      <Shield className="h-4 w-4 text-blue-500" />
                       <span>{userManagementLabels.admin}</span>
                     </div>
                   </SelectItem>
-                  <SelectItem value="teacher">
+                  <SelectItem
+                    value="teacher"
+                    className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                  >
                     <div className="flex items-center gap-2">
-                      <UserCheck className="h-4 w-4" />
+                      <UserCheck className="h-4 w-4 text-emerald-500" />
                       <span>{userManagementLabels.teacher}</span>
                     </div>
                   </SelectItem>
@@ -1318,22 +1405,36 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
           {/* اختيار الدور - Admin */}
           {userRole === 'admin' && (
             <div className="grid gap-2">
-              <Label htmlFor="role" className="flex items-center gap-1">
+              <Label htmlFor="role" className="mb-1 flex items-center gap-1 text-sm font-medium">
                 <Shield className="h-4 w-4 text-green-600" />
-                {userManagementLabels.role}
+                {userManagementLabels.role} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={role}
                 onValueChange={(value) => setRole(value as UserRole)}
                 disabled
               >
-                <SelectTrigger>
+                <SelectTrigger
+                  id="role"
+                  dir="rtl"
+                  className={`text-right truncate leading-none rounded-lg border px-2 pr-2 h-9 text-sm transition-all cursor-not-allowed opacity-80
+                    bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500`}
+                >
                   <SelectValue placeholder={userManagementLabels.chooseRole} />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="teacher">
+                <SelectContent
+                  position="popper"
+                  dir="rtl"
+                  align="end"
+                  side="bottom"
+                  className="max-h-[260px] text-sm rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900"
+                >
+                  <SelectItem
+                    value="teacher"
+                    className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                  >
                     <div className="flex items-center gap-2">
-                      <UserCheck className="h-4 w-4" />
+                      <UserCheck className="h-4 w-4 text-emerald-500" />
                       <span>{userManagementLabels.teacher}</span>
                     </div>
                   </SelectItem>
@@ -1343,7 +1444,6 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
           )}
 
         </div>
-
       </FormDialog>
 
       {/* مربع حوار تأكيد حذف المستخدم */}
@@ -1382,7 +1482,7 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
         cancelButtonText="إلغاء"
       />
 
-      {/* Change Password Dialog migrated to FormDialog */}
+      {/* Change Password Dialog */}
       <FormDialog
         open={isChangePasswordDialogOpen}
         onOpenChange={setIsChangePasswordDialogOpen}
@@ -1391,11 +1491,17 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
         hideCancelButton={false}
         saveButtonText={userManagementLabels.changePasswordForm.submit}
         onSave={handleSavePassword}
+        maxWidth="380px"
       >
         <div className="grid gap-4 py-2" dir="rtl">
+
+          {/* كلمة المرور الحالية */}
           {userToChangePassword && userToChangePassword.id === currentUserId && (
-            <div className="grid gap-2">
-              <Label htmlFor="current_password">{userManagementLabels.changePasswordForm.currentPassword}</Label>
+            <div className="grid gap-2 relative">
+              <Label htmlFor="current_password" className="flex items-center gap-1 text-sm">
+                <Lock className="h-4 w-4 text-green-600" />
+                {userManagementLabels.changePasswordForm.currentPassword}
+              </Label>
               <div className="relative">
                 <Input
                   id="current_password"
@@ -1403,7 +1509,9 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder={userManagementLabels.changePasswordForm.currentPassword}
+                  className="pl-10 pr-10 h-8 text-sm"
                 />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
@@ -1414,8 +1522,13 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
               </div>
             </div>
           )}
-          <div className="grid gap-2">
-            <Label htmlFor="new_password">{userManagementLabels.changePasswordForm.newPassword}</Label>
+
+          {/* كلمة المرور الجديدة */}
+          <div className="grid gap-2 relative">
+            <Label htmlFor="new_password" className="flex items-center gap-1 text-sm">
+              <Lock className="h-4 w-4 text-green-600" />
+              {userManagementLabels.changePasswordForm.newPassword}
+            </Label>
             <div className="relative">
               <Input
                 id="new_password"
@@ -1423,7 +1536,9 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder={userManagementLabels.changePasswordForm.newPassword}
+                className="pl-10 pr-10 h-8 text-sm"
               />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <button
                 type="button"
                 onClick={() => setShowNewPassword(!showNewPassword)}
@@ -1433,8 +1548,13 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
               </button>
             </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="confirm_password">{userManagementLabels.changePasswordForm.confirmNewPassword}</Label>
+
+          {/* تأكيد كلمة المرور الجديدة */}
+          <div className="grid gap-2 relative">
+            <Label htmlFor="confirm_password" className="flex items-center gap-1 text-sm">
+              <Lock className="h-4 w-4 text-green-600" />
+              {userManagementLabels.changePasswordForm.confirmNewPassword}
+            </Label>
             <div className="relative">
               <Input
                 id="confirm_password"
@@ -1442,7 +1562,9 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
                 value={confirmNewPassword}
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
                 placeholder={userManagementLabels.changePasswordForm.confirmNewPassword}
+                className="pl-10 pr-10 h-8 text-sm"
               />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
@@ -1452,584 +1574,426 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
               </button>
             </div>
           </div>
+
         </div>
       </FormDialog>
 
-      {/* Circles Dialog */}
-      <Dialog open={openCirclesDialog} onOpenChange={setOpenCirclesDialog}>
 
-        <DialogContent dir="rtl" className="sm:max-w-[700px] max-h-[80vh] overflow-auto">
-          <DialogHeader className="flex flex-col items-center border-b border-islamic-green/20 pb-4">
-            <DialogTitle className="text-xl text-islamic-green flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              {selectedTeacher ? `حلقات ${selectedTeacher.full_name}` : 'حلقات المستخدم'}
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">
-              عرض وإدارة الحلقات الدراسية الخاصة بالمستخدم
-            </DialogDescription>
-          </DialogHeader>
-
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-islamic-green border-islamic-green/40">
-                    {teacherCircles.length} حلقة
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">إجمالي الحلقات</span>
-                </div>
-                {selectedTeacher && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      المعلم: {selectedTeacher.full_name}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-              <Button
-                onClick={handleAddCircle}
-                className="bg-islamic-green hover:bg-islamic-green/90 text-white"
-                size="sm"
-              >
-                <UserPlus className="h-4 w-4 ml-2" />
-                إضافة حلقة جديدة
-              </Button>
-            </div>
-
-            {loadingCircles ? (
-              <div className="text-center p-8">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green mb-4"></div>
-                  <span className="text-muted-foreground">جاري تحميل الحلقات...</span>
-                </div>
-              </div>
-            ) : teacherCircles.length === 0 ? (
-              <div className="text-center p-8 bg-muted/30 rounded-lg">
-                <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-medium text-lg mb-2">لا توجد حلقات</h3>
-                <p className="text-muted-foreground mb-4">لم يتم تسجيل أي حلقات لهذا المستخدم بعد</p>
-                <Button
-                  onClick={handleAddCircle}
-                  className="bg-islamic-green hover:bg-islamic-green/90"
-                >
-                  <UserPlus className="h-4 w-4 ml-2" />
-                  إضافة أول حلقة
-                </Button>
-              </div>
-            ) : (
-              <div className="border border-islamic-green/20 rounded-lg overflow-hidden">
-                <GenericTable
-                  data={teacherCircles.map(c => ({
-                    ...c,
-                    id: c.id,
-                    __createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '-',
-                    __max: c.max_students || 'غير محدد'
-                  })) as any}
-                  columns={([
-                    { key: 'name', header: '📖 اسم الحلقة', align: 'right', render: (r: any) => <span className="font-medium">{r.name}</span> },
-                    { key: '__max', header: '👥 الحد الأقصى للطلاب', align: 'center', render: (r: any) => <Badge variant="secondary" className="text-sm px-2 py-1 rounded-lg">{r.__max}</Badge> },
-                    { key: '__createdAt', header: '📅 تاريخ الإنشاء', align: 'center', render: (r: any) => <span className="text-xs text-muted-foreground">{r.__createdAt}</span> },
-                    {
-                      key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
-                        <div className="flex justify-center items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenScheduleDialog(r)}
-                            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors rounded-lg"
-                            title="جدولة الحلقة"
-                          >
-                            <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-300" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditCircle(r)}
-                            className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
-                            title="تعديل الحلقة"
-                          >
-                            <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteCircle(r)}
-                            className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                            title="حذف الحلقة"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                          </Button>
-                        </div>
-                      )
-                    }
-                  ]) as any}
-                  defaultView="table"
-                  hideSortToggle
-                  enablePagination
-                  defaultPageSize={10}
-                  pageSizeOptions={[10, 20, 50]}
-                  className="rounded-none border-0 text-sm"
-                  getRowClassName={(_: any, i: number) => `${i % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
-                />
-              </div>
-            )}
+      {/* Circles Dialog migrated to FormDialog */}
+      <FormDialog
+        open={openCirclesDialog}
+        onOpenChange={setOpenCirclesDialog}
+        title={selectedTeacher ? `حلقات ${selectedTeacher.full_name}` : 'حلقات المستخدم'}
+        mode="edit"
+        maxWidth="760px"
+        showSaveButton={false}
+        hideCancelButton
+        fullBleedBody
+        mobileFullScreen
+        mobileInlineActions
+        compactFooterSpacing
+        mobileFooterShadow
+        onSave={() => { /* view-only dialog */ }}
+        extraButtons={
+          <div className="flex gap-2 w-full justify-end">
+            <Button
+              onClick={handleAddCircle}
+              className="bg-islamic-green hover:bg-islamic-green/90 text-white"
+            >
+              <UserPlus className="h-4 w-4 ml-2" />
+              إضافة حلقة
+            </Button>
           </div>
-
-          <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t" dir="rtl">
-            <div className="flex gap-2 w-full justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setOpenCirclesDialog(false)}
-                className="border-islamic-green text-islamic-green hover:bg-islamic-green/10"
-              >
-                إغلاق
-              </Button>
-              <Button
-                onClick={handleAddCircle}
-                className="bg-islamic-green hover:bg-islamic-green/90 text-white"
-              >
-                <UserPlus className="h-4 w-4 ml-2" />
-                إضافة حلقة
-              </Button>
+        }
+      >
+        <div className="space-y-4">
+          {loadingCircles ? (
+            <div className="text-center p-8">
+              <div className="flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green mb-4"></div>
+                <span className="text-muted-foreground">جاري تحميل الحلقات...</span>
+              </div>
             </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Circle Dialog */}
-      <Dialog open={openEditCircleDialog} onOpenChange={setOpenEditCircleDialog}>
-        <DialogContent dir="rtl" className="sm:max-w-[400px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="flex flex-col items-center border-b border-islamic-green/20 pb-4">
-            <DialogTitle className="text-xl text-islamic-green flex items-center gap-2">
-              <Pencil className="h-5 w-5" />
-              تعديل الحلقة
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">
-              قم بتعديل بيانات الحلقة الدراسية
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-circle-name" className="text-right">اسم الحلقة *</Label>
-              <Input
-                id="edit-circle-name"
-                value={editCircleForm.name}
-                onChange={(e) => handleEditFormChange('name', e.target.value)}
-                placeholder="أدخل اسم الحلقة"
-                required
+          ) : teacherCircles.length === 0 ? (
+            <div className="text-center p-8 bg-muted/30 rounded-lg">
+              <BookOpen className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-medium text-lg mb-2">لا توجد حلقات</h3>
+              <p className="text-muted-foreground mb-4">لم يتم تسجيل أي حلقات لهذا المستخدم بعد</p>
+            </div>
+          ) : (
+            <div className="border border-islamic-green/20 rounded-lg 
+                            max-h-[calc(100dvh-160px)] sm:max-h-[60vh] overflow-auto custom-scrollbar 
+                            scrollbar-green scroll-fade-overlay 
+                            bg-white/50 dark:bg-green-950/30 transition-[max-height] duration-300 ease-in-out">
+              <GenericTable
+                data={teacherCircles.map(c => ({
+                  ...c,
+                  id: c.id,
+                  __createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '-',
+                  __max: c.max_students || 'غير محدد'
+                })) as any}
+                columns={([
+                  {
+                    key: '__index', header: '🔢', align: 'center', render: (_r: any, idx?: number) => (
+                      <span
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full
+                        bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500
+                        text-white text-[11px] font-bold shadow-inner ring-1 ring-white/40"
+                      >
+                        {(idx ?? 0) + 1}
+                      </span>
+                    )
+                  },
+                  { key: 'name', header: '📖 اسم الحلقة', align: 'right', render: (r: any) => <span className="font-medium">{r.name}</span> },
+                  { key: '__max', header: '👥 الحد الأقصى للطلاب', align: 'center', render: (r: any) => <Badge variant="secondary" className="text-sm px-2 py-1 rounded-lg">{r.__max}</Badge> },
+                  { key: '__createdAt', header: '📅 تاريخ الإنشاء', align: 'center', render: (r: any) => <span className="text-xs text-muted-foreground">{r.__createdAt}</span> },
+                  {
+                    key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
+                      <div className="flex justify-center items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleOpenScheduleDialog(r)}
+                          className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors rounded-lg"
+                          title="جدولة الحلقة"
+                        >
+                          <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-300" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditCircle(r)}
+                          className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
+                          title="تعديل الحلقة"
+                        >
+                          <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteCircle(r)}
+                          className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                          title="حذف الحلقة"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                        </Button>
+                      </div>
+                    )
+                  }
+                ]) as any}
+                defaultView="table"
+                hideSortToggle={false}
+                enablePagination
+                defaultPageSize={2}
+                pageSizeOptions={[2, 4, 8, 16]}
+                className="rounded-none border-0 text-sm"
+                getRowClassName={(_: any, i: number) => `${i % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
               />
             </div>
+          )}
+        </div>
+      </FormDialog>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-circle-max-students" className="text-right">الحد الأقصى للطلاب</Label>
-              <Input
-                id="edit-circle-max-students"
-                type="number"
-                value={editCircleForm.max_students}
-                onChange={(e) => handleEditFormChange('max_students', e.target.value)}
-                placeholder="أدخل العدد الأقصى للطلاب"
-                min="1"
+      {/* Edit Circle Dialog migrated to FormDialog */}
+      <FormDialog
+        open={openEditCircleDialog}
+        onOpenChange={setOpenEditCircleDialog}
+        title="تعديل الحلقة"
+        description="قم بتعديل بيانات الحلقة الدراسية"
+        mode="edit"
+        maxWidth="520px"
+        hideCancelButton={false}
+        onSave={handleSaveCircleEdit}
+        saveButtonText={savingCircleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
+        isLoading={savingCircleEdit}
+        mobileFullScreen
+        mobileInlineActions
+        mobileFooterShadow
+        compactFooterSpacing
+      >
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="edit-circle-name" className="text-right">اسم الحلقة *</Label>
+            <Input
+              id="edit-circle-name"
+              value={editCircleForm.name}
+              onChange={(e) => handleEditFormChange('name', e.target.value)}
+              placeholder="أدخل اسم الحلقة"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="edit-circle-max-students" className="text-right">الحد الأقصى للطلاب</Label>
+            <Input
+              id="edit-circle-max-students"
+              type="number"
+              value={editCircleForm.max_students}
+              onChange={(e) => handleEditFormChange('max_students', e.target.value)}
+              placeholder="أدخل العدد الأقصى للطلاب"
+              min="1"
+            />
+          </div>
+        </div>
+      </FormDialog>
+
+      {/* Add New Circle Dialog migrated to FormDialog */}
+      <FormDialog
+        open={openAddCircleDialog}
+        onOpenChange={setOpenAddCircleDialog}
+        title="إضافة حلقة جديدة"
+        description="قم بإدخال بيانات الحلقة الدراسية الجديدة"
+        mode="add"
+        maxWidth="520px"
+        hideCancelButton={false}
+        onSave={handleSaveNewCircle}
+        saveButtonText={savingNewCircle ? "جارٍ الإضافة..." : "إضافة الحلقة"}
+        isLoading={savingNewCircle}
+        mobileFullScreen
+        mobileInlineActions
+        mobileFooterShadow
+        compactFooterSpacing
+      >
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="add-circle-name" className="text-right">اسم الحلقة *</Label>
+            <Input
+              id="add-circle-name"
+              value={addCircleForm.name}
+              onChange={(e) => handleAddFormChange('name', e.target.value)}
+              placeholder="أدخل اسم الحلقة"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="add-circle-max-students" className="text-right">الحد الأقصى للطلاب</Label>
+            <Input
+              id="add-circle-max-students"
+              type="number"
+              value={addCircleForm.max_students}
+              onChange={(e) => handleAddFormChange('max_students', e.target.value)}
+              placeholder="أدخل العدد الأقصى للطلاب"
+              min="1"
+            />
+          </div>
+        </div>
+      </FormDialog>
+
+      {/* Schedule Dialog migrated to FormDialog */}
+      <FormDialog
+        open={openScheduleDialog}
+        onOpenChange={setOpenScheduleDialog}
+        title={selectedCircleForSchedule ? `جدولة حلقة : ${selectedCircleForSchedule.name}` : 'جدولة الحلقة'}
+        description="إدارة مواعيد وأيام انعقاد الحلقة الدراسية"
+        mode="edit"
+        maxWidth="960px"
+        showSaveButton={false}
+        hideCancelButton
+        fullBleedBody
+        mobileFullScreen
+        mobileInlineActions
+        mobileFooterShadow
+        compactFooterSpacing
+        lightOverlay
+        onSave={() => { /* view-only dialog */ }}
+        extraButtons={
+          <div className="flex gap-2 w-full justify-end">
+            <Button
+              onClick={handleAddSchedule}
+              className="bg-islamic-green hover:bg-islamic-green/90 text-white"
+            >
+              <Plus className="h-4 w-4 ml-2" />
+              إضافة موعد
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-0">
+          {loadingSchedules ? (
+            <div className="text-center p-8">
+              <div className="flex flex-col items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green mb-4"></div>
+                <span className="text-muted-foreground">جاري تحميل جدولة الحلقة...</span>
+              </div>
+            </div>
+          ) : circleSchedules.length === 0 ? (
+            <div className="text-center p-8 bg-muted/30 rounded-lg">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-medium text-lg mb-2">لا توجد مواعيد محددة</h3>
+              <p className="text-muted-foreground mb-4">لم يتم تسجيل أي مواعيد لهذه الحلقة بعد</p>
+            </div>
+          ) : (
+            <div className="border border-islamic-green/20 rounded-lg 
+                            max-h-[calc(100dvh-160px)] sm:max-h-[60vh] overflow-auto custom-scrollbar 
+                            scrollbar-green scroll-fade-overlay 
+                            bg-white/50 dark:bg-green-950/30 transition-[max-height] duration-300 ease-in-out">
+              <GenericTable
+                data={circleSchedules.map(s => ({
+                  ...s,
+                  id: s.id,
+                  __weekday: getWeekdayName(s.weekday),
+                  __from: formatTime(s.start_time),
+                  __to: formatTime(s.end_time),
+                  __location: s.location || 'غير محدد',
+                  __created: s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '-',
+                })) as any}
+                columns={([
+                  {
+                    key: '__index', header: '🔢', align: 'center', render: (_r: any, idx?: number) => (
+                      <span
+                        className="inline-flex items-center justify-center w-7 h-7 rounded-full
+                        bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500
+                        text-white text-[11px] font-bold shadow-inner ring-1 ring-white/40"
+                      >
+                        {(idx ?? 0) + 1}
+                      </span>
+                    )
+                  },
+                  { key: '__weekday', header: '📅 اليوم', align: 'right', render: (r: any) => <span className="font-medium">{r.__weekday}</span> },
+                  { key: '__from', header: '⏱ من', align: 'center', render: (r: any) => <div className="flex items-center gap-1 justify-center"><Clock className="h-4 w-4 text-blue-500" />{r.__from}</div> },
+                  { key: '__to', header: '⏱ إلى', align: 'center', render: (r: any) => <div className="flex items-center gap-1 justify-center"><Clock className="h-4 w-4 text-red-500" />{r.__to}</div> },
+                  {
+                    key: '__location', header: '📍 الموقع', align: 'center', render: (r: any) => r.location ? (
+                      <div className="flex items-center gap-1 justify-center"><MapPin className="h-4 w-4 text-gray-500" />{r.location}</div>
+                    ) : <div className="text-muted-foreground italic text-xs">{r.__location}</div>
+                  },
+                  { key: '__created', header: '🗓 تاريخ الإضافة', align: 'center', render: (r: any) => <span className="text-xs text-muted-foreground">{r.__created}</span> },
+                  {
+                    key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
+                      <div className="flex justify-center items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditSchedule(r)}
+                          className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
+                          title="تعديل الموعد"
+                        >
+                          <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteSchedule(r)}
+                          className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                          title="حذف الموعد"
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                        </Button>
+                      </div>
+                    )
+                  }
+                ]) as any}
+                title={`المعلم : ${selectedTeacher?.full_name}`}
+                defaultView="table"
+                hideSortToggle={false}
+                enablePagination
+                defaultPageSize={4}
+                pageSizeOptions={[4, 8, 16, 32]}
+                className="rounded-none border-0 text-sm"
+                noMaxHeight
+                getRowClassName={(_: any, i: number) => `${i % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
               />
             </div>
-          </div>
+          )}
+        </div>
+      </FormDialog>
 
-          <DialogFooter className="gap-2" dir="rtl">
-            <Button
-              variant="outline"
-              onClick={() => setOpenEditCircleDialog(false)}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSaveCircleEdit}
-              className="bg-islamic-green hover:bg-islamic-green/90"
-              disabled={!editCircleForm.name.trim() || savingCircleEdit}
-            >
-              {savingCircleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Unified Add/Edit Schedule Dialog */}
+      <FormDialog
+        open={openAddScheduleDialog || openEditScheduleDialog}
+        onOpenChange={(o) => {
+          if (!o) {
+            setOpenAddScheduleDialog(false);
+            setOpenEditScheduleDialog(false);
+          }
+        }}
+        title={openAddScheduleDialog ? 'إضافة موعد جديد' : 'تعديل موعد'}
+        description={openAddScheduleDialog ? 'قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة' : 'قم بتعديل بيانات الموعد'}
+        mode={openAddScheduleDialog ? 'add' : 'edit'}
+        maxWidth="380px"
+        hideCancelButton
+        onSave={openAddScheduleDialog ? handleSaveNewSchedule : handleSaveScheduleEdit}
+        saveButtonText={openAddScheduleDialog
+          ? (savingNewSchedule ? 'جارٍ الإضافة...' : 'إضافة الموعد')
+          : (savingScheduleEdit ? 'جارٍ الحفظ...' : 'حفظ التغييرات')}
+        isLoading={openAddScheduleDialog ? savingNewSchedule : savingScheduleEdit}
+        mobileFullScreen
+        mobileInlineActions
+        mobileFooterShadow
+        compactFooterSpacing
+      >
+        {openAddScheduleDialog || openEditScheduleDialog ? (
+          <div className="border border-islamic-green/20 rounded-md 
+                  max-h-[calc(100dvh-140px)] sm:max-h-[55vh] 
+                  overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay 
+                  bg-white/50 dark:bg-green-950/30 transition-[max-height] duration-300 ease-in-out
+                  p-2 space-y-2 text-[11px]">
 
-      {/* Add New Circle Dialog */}
-      <Dialog open={openAddCircleDialog} onOpenChange={setOpenAddCircleDialog}>
-        <DialogContent dir="rtl" className="sm:max-w-[400px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="flex flex-col items-center border-b border-islamic-green/20 pb-4">
-            <DialogTitle className="text-xl text-islamic-green flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              إضافة حلقة جديدة
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">
-              قم بإدخال بيانات الحلقة الدراسية الجديدة
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="add-circle-name" className="text-right">اسم الحلقة *</Label>
-              <Input
-                id="add-circle-name"
-                value={addCircleForm.name}
-                onChange={(e) => handleAddFormChange('name', e.target.value)}
-                placeholder="أدخل اسم الحلقة"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="add-circle-max-students" className="text-right">الحد الأقصى للطلاب</Label>
-              <Input
-                id="add-circle-max-students"
-                type="number"
-                value={addCircleForm.max_students}
-                onChange={(e) => handleAddFormChange('max_students', e.target.value)}
-                placeholder="أدخل العدد الأقصى للطلاب"
-                min="1"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2" dir="rtl">
-            <Button
-              variant="outline"
-              onClick={() => setOpenAddCircleDialog(false)}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSaveNewCircle}
-              className="bg-islamic-green hover:bg-islamic-green/90"
-              disabled={!addCircleForm.name.trim() || savingNewCircle}
-            >
-              {savingNewCircle ? "جارٍ الإضافة..." : "إضافة الحلقة"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* جدولة الحلقة Dialog */}
-      <Dialog open={openScheduleDialog} onOpenChange={setOpenScheduleDialog}>
-        <DialogContent dir="rtl" className="sm:max-w-[900px] max-h-[80vh] overflow-y-auto">
-          <DialogHeader className="flex flex-col items-center border-b border-islamic-green/20 pb-4">
-            <DialogTitle className="text-xl text-islamic-green flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              {selectedCircleForSchedule ? `جدولة حلقة: ${selectedCircleForSchedule.name} | المعلم: ${selectedTeacher?.full_name}` : 'جدولة الحلقة'}
-            </DialogTitle>
-            <DialogDescription className="text-center text-muted-foreground">
-              إدارة مواعيد وأيام انعقاد الحلقة الدراسية
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-4 bg-muted/50 rounded-lg">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-islamic-green border-islamic-green/40">
-                    {circleSchedules.length} موعد
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">إجمالي المواعيد</span>
-                </div>
-                {selectedCircleForSchedule && (
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      الحلقة: {selectedCircleForSchedule.name}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-              <Button
-                onClick={handleAddSchedule}
-                className="bg-islamic-green hover:bg-islamic-green/90 text-white"
-                size="sm"
-              >
-                <Plus className="h-4 w-4 ml-2" />
-                إضافة موعد جديد
-              </Button>
-            </div>
-
-            {loadingSchedules ? (
-              <div className="text-center p-8">
-                <div className="flex flex-col items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green mb-4"></div>
-                  <span className="text-muted-foreground">جاري تحميل جدولة الحلقة...</span>
-                </div>
-              </div>
-            ) : circleSchedules.length === 0 ? (
-              <div className="text-center p-8 bg-muted/30 rounded-lg">
-                <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-medium text-lg mb-2">لا توجد مواعيد محددة</h3>
-                <p className="text-muted-foreground mb-4">لم يتم تسجيل أي مواعيد لهذه الحلقة بعد</p>
-                <Button
-                  onClick={handleAddSchedule}
-                  className="bg-islamic-green hover:bg-islamic-green/90"
-                >
-                  <Plus className="h-4 w-4 ml-2" />
-                  إضافة أول موعد
-                </Button>
-              </div>
-            ) : (
-              <div className="border border-islamic-green/20 rounded-lg overflow-hidden">
-                <GenericTable
-                  data={circleSchedules.map(s => ({
-                    ...s,
-                    id: s.id,
-                    __weekday: getWeekdayName(s.weekday),
-                    __from: formatTime(s.start_time),
-                    __to: formatTime(s.end_time),
-                    __location: s.location || 'استخدام موقع الحلقة الافتراضي',
-                    __created: s.created_at ? new Date(s.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }) : '-',
-                  })) as any}
-                  columns={([
-                    { key: '__weekday', header: '📅 اليوم', align: 'right', render: (r: any) => <span className="font-medium">{r.__weekday}</span> },
-                    { key: '__from', header: '⏱ من', align: 'right', render: (r: any) => <div className="flex items-center gap-1 justify-end"><Clock className="h-4 w-4 text-blue-500" />{r.__from}</div> },
-                    { key: '__to', header: '⏱ إلى', align: 'right', render: (r: any) => <div className="flex items-center gap-1 justify-end"><Clock className="h-4 w-4 text-red-500" />{r.__to}</div> },
-                    {
-                      key: '__location', header: '📍 الموقع', align: 'right', render: (r: any) => r.location ? (
-                        <div className="flex items-center gap-1 justify-end"><MapPin className="h-4 w-4 text-gray-500" />{r.location}</div>
-                      ) : <div className="text-muted-foreground italic text-xs">{r.__location}</div>
-                    },
-                    { key: '__created', header: '🗓 تاريخ الإضافة', align: 'center', render: (r: any) => <span className="text-xs text-muted-foreground">{r.__created}</span> },
-                    {
-                      key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
-                        <div className="flex justify-center items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEditSchedule(r)}
-                            className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
-                            title="تعديل الموعد"
-                          >
-                            <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteSchedule(r)}
-                            className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                            title="حذف الموعد"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                          </Button>
-                        </div>
-                      )
-                    }
-                  ]) as any}
-                  defaultView="table"
-                  hideSortToggle
-                  enablePagination
-                  defaultPageSize={10}
-                  pageSizeOptions={[10, 20, 50]}
-                  className="rounded-none border-0 text-sm"
-                  getRowClassName={(_: any, i: number) => `${i % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
-                />
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="sticky bottom-0 bg-background pt-4 border-t" dir="rtl">
-            <div className="flex gap-2 w-full justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setOpenScheduleDialog(false)}
-                className="border-islamic-green text-islamic-green hover:bg-islamic-green/10"
-              >
-                إغلاق
-              </Button>
-              <Button
-                onClick={handleAddSchedule}
-                className="bg-islamic-green hover:bg-islamic-green/90 text-white"
-              >
-                <Plus className="h-4 w-4 ml-2" />
-                إضافة موعد
-              </Button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* إضافة موعد جديد Dialog */}
-      <Dialog open={openAddScheduleDialog} onOpenChange={setOpenAddScheduleDialog}>
-        <DialogContent className="sm:max-w-[500px]" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-islamic-green flex items-center gap-2">
-              <Plus className="h-5 w-5" />
-              إضافة موعد جديد
-            </DialogTitle>
-            <DialogDescription>
-              قم بتحديد اليوم والوقت لإضافة موعد جديد للحلقة
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="add-schedule-weekday" className="text-right">اليوم *</Label>
-              <Select
-                value={addScheduleForm.weekday}
-                onValueChange={(value) => handleAddScheduleFormChange('weekday', value)}
-              >
-                <SelectTrigger id="add-schedule-weekday">
-                  <SelectValue placeholder="اختر اليوم" />
-                </SelectTrigger>
-                <SelectContent>
-                  {weekdayOptions.map(day => (
-                    <SelectItem key={day.value} value={day.value.toString()}>
+            {/* اختيار اليوم */}
+            <div className="border border-gray-200 rounded-md shadow-sm p-2 bg-white">
+              <Label className="text-right text-gray-800 text-[11px] mb-1 block">
+                {scsLabels?.fieldDay || 'اليوم *'}
+              </Label>
+              <div className="grid grid-cols-3 sm:grid-cols-7 gap-1 w-full">
+                {weekdayOptions.map(day => {
+                  const activeForm = openAddScheduleDialog ? addScheduleForm : editScheduleForm;
+                  const isSelected = activeForm.weekday === day.value.toString();
+                  return (
+                    <button
+                      key={day.value}
+                      type="button"
+                      onClick={() => (openAddScheduleDialog ? handleAddScheduleFormChange : handleEditScheduleFormChange)('weekday', day.value.toString())}
+                      className={`flex items-center justify-center h-6 px-2 text-[10px] font-medium rounded-sm border transition-all duration-150 ease-out focus:outline-none focus:ring-1 focus:ring-blue-300 ${isSelected
+                        ? 'bg-blue-500 text-white border-blue-600 shadow-sm scale-105'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-400'}`}
+                    >
                       {day.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="add-schedule-start-time" className="text-right">وقت البداية *</Label>
-                <Input
-                  id="add-schedule-start-time"
-                  type="time"
-                  value={addScheduleForm.start_time}
-                  onChange={(e) => handleAddScheduleFormChange('start_time', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="add-schedule-end-time" className="text-right">وقت النهاية *</Label>
-                <Input
-                  id="add-schedule-end-time"
-                  type="time"
-                  value={addScheduleForm.end_time}
-                  onChange={(e) => handleAddScheduleFormChange('end_time', e.target.value)}
-                  required
-                />
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="add-schedule-location" className="text-right">الموقع (اختياري)</Label>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <Info className="h-3 w-3 mr-1" />
-                  اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
-                </div>
+            {/* وقت البداية والنهاية */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label htmlFor="schedule-start-time" className="text-[11px]">وقت البداية *</Label>
+                <Input
+                  id="schedule-start-time"
+                  type="time"
+                  value={(openAddScheduleDialog ? addScheduleForm : editScheduleForm).start_time}
+                  onChange={(e) => (openAddScheduleDialog ? handleAddScheduleFormChange : handleEditScheduleFormChange)('start_time', e.target.value)}
+                  className="h-7 text-[11px]"
+                  required
+                />
               </div>
+              <div className="space-y-1">
+                <Label htmlFor="schedule-end-time" className="text-[11px]">وقت النهاية *</Label>
+                <Input
+                  id="schedule-end-time"
+                  type="time"
+                  value={(openAddScheduleDialog ? addScheduleForm : editScheduleForm).end_time}
+                  onChange={(e) => (openAddScheduleDialog ? handleAddScheduleFormChange : handleEditScheduleFormChange)('end_time', e.target.value)}
+                  className="h-7 text-[11px]"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* الموقع */}
+            <div className="space-y-1">
+              <Label htmlFor="schedule-location" className="text-[11px]">الموقع</Label>
               <Input
-                id="add-schedule-location"
-                value={addScheduleForm.location}
-                onChange={(e) => handleAddScheduleFormChange('location', e.target.value)}
+                id="schedule-location"
+                value={(openAddScheduleDialog ? addScheduleForm : editScheduleForm).location}
+                onChange={(e) => (openAddScheduleDialog ? handleAddScheduleFormChange : handleEditScheduleFormChange)('location', e.target.value)}
                 placeholder="أدخل موقع الموعد (اختياري)"
+                className="h-7 text-[11px] placeholder:text-[10px]"
               />
             </div>
           </div>
+        ) : null}
+      </FormDialog>
 
-          <DialogFooter className="gap-2" dir="rtl">
-            <Button
-              variant="outline"
-              onClick={() => setOpenAddScheduleDialog(false)}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSaveNewSchedule}
-              className="bg-islamic-green hover:bg-islamic-green/90"
-              disabled={!addScheduleForm.start_time || !addScheduleForm.end_time || savingNewSchedule}
-            >
-              {savingNewSchedule ? "جارٍ الإضافة..." : "إضافة الموعد"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* تعديل موعد Dialog */}
-      <Dialog open={openEditScheduleDialog} onOpenChange={setOpenEditScheduleDialog}>
-        <DialogContent className="sm:max-w-[500px]" dir="rtl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-islamic-green flex items-center gap-2">
-              <Pencil className="h-5 w-5" />
-              تعديل موعد
-            </DialogTitle>
-            <DialogDescription>
-              قم بتعديل بيانات الموعد
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-schedule-weekday" className="text-right">اليوم *</Label>
-              <Select
-                value={editScheduleForm.weekday}
-                onValueChange={(value) => handleEditScheduleFormChange('weekday', value)}
-              >
-                <SelectTrigger id="edit-schedule-weekday">
-                  <SelectValue placeholder="اختر اليوم" />
-                </SelectTrigger>
-                <SelectContent>
-                  {weekdayOptions.map(day => (
-                    <SelectItem key={day.value} value={day.value.toString()}>
-                      {day.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-schedule-start-time" className="text-right">وقت البداية *</Label>
-                <Input
-                  id="edit-schedule-start-time"
-                  type="time"
-                  value={editScheduleForm.start_time}
-                  onChange={(e) => handleEditScheduleFormChange('start_time', e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="edit-schedule-end-time" className="text-right">وقت النهاية *</Label>
-                <Input
-                  id="edit-schedule-end-time"
-                  type="time"
-                  value={editScheduleForm.end_time}
-                  onChange={(e) => handleEditScheduleFormChange('end_time', e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="edit-schedule-location" className="text-right">الموقع (اختياري)</Label>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <Info className="h-3 w-3 mr-1" />
-                  اتركه فارغاً لاستخدام موقع الحلقة الافتراضي
-                </div>
-              </div>
-              <Input
-                id="edit-schedule-location"
-                value={editScheduleForm.location}
-                onChange={(e) => handleEditScheduleFormChange('location', e.target.value)}
-                placeholder="أدخل موقع الموعد (اختياري)"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2" dir="rtl">
-            <Button
-              variant="outline"
-              onClick={() => setOpenEditScheduleDialog(false)}
-            >
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleSaveScheduleEdit}
-              className="bg-islamic-green hover:bg-islamic-green/90"
-              disabled={!editScheduleForm.start_time || !editScheduleForm.end_time || savingScheduleEdit}
-            >
-              {savingScheduleEdit ? "جارٍ الحفظ..." : "حفظ التغييرات"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
     </div>
   );
@@ -2099,11 +2063,27 @@ function UsersTable({ users, onEdit, onDelete, onChangePassword, userRole, curre
 
   // Columns for GenericTable
   const columns: Column<Profile & { __lastLogin: string; __circleCount?: number }>[] = [
+    // فهرس الصف (يُعرض كأول عمود وفي البطاقات يظهر كشارة بجانب الاسم)
+    {
+      key: '__index',
+      header: '🔢',
+      align: 'center',
+      render: (_u, idx) => (
+        <span
+          className="inline-flex items-center justify-center w-7 h-7 rounded-full
+            bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500
+            text-white text-[11px] font-bold shadow-inner ring-1 ring-white/40"
+        >
+          {(idx ?? 0) + 1}
+        </span>
+      )
+    },
     {
       key: 'full_name',
       header: `👤 ${userManagementLabels.fullName}`,
       align: 'center',
-      render: (u) => <span className="font-medium text-islamic-green/90">{u.full_name}</span>
+      // إزالة تلوين أخضر ثابت حتى يرث اللون المناسب: في هيدر البطاقة يكون أبيض، وفي الجدول يرث لون الخلية (أخضر داكن)
+      render: (u) => <span className="font-medium">{u.full_name}</span>
     },
     {
       key: 'username',
@@ -2205,14 +2185,14 @@ function UsersTable({ users, onEdit, onDelete, onChangePassword, userRole, curre
   }));
 
   return (
-    <div dir="rtl" className="border border-islamic-green/20 rounded-lg overflow-hidden">
+    <div dir="rtl" className="border border-islamic-green/20 rounded-lg overflow-hidden w-full">
       <GenericTable
         data={dataForTable as any}
         columns={columns as any}
         defaultView="table"
         hideSortToggle
         title={userType === 'teacher' ? userManagementLabels.teachers : userType === 'admin' ? userManagementLabels.administrators : userManagementLabels.superadmins}
-        className="rounded-none border-0 text-sm"
+        className="rounded-none border-0 text-sm w-full"
         getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
         enablePagination
         defaultPageSize={10}

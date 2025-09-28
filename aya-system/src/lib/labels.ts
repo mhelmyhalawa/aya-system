@@ -232,7 +232,7 @@ const ar = {
     addUser: 'إضافة المستخدم',
     saveChanges: 'حفظ التغييرات',
     cancel: 'إلغاء',
-    passwordKeep: '(اتركه فارغاً للإبقاء عليه)',
+    passwordKeep: 'اتركه فارغاً للإبقاء عليه',
     enterPassword: 'أدخل كلمة المرور',
     enterNewPassword: 'أدخل كلمة المرور الجديدة',
     // Validation / errors

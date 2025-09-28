@@ -1,7 +1,7 @@
 import { UserCog, UserCircle, UsersRound, Menu, X, LogOut, Search, ChevronDown, ChevronUp, School, Users, Settings, Database, BookOpen, GraduationCap, BookText, UserPlus, User, Calendar, BookMarked, ClipboardList, BookOpenCheck, FileHeart, FileText, Mail, Inbox, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { signOut } from "@/lib/auth-service";
 import {
   Popover,
@@ -21,6 +21,7 @@ interface SidebarProps {
 
 export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen, setIsOpen: externalSetIsOpen }: SidebarProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const LAST_OPEN_MENU_KEY = 'sidebar:lastOpenMenu';
   // أضفنا جميع المفاتيح المحتملة لضمان عمل الفتح/الإغلاق فوراً
   const [expandedMenus, setExpandedMenus] = useState<{ [key: string]: boolean }>({
     circleManagement: false,
@@ -28,19 +29,55 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
     notificationsManagement: false,
     teacherSettings: false,
     systemManagement: false,
+    evaluationManagement: false,
   });
+  // (سيتم نقل useEffect الخاص بالاسترجاع إلى بعد تعريف isOpen)
   
   // حالة جديدة للتحكم في القوائم المنسدلة في وضع Popover
   const [openPopoverMenus, setOpenPopoverMenus] = useState<{ [key: string]: boolean }>({});
   
   // وظيفة لتبديل حالة Popover
   const togglePopoverMenu = (key: string) => {
-    setOpenPopoverMenus(prev => ({ ...prev, [key]: !prev[key] }));
+    setOpenPopoverMenus(prev => {
+      const isOpenNow = !prev[key];
+      const next: { [k: string]: boolean } = {};
+      Object.keys(prev).forEach(k => { next[k] = false; });
+      next[key] = isOpenNow;
+      return next;
+    });
+  };
+
+  // Scroll handling for mobile full menu
+  const mobileScrollRef = useRef<HTMLDivElement | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  useEffect(() => {
+    const el = mobileScrollRef.current;
+    if (!el) return;
+    const handler = () => setShowScrollTop(el.scrollTop > 180);
+    el.addEventListener('scroll', handler, { passive: true });
+    return () => el.removeEventListener('scroll', handler);
+  }, []);
+  const scrollToTop = () => {
+    mobileScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
   // استخدام الحالة الخارجية إذا كانت موجودة، وإلا استخدام الحالة الداخلية
   const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
   const setIsOpen = externalSetIsOpen || setInternalIsOpen;
+
+  // استرجاع آخر قائمة مفتوحة (في وضع الحاوية الكاملة فقط)
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const saved = localStorage.getItem(LAST_OPEN_MENU_KEY);
+      if (saved) {
+        setExpandedMenus(prev => {
+          if (!(saved in prev)) return prev;
+          const next: any = {}; Object.keys(prev).forEach(k => next[k] = false); next[saved] = true; return next;
+        });
+      }
+    } catch {}
+  }, [isOpen]);
 
   // التحقق من صلاحيات المستخدم لعرض عناصر القائمة
   const canViewUserManagement = userRole === 'superadmin' || userRole === 'admin';
@@ -71,11 +108,6 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
           icon: <ClipboardList className="h-5 w-5" />,
           label: "تسجيل الجلسات",
           path: "/teacher-sessions"
-        },
-        {
-          icon: <Users className="h-5 w-5" />,
-          label: "سجل الحضور",
-          path: "/attendance-record"
         },
       ].filter(Boolean)
     },
@@ -197,8 +229,8 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
       )}
 
   {isOpen ? (
-        // الحالة الكاملة
-        <div className="w-64 h-[calc(100vh-64px)] z-50 relative">
+        // الحالة الكاملة (موبايل) - جعلها ثابتة لتأمين ارتفاع كامل و سكرول داخلي
+        <div className="fixed top-16 bottom-0 right-0 w-64 z-50">
           <div className="flex flex-col h-full backdrop-blur-lg bg-black/50 border-l border-green-700/30 shadow-2xl animate-in fade-in">
             <div className="flex items-center justify-between p-4 border-b border-green-400/30 bg-gradient-to-l from-green-900/80 via-green-800/60 to-transparent">
               <h2 className="text-lg font-bold text-green-100 tracking-wide">القائمة الرئيسية</h2>
@@ -206,7 +238,8 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <div className="flex-1 p-4 space-y-3 overflow-y-auto scrollbar-thin scrollbar-thumb-green-500/50 scrollbar-track-transparent">
+            {/* منطقة التمرير الرئيسية */}
+            <div ref={mobileScrollRef} className="flex-1 p-4 pb-36 space-y-3 overflow-y-auto modern-scrollbar overscroll-contain">
               {menuItems.map((item: any, index) => (
                 <div key={index} className="group">
                   {item.isSubmenu ? (
@@ -214,7 +247,15 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
                       <Button
                         variant="ghost"
                         className="w-full justify-between gap-3 text-right text-green-100 hover:bg-green-700/50 hover:text-white transition-all duration-200 rounded-lg px-2 py-1"
-                        onClick={() => setExpandedMenus(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
+                        onClick={() => setExpandedMenus(prev => {
+                          const next: { [k: string]: boolean } = {};
+                          Object.keys(prev).forEach(k => { next[k] = false; });
+                          const willOpen = !prev[item.key];
+                          next[item.key] = willOpen;
+                          // حفظ المفتاح
+                          try { if (willOpen) localStorage.setItem(LAST_OPEN_MENU_KEY, item.key); else localStorage.removeItem(LAST_OPEN_MENU_KEY); } catch {}
+                          return next;
+                        })}
                       >
                         <div className="flex items-center gap-3">
                           {item.icon}
@@ -222,21 +263,20 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
                         </div>
                         {expandedMenus[item.key] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       </Button>
-                      {expandedMenus[item.key] && (
-                        <div className="pr-4 space-y-1 border-r-2 border-green-400/40 mr-2 animate-in slide-in-from-right-2">
-                          {item.subItems.map((subItem: any, subIndex: number) => (
-                            <Button
-                              key={subIndex}
-                              variant="ghost"
-                              className="w-full justify-start gap-3 text-right text-green-200 hover:bg-green-700/50 hover:text-white transition-all duration-200 rounded-md px-2 py-1"
-                              onClick={() => { onNavigate(subItem.path); setIsOpen(false); }}
-                            >
-                              {subItem.icon}
-                              <span>{subItem.label}</span>
-                            </Button>
-                          ))}
-                        </div>
-                      )}
+                      <div className={"pr-4 space-y-1 border-r-2 border-green-400/40 mr-2 overflow-hidden transition-[max-height] duration-600 ease-in-out " + (expandedMenus[item.key] ? 'max-h-72 animate-in slide-in-from-right-2' : 'max-h-0')}
+                           aria-hidden={!expandedMenus[item.key]}>
+                        {item.subItems.map((subItem: any, subIndex: number) => (
+                          <Button
+                            key={subIndex}
+                            variant="ghost"
+                            className="w-full justify-start gap-3 text-right text-green-200 hover:bg-green-700/50 hover:text-white transition-all duration-200 rounded-md px-2 py-1"
+                            onClick={() => { onNavigate(subItem.path); setIsOpen(false); }}
+                          >
+                            {subItem.icon}
+                            <span>{subItem.label}</span>
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <Button
@@ -251,7 +291,7 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
                 </div>
               ))}
             </div>
-            <div className="p-4 border-t border-green-400/30 bg-gradient-to-t from-green-900/80 via-green-800/60 to-transparent">
+            <div className="p-4 border-t border-green-400/30 bg-gradient-to-t from-green-900/80 via-green-800/60 to-transparent relative">
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-3 text-right text-red-300 hover:bg-red-700/40 hover:text-red-200 transition-all duration-200 rounded-md px-2 py-1"
@@ -266,6 +306,18 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
                 <LogOut className="h-5 w-5" />
                 <span>تسجيل الخروج</span>
               </Button>
+              {showScrollTop && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="الرجوع للأعلى"
+                  onClick={scrollToTop}
+                  className="absolute -top-10 left-4 rtl:right-4 rtl:left-auto h-9 w-9 rounded-full bg-green-800/60 hover:bg-green-700 text-green-100 shadow-lg backdrop-blur-sm border border-green-600/40 transition-all"
+                >
+                  ↑
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -301,7 +353,7 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent
-                        className="min-w-[220px] border border-green-800/50 bg-green-900/90 p-3 text-white shadow-2xl backdrop-blur-md rounded-xl z-50"
+                        className="min-w-[220px] max-h-[70vh] overflow-y-auto modern-scrollbar border border-green-800/50 bg-green-900/90 p-3 text-white shadow-2xl backdrop-blur-md rounded-xl z-[70]"
                         side="left"
                         align="start"
                         sideOffset={20}

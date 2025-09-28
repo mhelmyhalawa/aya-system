@@ -268,3 +268,16 @@ All colors MUST be HSL.
 .scroll-fade-overlay::after { bottom:0; background:linear-gradient(to top,rgba(255,255,255,0.9),rgba(255,255,255,0)); }
 .dark .scroll-fade-overlay::before { background:linear-gradient(to bottom,rgba(0,0,0,0.85),rgba(0,0,0,0)); }
 .dark .scroll-fade-overlay::after { background:linear-gradient(to top,rgba(0,0,0,0.85),rgba(0,0,0,0)); }
+
+/* Modern minimal scrollbar utility (neutral, subtle) */
+.modern-scrollbar { scrollbar-width: thin; scrollbar-color: hsl(var(--islamic-green)) transparent; }
+.modern-scrollbar { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+.modern-scrollbar::-webkit-scrollbar { width: 8px; }
+.modern-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.modern-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--islamic-green) / 0.35); border-radius: 8px; }
+.modern-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--islamic-green) / 0.55); }
+.dark .modern-scrollbar::-webkit-scrollbar-thumb { background: hsl(var(--islamic-green) / 0.45); }
+.dark .modern-scrollbar::-webkit-scrollbar-thumb:hover { background: hsl(var(--islamic-green) / 0.65); }
+
+/* Helper utility for full-height scroll areas on mobile minus safe areas */
+.vh-scroll { max-height: calc(100svh - 0rem); }

@@ -1188,7 +1188,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
 
   return (
     <div className="w-full max-w-[1600px] mx-auto">
-      <Card className="pt-0.5 pb-0 px-0 sm:px-0 shadow-lg border-0">
+      <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
         <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
