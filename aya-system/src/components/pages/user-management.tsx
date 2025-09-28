@@ -3,7 +3,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"; // legacy dialogs (remaining to convert)
+import { FormDialog } from "@/components/ui/form-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -28,7 +29,7 @@ import {
 } from "@/lib/profile-service";
 import { getStudyCircleCountByTeacherIds, getStudyCirclesByTeacherId, updateStudyCircle, createStudyCircle, deleteStudyCircle } from '@/lib/study-circle-service';
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from '@/lib/study-circle-schedule-service';
-import { Shield, User, UserCheck, Eye, EyeOff, Pencil, UserPlus, AlertTriangle, Trash2, KeyRound, Crown, BookOpen, Calendar, Clock, MapPin, Plus, Info, NotebookPenIcon, User2Icon, RefreshCwIcon } from "lucide-react";
+import { Shield, User, UserCheck, Eye, EyeOff, Pencil, UserPlus, AlertTriangle, Trash2, KeyRound, Crown, BookOpen, Calendar, Clock, MapPin, Plus, Info, NotebookPenIcon, User2Icon, RefreshCwIcon, AtSign, Lock, Users } from "lucide-react";
 import { getLabels } from '@/lib/labels';
 
 interface UserManagementProps {
@@ -1202,120 +1203,148 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
           </Tabs>
         )}
       </div>
-      {/* User Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-center text-xl font-bold">{dialogTitle}</DialogTitle>
-          </DialogHeader>
+      {/* User Add/Edit Dialog migrated to FormDialog */}
+      <FormDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        title={dialogTitle}
+        mode={dialogMode === 'edit' ? 'edit' : 'add'}
+        hideCancelButton={false}
+        saveButtonText={dialogMode === 'add' ? userManagementLabels.addUser : userManagementLabels.saveChanges}
+        onSave={handleSaveUser}
+      >
+        <div className="grid gap-4 py-2" dir="rtl">
 
-          <div className="grid gap-4 py-4" dir="rtl">
-            <div className="grid gap-2">
-              <Label htmlFor="full_name">{userManagementLabels.fullName}</Label>
+          {/* الاسم الكامل */}
+          <div className="grid gap-2 relative">
+            <Label htmlFor="full_name" className="flex items-center gap-1">
+              <User className="h-4 w-4 text-green-600" />
+              {userManagementLabels.fullName}
+            </Label>
+            <div className="relative">
               <Input
                 id="full_name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder={userManagementLabels.fullName}
+                className="pl-10"
               />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
+          </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="username">{userManagementLabels.usernameLabel}</Label>
+          {/* اسم المستخدم */}
+          <div className="grid gap-2 relative">
+            <Label htmlFor="username" className="flex items-center gap-1">
+              <AtSign className="h-4 w-4 text-green-600" />
+              {userManagementLabels.usernameLabel}
+            </Label>
+            <div className="relative">
               <Input
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={userManagementLabels.usernameLabel}
+                className="pl-10"
               />
+              <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="password">{userManagementLabels.addUserForm.password} {dialogMode === "edit" && userManagementLabels.passwordKeep}</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={dialogMode === "add" ? userManagementLabels.enterPassword : userManagementLabels.enterNewPassword}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Role selection based on user permissions */}
-            {userRole === 'superadmin' && (
-              <div className="grid gap-2">
-                <Label htmlFor="role">{userManagementLabels.role}</Label>
-                <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={userManagementLabels.chooseRole} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="superadmin">
-                      <div className="flex items-center gap-2">
-                        <Crown className="h-4 w-4" />
-                        <span>{userManagementLabels.superadmin}</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="admin">
-                      <div className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        <span>{userManagementLabels.admin}</span>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="teacher">
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4" />
-                        <span>{userManagementLabels.teacher}</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {userRole === 'admin' && (
-              <div className="grid gap-2">
-                <Label htmlFor="role">{userManagementLabels.role}</Label>
-                <Select
-                  value={role}
-                  onValueChange={(value) => setRole(value as UserRole)}
-                  disabled={true}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={userManagementLabels.chooseRole} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="teacher">
-                      <div className="flex items-center gap-2">
-                        <UserCheck className="h-4 w-4" />
-                        <span>{userManagementLabels.teacher}</span>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
 
-          <DialogFooter dir="rtl" className="flex justify-start gap-2">
-            <Button onClick={handleSaveUser} className="bg-islamic-green hover:bg-islamic-green/90">
-              {dialogMode === "add" ? userManagementLabels.addUser : userManagementLabels.saveChanges}
-            </Button>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="border-islamic-green text-islamic-green hover:bg-islamic-green/10">
-              {userManagementLabels.cancel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          {/* كلمة المرور */}
+          <div className="grid gap-2 relative">
+            <Label htmlFor="password" className="flex items-center gap-1">
+              <Lock className="h-4 w-4 text-green-600" />
+              {userManagementLabels.addUserForm.password}
+              {dialogMode === "edit" && (
+                <span className="text-sm text-gray-400">({userManagementLabels.passwordKeep})</span>
+              )}
+            </Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={dialogMode === "add" ? userManagementLabels.enterPassword : userManagementLabels.enterNewPassword}
+                className="pl-10 pr-10"
+              />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* اختيار الدور - Superadmin */}
+          {userRole === 'superadmin' && (
+            <div className="grid gap-2">
+              <Label htmlFor="role" className="flex items-center gap-1">
+                <Users className="h-4 w-4 text-green-600" />
+                {userManagementLabels.role}
+              </Label>
+              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+                <SelectTrigger>
+                  <SelectValue placeholder={userManagementLabels.chooseRole} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="superadmin">
+                    <div className="flex items-center gap-2">
+                      <Crown className="h-4 w-4" />
+                      <span>{userManagementLabels.superadmin}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <span>{userManagementLabels.admin}</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="teacher">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span>{userManagementLabels.teacher}</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* اختيار الدور - Admin */}
+          {userRole === 'admin' && (
+            <div className="grid gap-2">
+              <Label htmlFor="role" className="flex items-center gap-1">
+                <Shield className="h-4 w-4 text-green-600" />
+                {userManagementLabels.role}
+              </Label>
+              <Select
+                value={role}
+                onValueChange={(value) => setRole(value as UserRole)}
+                disabled
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={userManagementLabels.chooseRole} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="teacher">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4" />
+                      <span>{userManagementLabels.teacher}</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+        </div>
+
+      </FormDialog>
 
       {/* مربع حوار تأكيد حذف المستخدم */}
       <DeleteConfirmationDialog
@@ -1353,90 +1382,78 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
         cancelButtonText="إلغاء"
       />
 
-      {/* Change Password Dialog */}
-      <Dialog open={isChangePasswordDialogOpen} onOpenChange={setIsChangePasswordDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="text-center text-xl font-bold">
-              {userManagementLabels.changePasswordForm.title}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4 py-4" dir="rtl">
-            {/* Only show current password field if user is changing their own password */}
-            {userToChangePassword && userToChangePassword.id === currentUserId && (
-              <div className="grid gap-2">
-                <Label htmlFor="current_password">{userManagementLabels.changePasswordForm.currentPassword}</Label>
-                <div className="relative">
-                  <Input
-                    id="current_password"
-                    type={showCurrentPassword ? "text" : "password"}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder={userManagementLabels.changePasswordForm.currentPassword}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-            )}
-
+      {/* Change Password Dialog migrated to FormDialog */}
+      <FormDialog
+        open={isChangePasswordDialogOpen}
+        onOpenChange={setIsChangePasswordDialogOpen}
+        title={userManagementLabels.changePasswordForm.title}
+        mode="edit"
+        hideCancelButton={false}
+        saveButtonText={userManagementLabels.changePasswordForm.submit}
+        onSave={handleSavePassword}
+      >
+        <div className="grid gap-4 py-2" dir="rtl">
+          {userToChangePassword && userToChangePassword.id === currentUserId && (
             <div className="grid gap-2">
-              <Label htmlFor="new_password">{userManagementLabels.changePasswordForm.newPassword}</Label>
+              <Label htmlFor="current_password">{userManagementLabels.changePasswordForm.currentPassword}</Label>
               <div className="relative">
                 <Input
-                  id="new_password"
-                  type={showNewPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder={userManagementLabels.changePasswordForm.newPassword}
+                  id="current_password"
+                  type={showCurrentPassword ? "text" : "password"}
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder={userManagementLabels.changePasswordForm.currentPassword}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="confirm_password">{userManagementLabels.changePasswordForm.confirmNewPassword}</Label>
-              <div className="relative">
-                <Input
-                  id="confirm_password"
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  placeholder={userManagementLabels.changePasswordForm.confirmNewPassword}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+          )}
+          <div className="grid gap-2">
+            <Label htmlFor="new_password">{userManagementLabels.changePasswordForm.newPassword}</Label>
+            <div className="relative">
+              <Input
+                id="new_password"
+                type={showNewPassword ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={userManagementLabels.changePasswordForm.newPassword}
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
-
-          <DialogFooter dir="rtl" className="flex justify-start gap-2">
-            <Button onClick={handleSavePassword} className="bg-islamic-green hover:bg-islamic-green/90">
-              {userManagementLabels.changePasswordForm.submit}
-            </Button>
-            <Button variant="outline" onClick={() => setIsChangePasswordDialogOpen(false)} className="border-islamic-green text-islamic-green hover:bg-islamic-green/10">
-              {userManagementLabels.cancel}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="grid gap-2">
+            <Label htmlFor="confirm_password">{userManagementLabels.changePasswordForm.confirmNewPassword}</Label>
+            <div className="relative">
+              <Input
+                id="confirm_password"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                placeholder={userManagementLabels.changePasswordForm.confirmNewPassword}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </FormDialog>
 
       {/* Circles Dialog */}
       <Dialog open={openCirclesDialog} onOpenChange={setOpenCirclesDialog}>
@@ -1513,43 +1530,45 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
                     { key: 'name', header: '📖 اسم الحلقة', align: 'right', render: (r: any) => <span className="font-medium">{r.name}</span> },
                     { key: '__max', header: '👥 الحد الأقصى للطلاب', align: 'center', render: (r: any) => <Badge variant="secondary" className="text-sm px-2 py-1 rounded-lg">{r.__max}</Badge> },
                     { key: '__createdAt', header: '📅 تاريخ الإنشاء', align: 'center', render: (r: any) => <span className="text-xs text-muted-foreground">{r.__createdAt}</span> },
-                    { key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
-                      <div className="flex justify-center items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleOpenScheduleDialog(r)}
-                          className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors rounded-lg"
-                          title="جدولة الحلقة"
-                        >
-                          <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-300" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditCircle(r)}
-                          className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
-                          title="تعديل الحلقة"
-                        >
-                          <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteCircle(r)}
-                          className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                          title="حذف الحلقة"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                        </Button>
-                      </div>
-                    ) }
+                    {
+                      key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
+                        <div className="flex justify-center items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenScheduleDialog(r)}
+                            className="h-8 w-8 p-0 hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors rounded-lg"
+                            title="جدولة الحلقة"
+                          >
+                            <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-300" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditCircle(r)}
+                            className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
+                            title="تعديل الحلقة"
+                          >
+                            <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteCircle(r)}
+                            className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                            title="حذف الحلقة"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                          </Button>
+                        </div>
+                      )
+                    }
                   ]) as any}
                   defaultView="table"
                   hideSortToggle
                   enablePagination
                   defaultPageSize={10}
-                  pageSizeOptions={[10,20,50]}
+                  pageSizeOptions={[10, 20, 50]}
                   className="rounded-none border-0 text-sm"
                   getRowClassName={(_: any, i: number) => `${i % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
                 />
@@ -1764,38 +1783,42 @@ export function UserManagement({ onNavigate, userRole, currentUserId, teacherOnl
                     { key: '__weekday', header: '📅 اليوم', align: 'right', render: (r: any) => <span className="font-medium">{r.__weekday}</span> },
                     { key: '__from', header: '⏱ من', align: 'right', render: (r: any) => <div className="flex items-center gap-1 justify-end"><Clock className="h-4 w-4 text-blue-500" />{r.__from}</div> },
                     { key: '__to', header: '⏱ إلى', align: 'right', render: (r: any) => <div className="flex items-center gap-1 justify-end"><Clock className="h-4 w-4 text-red-500" />{r.__to}</div> },
-                    { key: '__location', header: '📍 الموقع', align: 'right', render: (r: any) => r.location ? (
-                      <div className="flex items-center gap-1 justify-end"><MapPin className="h-4 w-4 text-gray-500" />{r.location}</div>
-                    ) : <div className="text-muted-foreground italic text-xs">{r.__location}</div> },
+                    {
+                      key: '__location', header: '📍 الموقع', align: 'right', render: (r: any) => r.location ? (
+                        <div className="flex items-center gap-1 justify-end"><MapPin className="h-4 w-4 text-gray-500" />{r.location}</div>
+                      ) : <div className="text-muted-foreground italic text-xs">{r.__location}</div>
+                    },
                     { key: '__created', header: '🗓 تاريخ الإضافة', align: 'center', render: (r: any) => <span className="text-xs text-muted-foreground">{r.__created}</span> },
-                    { key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
-                      <div className="flex justify-center items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditSchedule(r)}
-                          className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
-                          title="تعديل الموعد"
-                        >
-                          <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteSchedule(r)}
-                          className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
-                          title="حذف الموعد"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
-                        </Button>
-                      </div>
-                    ) }
+                    {
+                      key: '__actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
+                        <div className="flex justify-center items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditSchedule(r)}
+                            className="h-8 w-8 p-0 hover:bg-islamic-green/10 transition-colors rounded-lg"
+                            title="تعديل الموعد"
+                          >
+                            <Pencil className="h-4 w-4 text-islamic-green dark:text-green-300" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteSchedule(r)}
+                            className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 transition-colors rounded-lg"
+                            title="حذف الموعد"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                          </Button>
+                        </div>
+                      )
+                    }
                   ]) as any}
                   defaultView="table"
                   hideSortToggle
                   enablePagination
                   defaultPageSize={10}
-                  pageSizeOptions={[10,20,50]}
+                  pageSizeOptions={[10, 20, 50]}
                   className="rounded-none border-0 text-sm"
                   getRowClassName={(_: any, i: number) => `${i % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
                 />
