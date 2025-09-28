@@ -77,11 +77,6 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
           label: "سجل الحضور",
           path: "/attendance-record"
         },
-        canViewStudents && {
-          icon: <BookOpenCheck className="h-5 w-5" />,
-          label: "سجل الحفظ والمراجعة",
-          path: "/memorization-records"
-        },
       ].filter(Boolean)
     },
 
@@ -102,13 +97,34 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
           label: "بيانات الطلاب",
           path: "/students-list"
         },
-        canViewStudents && {
+      ].filter(Boolean)
+    },
+
+        // ✅ القائمة الموحدة لتقييم ومتابعة الطلاب
+    (userRole === 'superadmin' || userRole === 'admin' || userRole === 'teacher') && {
+      icon: <Award className="h-5 w-5" />,
+      label: "تقييم الطلاب",
+      isSubmenu: true,
+      key: "evaluationManagement",
+      subItems: [
+        {
+          icon: <Users className="h-5 w-5" />,
+          label: "سجل الحضور",
+          path: "/attendance-record"
+        },
+        {
+          icon: <BookOpenCheck className="h-5 w-5" />,
+          label: "سجل الحفظ والمراجعة",
+          path: "/memorization-records"
+        },
+        {
           icon: <Award className="h-5 w-5" />,
           label: "الاختبارات والتقييمات",
           path: "/student-assessments"
         },
-      ].filter(Boolean)
+      ]
     },
+
 
     // 3️⃣ استعلام ولي الأمر
     {
