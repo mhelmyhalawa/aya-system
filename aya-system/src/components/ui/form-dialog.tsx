@@ -112,6 +112,10 @@ export type FormDialogProps = {
     mobileFooterShadow?: boolean;
     /** اجعل زر الحفظ/التالي يُرسم أولاً (مفيد لعكس الترتيب في RTL ليظهر يميناً) */
     saveButtonFirst?: boolean;
+    /** جعل جسم الحوار شفاف تماماً بدون حواف أو خلفية بحيث يبدو كأنه غير موجود */
+    transparentBody?: boolean;
+    /** محتوى اختياري لمؤشرات خطوات (Wizard) يعرض أسفل العنوان مباشرة وخارج منطقة التمرير */
+    wizardSteps?: React.ReactNode;
 };
 
 /**
@@ -142,7 +146,9 @@ export function FormDialog({
     mobilePrimaryLeft = false,
     compactFooterSpacing = false,
     mobileFooterShadow = false,
-    saveButtonFirst = false
+    saveButtonFirst = false,
+    transparentBody = false,
+    wizardSteps
 }: FormDialogProps) {
     const realShowSaveButton = showSaveButton !== false; // default true if undefined
     const hasFooterContent = realShowSaveButton || (!!extraButtons) || (!hideCancelButton && realShowSaveButton);
@@ -165,34 +171,42 @@ export function FormDialog({
             : 'flex-row')
         : 'flex-col-reverse';
     const saveButtonWidthClasses = mobileInlineActions ? 'flex-1 basis-0 sm:w-auto' : 'w-full sm:w-auto';
+    // إذا تم تمرير wizardSteps نجعل الجسم شفاف افتراضياً ما لم يُطلب عكس ذلك
+    const effectiveTransparentBody = transparentBody || !!wizardSteps;
+    // تعطيل تأثير التدرج العلوي/السفلي عند وجود خطوات ويزارد أو شفافية حتى لا يُغطي شريط التقدم
+    const scrollFadeClass = (!wizardSteps && !effectiveTransparentBody) ? 'scroll-fade-overlay' : '';
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogPortal>
                 {/* الخلفية */}
-                <DialogOverlay className="bg-black/60" />
+                <DialogOverlay />
 
                 {/* الحاوية الرئيسية */}
                 <div
                     dir="rtl"
                     style={{ maxWidth, "--dialog-max-width": maxWidth } as React.CSSProperties}
                     className={cn(
-                        "fixed top-0 z-50 grid",
-                        // موبايل: تمدد كامل (يمين/يسار 0) ، ديسكتوب يتوسط
-                        mobileFullWidth ? "inset-x-0 w-full sm:left-[50%] sm:top-[50%] sm:w-auto" : "inset-x-4 sm:left-[50%] sm:top-[50%] w-auto",
-                        "sm:translate-x-[-50%] sm:translate-y-[-50%]",
+                        "fixed z-50 grid",
+                        mobileFullWidth
+                            ? "inset-x-0 top-0 w-full"
+                            : "inset-x-4 top-0 w-auto",
+                        "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2",
+                        // السماح بالتحكم الكامل في العرض عبر خاصية maxWidth (حذف العرض الثابت)
+                        // تم إزالة sm:w-[500px] ليتبع style.maxWidth
                         "gap-2 border sm:border p-2 sm:p-4 shadow-lg sm:rounded-lg",
                         "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out",
                         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
                         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-                        "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-[48%]",
-                        "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-[48%]",
-                        "max-w-full sm:max-w-[450px] overflow-hidden sm:overflow-visible",
-                        // الخلفية الملونة هنا
-                        mobileFlatStyle
-                            ? "bg-gradient-to-br from-teal-600 via-white to-green-50 dark:from-teal-900 dark:via-green-950 dark:to-green-900"
-                            : "bg-gradient-to-br from-teal-600 via-white to-green-50 dark:from-teal-900 dark:via-green-950 dark:to-green-900",
+                        "sm:data-[state=closed]:slide-out-to-left-1/2 sm:data-[state=closed]:slide-out-to-top-1/2",
+                        "sm:data-[state=open]:slide-in-from-left-1/2 sm:data-[state=open]:slide-in-from-top-1/2",
+                        // max-w يعتمد الآن على style (maxWidth) بدلاً من تثبيته 500px
+                        "max-w-full sm:max-w-full overflow-hidden sm:overflow-visible",
+                        "bg-gradient-to-br from-teal-50 via-blue to-green-50 dark:from-teal-150 dark:via-green-950 dark:to-green-700",
                         containerHeightClasses
                     )}
+
+
 
                 >
                     {/* زر الإغلاق */}
@@ -215,7 +229,7 @@ export function FormDialog({
                             </div>
                         ) : (
                             <div className={cn("mt-2 sm:mt-1 mb-1 px-1 sm:px-0",
-                                mobileStickyHeader && "sticky top-0 z-40 bg-white/500 dark:bg-green-950/85 backdrop-blur-sm rounded-b-md pb-1") }>
+                                mobileStickyHeader && "sticky top-0 z-40 bg-white/500 dark:bg-green-950/85 backdrop-blur-sm rounded-b-md pb-1")}>
                                 {/* موبايل: العنوان وسط مستقل عن زر الإغلاق */}
                                 <div className="relative sm:hidden h-10">
                                     <h3 className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-lg shadow-sm truncate max-w-[75%] text-center">
@@ -240,31 +254,44 @@ export function FormDialog({
                             </div>
                         )}
 
+                        {wizardSteps && (
+                            <div className={cn("px-1 sm:px-0 mt-1 sm:mt-0", effectiveTransparentBody && "mb-1")}>{wizardSteps}</div>
+                        )}
+
                         {/* الجسم */}
                         <div
                             className={cn(
-                                "space-y-3 mt-1 overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay rounded-b-md min-h-0 flex flex-col",
-                                        mobileFullScreen
-                                            ? (hasFooterContent ? 'flex-1' : 'flex-1')
-                                            : (hasFooterContent ? "max-h-[calc(100vh-155px)] sm:max-h-[55vh]" : "flex-1"),
+                                "space-y-2 overflow-auto custom-scrollbar scrollbar-green min-h-0 flex flex-col rounded-b-md !bg-transparent rounded-3xl p-3",
+                                scrollFadeClass,
+                                // تحكم بالمسافة العلوية: إذا لدينا wizardSteps نقلل/نلغي الهامش لتلتصق الخطوات بالجزء العلوي
+                                wizardSteps ? "mt-0" : "mt-1",
+                                // إذا لم نكن في نمط شفاف حافظ على الزوايا المستديرة (ممكن لاحقاً نقلها إلى عنصر آخر)
+                                !effectiveTransparentBody && "rounded-b-md",
+                                mobileFullScreen
+                                    ? (hasFooterContent ? 'flex-1' : 'flex-1')
+                                    : (hasFooterContent ? "max-h-[calc(100vh-155px)] sm:max-h-[55vh]" : "flex-1"),
                                 bodyBottomPaddingClass,
                                 bodyHorizontalPaddingClass,
-                                mobileFlatStyle && "bg-white dark:bg-green-950"
+                                effectiveTransparentBody && "p-0 px-0 pr-0"
                             )}
                         >
                             {children}
                         </div>
 
+
                         {/* الفوتر */}
                         {hasFooterContent && (
                             <DialogFooter
                                 className={cn(
-                                    `flex ${footerLayoutMobile} w-full sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t border-gray-200 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static fixed bottom-0 left-0 right-0 px-3 sm:px-0 py-3 sm:py-0`,
+                                    `!bg-transparent
+                                    flex ${footerLayoutMobile} w-full sm:flex-row sm:justify-end gap-2 mt-3 pt-2 border-t 
+                                    border-gray-200 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:static 
+                                    fixed bottom-0 left-0 right-0 px-3 sm:px-0 py-3 sm:py-0`,
                                     mobileFooterShadow && 'shadow-[0_-4px_10px_-2px_rgba(0,0,0,0.12)] sm:shadow-none'
                                 )}
                             >
                                 {extraButtons}
-                                
+
                                 {/* ترتيب ديناميكي: إذا saveButtonFirst نرسم زر الحفظ قبل الأزرار الإضافية */}
                                 {saveButtonFirst && realShowSaveButton && (
                                     <Button
@@ -299,7 +326,7 @@ export function FormDialog({
                                     </Button>
                                 )}
 
-                                
+
 
                                 {/* زر إلغاء للموبايل */}
                                 {!hideCancelButton && realShowSaveButton && (

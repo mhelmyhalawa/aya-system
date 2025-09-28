@@ -830,7 +830,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       typeColor: getAssessmentTypeColor(assessment.type),
       range: formatAssessmentRange(assessment),
       score: formatScore(assessment.total_score),
-      date: new Date(assessment.date).toLocaleDateString('ar-SA')
+      // عرض التاريخ بالتقويم الميلادي (جرجوري) بصيغة يوم/شهر/سنة
+      date: new Date(assessment.date).toLocaleDateString('ar-EG', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        // ضمان استخدام التقويم الميلادي حتى لو اختلفت إعدادات المتصفح
+        calendar: 'gregory'
+      })
     };
   };
 
@@ -1204,10 +1211,10 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   ...(activeTab !== 'my-records' ? [
                     { key: 'teacher', header: '👨‍🏫 المعلم', align: 'right', render: (r: any) => r.__display.teacher || 'غير معروف' }
                   ] : []),
-                  { key: 'circle', header: '📚 الحلقة', align: 'right', render: (r: any) => r.student?.study_circle ? (r.student.study_circle.name || `حلقة ${r.student.study_circle.id}`) : 'غير محدد' },
+                  { key: 'circle', header: '𑁍 الحلقة', align: 'right', render: (r: any) => r.student?.study_circle ? (r.student.study_circle.name || `حلقة ${r.student.study_circle.id}`) : 'غير محدد' },
                   { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
                   {
-                    key: 'type', header: '📂 النوع', align: 'right', render: (r: any) => (
+                    key: 'type', header: '📖 النوع', align: 'right', render: (r: any) => (
                       <Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>
                         {r.__display.type}
                       </Badge>
@@ -1215,7 +1222,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   },
                   { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir="rtl">{r.__display.range}</span> },
                   ...(showLatestPerStudent ? [{
-                    key: '__remaining', header: '📂 باقي السجلات', align: 'center', render: (r: any) => {
+                    key: '__remaining', header: '📚 باقي السجلات', align: 'center', render: (r: any) => {
                       const remaining = (r as any).__remainingCount;
                       if (remaining === undefined) return <span className="text-[10px] text-gray-400">-</span>;
                       return (
@@ -1484,26 +1491,34 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         compactFooterSpacing
         mobileFooterShadow
       >
-        {/* مؤشرات الخطوات */}
+        {/* مؤشرات الخطوات (تحويل إلى نقاط) */}
         <div className="w-full mb-2" dir="rtl">
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-3">
             {['معلومات', 'النطاق', 'الدرجات'].map((label, i) => {
               const active = i === wizardStep; const done = i < wizardStep;
               return (
                 <button
-                  key={i}
+                  key={label}
                   type="button"
-                  aria-label={`الخطوة ${i + 1}`}
+                  aria-label={`الخطوة ${i + 1}: ${label}`}
                   onClick={() => (i < wizardStep ? setWizardStep(i) : null)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-full text-[11px] font-bold border transition-colors shadow-sm ${active ? 'bg-green-600 text-white border-green-600' : done ? 'bg-green-100 text-green-800 border-green-300 hover:bg-green-200' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-100'}`}
+                  className={`relative w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 ${active
+                    ? 'bg-green-600 ring-2 ring-green-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-900'
+                    : done
+                      ? 'bg-green-300 hover:bg-green-400'
+                      : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400'} `}
                 >
-                  {i + 1}
+                  <span className="sr-only">{`الخطوة ${i + 1} - ${label}`}</span>
                 </button>
               );
             })}
           </div>
+          {/* شريط تقدم سفلي (يبقى كما هو) */}
           <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-green-600 transition-all" style={{ width: `${((wizardStep + 1) / 3) * 100}%` }} />
+            <div
+              className="h-full bg-green-600 transition-all"
+              style={{ width: `${((wizardStep + 1) / 3) * 100}%` }}
+            />
           </div>
         </div>
 
@@ -1882,7 +1897,12 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         itemDetails={assessmentToDelete ? {
           "الطالب": assessmentToDelete.student?.full_name || '-',
           "النوع": getAssessmentTypeName(assessmentToDelete.type),
-          "التاريخ": new Date(assessmentToDelete.date).toLocaleDateString('ar-SA')
+          "التاريخ": new Date(assessmentToDelete.date).toLocaleDateString('ar-EG', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            calendar: 'gregory'
+          })
         } : null}
         detailsLabels={[
           { key: "الطالب", label: "الطالب" },
@@ -1895,13 +1915,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
 
       {/* حوار السجلات السابقة للطالب */}
       <FormDialog
-        title={`السجلات السابقة - ${historyStudentName}`}
+        title={`📚السجلات السابقة - ${historyStudentName}`}
         open={historyDialogOpen}
         onOpenChange={setHistoryDialogOpen}
         onSave={() => setHistoryDialogOpen(false)}
         mode="edit"
         showSaveButton={false}
-        maxWidth="760px"
+        // تكبير العرض لتسهيل قراءة الأعمدة
+        maxWidth="900px"
       >
         <div className="py-1">
           {historyItems.length === 0 ? (
@@ -1925,7 +1946,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
               columns={([
                 { key: '__index', header: '🔢', align: 'center', render: (r: any) => <span className='text-[10px] font-bold'>{r.__index}</span> },
                 { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
-                { key: 'type', header: '📂 النوع', align: 'right', render: (r: any) => (<Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>{r.__display.type}</Badge>) },
+                { key: 'type', header: '📘 النوع', align: 'right', render: (r: any) => (<Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>{r.__display.type}</Badge>) },
                 { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir='rtl'>{r.__display.range}</span> },
                 { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
                 { key: 'details', header: '📊 تفاصيل', align: 'center', render: (r: any) => { const parts: string[] = []; if (r.tajweed_score !== undefined) parts.push(`تجويد: ${formatScore(r.tajweed_score)}`); if (r.memorization_score !== undefined) parts.push(`حفظ: ${formatScore(r.memorization_score)}`); if (r.recitation_score !== undefined) parts.push(`تلاوة: ${formatScore(r.recitation_score)}`); return parts.length ? <span className='text-[10px] whitespace-pre-line'>{parts.join('\n')}</span> : <span className='text-[10px] text-gray-400'>-</span>; } }

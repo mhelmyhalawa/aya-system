@@ -1718,26 +1718,33 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
           </Button>
         )}
       >
-        {/* مؤشرات الخطوات */}
+        {/* مؤشرات الخطوات (نقاط) */}
         <div className="w-full mb-2">
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-3">
             {wizardSteps.map((s, i) => {
               const active = i === wizardStep; const done = i < wizardStep;
               return (
                 <button
                   key={s.key}
                   type="button"
-                  aria-label={`الخطوة ${i + 1}`}
+                  aria-label={`الخطوة ${i + 1}: ${s.label}`}
                   onClick={() => (i < wizardStep ? setWizardStep(i) : null)}
-                  className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] font-bold border transition-colors ${active ? 'bg-islamic-green text-white border-islamic-green' : done ? 'bg-green-100 text-green-800 border-green-300' : 'bg-white dark:bg-gray-800 text-gray-500 border-gray-300 dark:border-gray-600 hover:bg-gray-100'}`}
+                  className={`relative w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-gray-900 ${active
+                    ? 'bg-islamic-green ring-2 ring-green-400 ring-offset-2 ring-offset-white dark:ring-offset-gray-900'
+                    : done
+                      ? 'bg-green-300 hover:bg-green-400'
+                      : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400'} `}
                 >
-                  {i + 1}
+                  <span className="sr-only">{`الخطوة ${i + 1} - ${s.label}`}</span>
                 </button>
               );
             })}
           </div>
           <div className="mt-2 h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-            <div className="h-full bg-islamic-green transition-all" style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }} />
+            <div
+              className="h-full bg-islamic-green transition-all"
+              style={{ width: `${((wizardStep + 1) / wizardSteps.length) * 100}%` }}
+            />
           </div>
         </div>
 
@@ -2186,7 +2193,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               },
               {
                 key: 'circle',
-                header: '📘 الحلقة',
+                header: '𑁍 الحلقة',
                 align: 'center' as const,
                 render: (item: any) => (
                   <span className="block w-full text-center text-[10px] sm:text-[11px]">
@@ -2269,7 +2276,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               },
               {
                 key: 'name',
-                header: '📘 الحلقة',
+                header: '𑁍 الحلقة',
                 align: 'center' as const,
                 render: (item: any) => {
                   const selected = item.id === selectedCircleId;

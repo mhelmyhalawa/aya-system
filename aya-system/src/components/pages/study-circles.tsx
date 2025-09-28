@@ -822,7 +822,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           },
           {
             key: 'name',
-            header: `📘 ${studyCirclesLabels.name}`,
+            header: `𑁍 ${studyCirclesLabels.name}`,
             important: true,
             render: (c) => (
               <div className="flex items-center gap-2">
@@ -973,21 +973,36 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           {/* المعلم */}
           <FormRow label={`${studyCirclesLabels.teacher} *`}>
             <Select value={teacherId} onValueChange={setTeacherId}>
-              <SelectTrigger className="bg-green-50 border-green-200 text-green-900 rounded-md text-sm py-1 px-2 text-right">
+              <SelectTrigger
+                id="teacher"
+                dir="rtl"
+                className={`h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs
+                  rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500
+                  bg-white dark:bg-gray-800
+                  ${teacherId
+                    ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                `}
+              >
                 <SelectValue placeholder={studyCirclesLabels.selectTeacher} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                position="popper"
+                dir="rtl"
+                className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900"
+              >
                 {teachers.length > 0 ? (
                   teachers.map((teacher) => (
-                    <SelectItem key={teacher.id} value={teacher.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span>{teacher.full_name}</span>
-                      </div>
+                    <SelectItem
+                      key={teacher.id}
+                      value={teacher.id}
+                      className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 rounded-md"
+                    >
+                      {teacher.full_name || `معلم ${teacher.id.slice(0,4)}`}
                     </SelectItem>
                   ))
                 ) : (
-                  <SelectItem value="" disabled>
+                  <SelectItem value="" disabled className="text-gray-500">
                     {studyCirclesLabels.noTeachers}
                   </SelectItem>
                 )}

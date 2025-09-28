@@ -1232,18 +1232,44 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                                       </div>
 
                                       <div className="grid grid-cols-2 gap-1.5 mt-0.5">
+                                        {/* حالة الحضور */}
                                         <Select
                                           value={attendanceFormData[item.student.id]?.status || 'present'}
                                           onValueChange={(value) => handleStatusChange(item.student.id, value as AttendanceStatus)}
                                         >
-                                          <SelectTrigger className="h-7 text-[10px] px-2">
+                                          <SelectTrigger
+                                            id={`attendance-status-${item.student.id}`}
+                                            dir="rtl"
+                                            className={`h-7 text-right truncate max-w-full min-w-0 text-[10px] leading-none rounded-md border px-2 pr-2 transition-all
+                                              focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 bg-white dark:bg-gray-800
+                                              ${(() => {
+                                                const st = attendanceFormData[item.student.id]?.status || 'present';
+                                                if (st === 'present') return 'border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold';
+                                                if (st === 'absent') return 'border-red-300 bg-red-50 text-red-700 font-semibold';
+                                                if (st === 'late') return 'border-amber-300 bg-amber-50 text-amber-700 font-semibold';
+                                                if (st === 'excused') return 'border-blue-300 bg-blue-50 text-blue-700 font-semibold';
+                                                return 'border-gray-300 text-gray-600';
+                                              })()}`}
+                                          >
                                             <SelectValue placeholder="اختر الحالة">
                                               {getAttendanceStatusName(attendanceFormData[item.student.id]?.status || 'present')}
                                             </SelectValue>
                                           </SelectTrigger>
-                                          <SelectContent>
+                                          <SelectContent
+                                            position="popper"
+                                            dir="rtl"
+                                            className="text-right text-[10px] sm:text-[11px] rounded-md border border-emerald-200 dark:border-emerald-700 shadow-md bg-white dark:bg-gray-900"
+                                          >
                                             {attendanceStatusOptions.map((option) => (
-                                              <SelectItem key={option.value} value={option.value} className="text-xs">
+                                              <SelectItem
+                                                key={option.value}
+                                                value={option.value}
+                                                className={`cursor-pointer data-[highlighted]:bg-emerald-900/80 data-[state=checked]:font-semibold rounded-sm text-[11px]
+                                                  ${option.value === 'present' ? 'text-emerald-700' :
+                                                     option.value === 'absent' ? 'text-red-700' :
+                                                     option.value === 'late' ? 'text-amber-700' :
+                                                     option.value === 'excused' ? 'text-blue-700' : 'text-gray-700'}`}
+                                              >
                                                 {option.label}
                                               </SelectItem>
                                             ))}

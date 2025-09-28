@@ -229,15 +229,22 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       onSave={isLast ? submit : handleNext}
       mode={mode}
       saveButtonText={isLast ? studentsLabels.save : 'التالي'}
-  isLoading={isSubmitting}
+      isLoading={isSubmitting}
       maxWidth="360px"
       hideCancelButton
+      mobileInlineActions
+      saveButtonFirst
       extraButtons={(
         <>
           {step > 0 && (
-            <Button variant="outline" onClick={handleBack} className="min-w-[110px] flex items-center justify-center gap-1.5">
+            <Button
+              type="button"
+              onClick={handleBack}
+              variant="outline"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium transition-transform transform hover:scale-105 flex items-center justify-center gap-2 shadow-md flex-1 basis-0 border border-green-300 text-green-700 bg-white hover:bg-green-50"
+            >
               <ChevronRight className="h-4 w-4" />
-              <span>رجوع</span>
+              <span className="leading-none tracking-wide">رجوع</span>
             </Button>
           )}
         </>
@@ -246,22 +253,31 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       {/* step indicators */}
       <div className="w-full mb-1">
         <div className="flex items-center justify-center gap-2">
-          {steps.map((_, i) => {
+          {steps.map((s, i) => {
             const active = i === step;
             const done = i < step;
             return (
               <button
-                key={i}
+                key={s.key}
                 type="button"
-                aria-label={`الخطوة ${i + 1}`}
+                aria-label={`الانتقال إلى ${s.title}`}
                 onClick={() => (i < step ? setStep(i) : null)}
-                className={`w-6 h-6 flex items-center justify-center rounded-full text-[11px] font-bold border transition-colors ${active
-                  ? 'bg-islamic-green text-white border-islamic-green'
-                  : done
-                    ? 'bg-islamic-green/20 text-islamic-green border-islamic-green/40'
-                    : 'bg-white text-gray-500 border-gray-300 hover:bg-islamic-green/5'}`}
+                className={`relative w-4 h-4 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-green-400/50
+                  ${active ? 'bg-gradient-to-r from-green-500 to-emerald-600 shadow-inner ring-2 ring-green-300 animate-pulse' : ''}
+                  ${!active && done ? 'bg-green-400/80 hover:bg-green-500' : ''}
+                  ${!active && !done ? 'bg-gray-300 hover:bg-gray-400' : ''}
+                  ${i < step ? 'cursor-pointer' : 'cursor-default'}`}
               >
-                {i + 1}
+                {/* حلقة خارجية عند الحالة النشطة */}
+                {active && (
+                  <span className="absolute -inset-1 rounded-full bg-green-500/20 animate-ping" />
+                )}
+                {/* علامة مكتمل صغيرة */}
+                {done && !active && (
+                  <span className="absolute inset-0 flex items-center justify-center">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                  </span>
+                )}
               </button>
             );
           })}
@@ -289,10 +305,33 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                     <Input placeholder="بحث..." className="pl-7 text-[13px] focus:border-islamic-green h-8" value={guardianSearch} onChange={e => setGuardianSearch(e.target.value)} />
                   </div>
                   <Select value={guardianId} onValueChange={val => setGuardianId(val)}>
-                    <SelectTrigger className="focus:border-islamic-green h-8 text-[13px]"><SelectValue placeholder="اختر ولي الأمر" /></SelectTrigger>
-                    <SelectContent position="item-aligned" align="start" side="bottom">
+                    <SelectTrigger
+                      id="guardian_id"
+                      dir="rtl"
+                      className={`h-8 text-right truncate max-w-full min-w-0 text-[12px] leading-none rounded-lg border px-2 pr-2 transition-all
+                        focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                        ${guardianId
+                          ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                      `}
+                    >
+                      <SelectValue placeholder="اختر ولي الأمر" />
+                    </SelectTrigger>
+                    <SelectContent
+                      position="popper"
+                      dir="rtl"
+                      align="start"
+                      side="bottom"
+                      className="text-right text-[12px] rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
+                    >
                       {filteredGuardians.map(g => (
-                        <SelectItem key={g.id} value={g.id}>{g.full_name}</SelectItem>
+                        <SelectItem
+                          key={g.id}
+                          value={g.id}
+                          className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                        >
+                          {g.full_name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -309,10 +348,21 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
               <div>
                 <Label htmlFor="gender" className="mb-1 block text-xs font-medium">الجنس <span className="text-muted-foreground text-[10px]">{studentsLabels.optionalField}</span></Label>
                 <Select value={gender} onValueChange={v => setGender(v as any)}>
-                  <SelectTrigger className={`focus:border-islamic-green ${extraCompactFieldClass}`}><SelectValue placeholder="الجنس" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="male">ذكر</SelectItem>
-                    <SelectItem value="female">أنثى</SelectItem>
+                  <SelectTrigger
+                    id="gender"
+                    dir="rtl"
+                    className={`text-right truncate ${extraCompactFieldClass} leading-none rounded-lg border px-2 pr-2 transition-all
+                      focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                      ${gender
+                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                    `}
+                  >
+                    <SelectValue placeholder="الجنس" />
+                  </SelectTrigger>
+                  <SelectContent dir="rtl" className="text-right text-[12px] rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                    <SelectItem value="male" className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md">ذكر</SelectItem>
+                    <SelectItem value="female" className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md">أنثى</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -324,31 +374,91 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
             <div>
               <Label htmlFor="grade_level" className="mb-1 block text-sm font-medium">{studentsLabels.grade} <span className="text-destructive">*</span></Label>
               <Select value={grade} onValueChange={setGrade}>
-                <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}><SelectValue placeholder="اختر الصف" /></SelectTrigger>
-                <SelectContent position="item-aligned" align="end" side="bottom" className="max-h-[300px] text-sm">
+                <SelectTrigger
+                  id="grade_level"
+                  dir="rtl"
+                  className={`text-right truncate ${compactFieldClass} leading-none rounded-lg border px-2 pr-2 transition-all
+                    focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                    ${grade
+                      ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                      : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                  `}
+                >
+                  <SelectValue placeholder="اختر الصف" />
+                </SelectTrigger>
+                <SelectContent position="popper" dir="rtl" align="end" side="bottom" 
+                className="max-h-[300px] text-sm rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                   <SelectGroup>
                     <SelectLabel className="font-bold text-islamic-green">مرحلة رياض الأطفال</SelectLabel>
-                    {studentsLabels.gradeOptions.slice(0, 2).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {studentsLabels.gradeOptions.slice(0, 2).map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel className="font-bold text-islamic-green">المرحلة الابتدائية</SelectLabel>
-                    {studentsLabels.gradeOptions.slice(2, 8).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {studentsLabels.gradeOptions.slice(2, 8).map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel className="font-bold text-islamic-green">المرحلة الإعدادية</SelectLabel>
-                    {studentsLabels.gradeOptions.slice(8, 11).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {studentsLabels.gradeOptions.slice(8, 11).map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel className="font-bold text-islamic-green">المرحلة الثانوية</SelectLabel>
-                    {studentsLabels.gradeOptions.slice(11, 14).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {studentsLabels.gradeOptions.slice(11, 14).map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel className="font-bold text-islamic-green">المرحلة الجامعية</SelectLabel>
-                    {studentsLabels.gradeOptions.slice(14, 20).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {studentsLabels.gradeOptions.slice(14, 20).map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                   <SelectGroup>
                     <SelectLabel className="font-bold text-islamic-green">الدراسات العليا</SelectLabel>
-                    {studentsLabels.gradeOptions.slice(20).map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    {studentsLabels.gradeOptions.slice(20).map(o => (
+                      <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md"
+                      >
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -372,10 +482,23 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                     <Input placeholder="البحث عن معلم" value={teacherSearch} onChange={e => setTeacherSearch(e.target.value)} className={`pl-3 pr-10 ${compactFieldClass}`} />
                   </div>
                   <Select value={teacherId} onValueChange={val => { setTeacherId(val); setStudyCircleId(''); onLoadTeacherCircles?.(val); }}>
-                    <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}><SelectValue placeholder="اختر معلم" /></SelectTrigger>
-                    <SelectContent>
+                    <SelectTrigger
+                      id="teacher_id"
+                      dir="rtl"
+                      className={`text-right truncate ${compactFieldClass} leading-none rounded-lg border px-2 pr-2 transition-all
+                        focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                        ${teacherId
+                          ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                      `}
+                    >
+                      <SelectValue placeholder="اختر معلم" />
+                    </SelectTrigger>
+                    <SelectContent dir="rtl" className="text-right text-[12px] rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto">
                       {filteredTeachers.map(t => (
-                        <SelectItem key={t.id} value={t.id}>{t.full_name}</SelectItem>
+                        <SelectItem key={t.id} value={t.id} className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md">
+                          {t.full_name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -403,12 +526,22 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                   onValueChange={val => setStudyCircleId(val)}
                   disabled={(!teacherId && !isTeacher) || !!isLoadingCircles || (isTeacher && studyCircles.length === 0)}
                 >
-                  <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}>
+                  <SelectTrigger
+                    id="study_circle_id"
+                    dir="rtl"
+                    className={`text-right truncate ${compactFieldClass} leading-none rounded-lg border px-2 pr-2 transition-all
+                      focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                      ${(studyCircleId)
+                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                        : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                      ${(!teacherId && !isTeacher) || isLoadingCircles ? 'opacity-60 cursor-not-allowed' : ''}
+                    `}
+                  >
                     <SelectValue placeholder={(teacherId || isTeacher) ? (studentsLabels.studyCirclePlaceholder || 'اختر حلقة') : 'اختر معلم أولاً'} />
                   </SelectTrigger>
-                  <SelectContent position="item-aligned" align="start" side="bottom">
+                  <SelectContent position="popper" dir="rtl" align="start" side="bottom" className="text-right text-[12px] rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto">
                     {studyCircles.length > 0 ? (
-                      studyCircles.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)
+                      studyCircles.map(c => <SelectItem key={c.id} value={c.id} className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md">{c.name}</SelectItem>)
                     ) : (
                       <div className="p-2 text-center text-muted-foreground">{(teacherId || isTeacher) ? 'لا توجد حلقات' : 'اختر معلم أولاً'}</div>
                     )}
@@ -470,13 +603,22 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
                 const uniqueOptions = Array.from(map.values());
                 return (
                   <Select value={memorizedParts} onValueChange={val => setMemorizedParts(val)}>
-                    <SelectTrigger className={`focus:border-islamic-green ${compactFieldClass}`}>
+                    <SelectTrigger
+                      id="memorized_parts"
+                      dir="rtl"
+                      className={`text-right truncate ${compactFieldClass} leading-none rounded-lg border px-2 pr-2 transition-all
+                        focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800
+                        ${memorizedParts
+                          ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-500'}
+                      `}
+                    >
                       <SelectValue placeholder={studentsLabels.quranProgressPlaceholder} />
                     </SelectTrigger>
-                    <SelectContent position="item-aligned" align="start" side="bottom" className="max-h-[300px] text-sm">
+                    <SelectContent position="popper" dir="rtl" align="start" side="bottom" className="max-h-[300px] text-sm rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                       <SelectGroup>
                         <SelectLabel className="font-bold text-islamic-green">الأجزاء</SelectLabel>
-                        {uniqueOptions.map(o => <SelectItem key={o.value} value={String(o.value)}>{o.label}</SelectItem>)}
+                        {uniqueOptions.map(o => <SelectItem key={o.value} value={String(o.value)} className="cursor-pointer data-[highlighted]:bg-green-900/80 data-[state=checked]:font-semibold rounded-md">{o.label}</SelectItem>)}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
