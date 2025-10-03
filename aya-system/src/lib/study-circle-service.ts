@@ -123,6 +123,46 @@ export const getStudyCirclesByTeacherId = async (teacherId: string): Promise<Stu
 };
 
 /**
+ * إحضار عدد الحلقات وعدد المواعيد (الجداول) للمعلم بشكل خفيف قبل تحميل التفاصيل
+ * يُستخدم لعرض الأرقام في البادجات عند فتح الصفحة بينما تكون بطاقة الحلقات في حالة الطي.
+ */
+export const getStudyCircleCountsForTeacher = async (teacherId: string): Promise<{ circles: number; schedules: number; }> => {
+  try {
+    const { data: circlesData, error: circlesError } = await supabase
+      .from(STUDY_CIRCLES_TABLE)
+      .select('id')
+      .eq('teacher_id', teacherId)
+      .is('deleted_at', null);
+
+    if (circlesError) {
+      console.error('خطأ في عدّ الحلقات:', circlesError);
+      return { circles: 0, schedules: 0 };
+    }
+
+    const circleIds = (circlesData || []).map(c => (c as any).id).filter(Boolean);
+    if (circleIds.length === 0) return { circles: 0, schedules: 0 };
+
+    const { data: schedulesData, error: schedulesError } = await supabase
+      .from('study_circle_schedules')
+      .select('id')
+      .in('study_circle_id', circleIds);
+
+    if (schedulesError) {
+      console.error('خطأ في عدّ المواعيد:', schedulesError);
+      return { circles: circleIds.length, schedules: 0 };
+    }
+
+    return {
+      circles: circleIds.length,
+      schedules: (schedulesData || []).length
+    };
+  } catch (error) {
+    console.error('خطأ غير متوقع في عدّ الحلقات / المواعيد:', error);
+    return { circles: 0, schedules: 0 };
+  }
+};
+
+/**
  * الحصول على حلقة دراسية بواسطة المعرف
  */
 export const getStudyCircleById = async (id: string): Promise<StudyCircle | null> => {

@@ -97,6 +97,8 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
   const [listSortDirection, setListSortDirection] = useState<'asc' | 'desc' | null>(null);
   // اظهار/اخفاء فلاتر البحث
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  // طي/فتح الكارد الرئيسي
+  const [mainMemCardCollapsed, setMainMemCardCollapsed] = useState(false);
   // قوائم منسدلة مخصصة (بديلة عن Select) لنمط الستايل المطلوب
   // Dialog pickers (بدلاً من القوائم المنسدلة المطلوبة الآن)
 
@@ -1191,20 +1193,35 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
       <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
         <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="flex flex-row justify-between items-center gap-2 w-full">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
               <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
                 <NotebookPenIcon className="h-4 w-4 text-yellow-300" />
                 سجلات الحفظ والمراجعة
               </CardTitle>
-              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5">
+              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5 hidden sm:block">
                 إدارة سجلات حفظ ومراجعة الطلاب، مع إمكانية إضافة وتعديل السجلات الحالية.
               </CardDescription>
             </div>
+            <button
+              type="button"
+              onClick={() => setMainMemCardCollapsed(v => !v)}
+              aria-label={mainMemCardCollapsed ? 'فتح المحتوى' : 'طي المحتوى'}
+              aria-expanded={!mainMemCardCollapsed}
+              aria-controls="main-memorization-card-body"
+              className={`inline-flex items-center justify-center h-9 w-9 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${mainMemCardCollapsed ? 'rotate-180' : ''}`}
+              title={mainMemCardCollapsed ? 'عرض المحتوى' : 'إخفاء المحتوى'}
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
           </div>
         </CardHeader>
-        <CardContent className="pt-0.5 pb-0 px-0 sm:px-0">
+        <CardContent
+          id="main-memorization-card-body"
+          className={`pt-0.5 pb-0 px-0 sm:px-0 transition-all duration-300 ease-in-out origin-top ${mainMemCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[3000px] opacity-100'}`}
+          aria-hidden={mainMemCardCollapsed}
+        >
           <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-1 rounded-lg
             bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
             {/* التابات */}

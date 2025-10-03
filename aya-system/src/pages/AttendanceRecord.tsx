@@ -29,6 +29,7 @@ import {
   Search,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   Calendar,
   CheckCircle2,
 } from "lucide-react";
@@ -610,13 +611,20 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     }
   };
 
+  // طي/فتح كارد الحلقات (ديسكتوب)
+  const [circlesCardCollapsed, setCirclesCardCollapsed] = useState(false);
+  // حالة طي كارد الجلسات
+  const [sessionsCardCollapsed, setSessionsCardCollapsed] = useState(false);
+  // حالة طي الكارد الرئيسي (سجل حضور الطلاب)
+  const [mainCardCollapsed, setMainCardCollapsed] = useState(false);
+
   return (
     <div className="w-full max-w-[1600px] mx-auto">
       <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
         <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
                                border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="flex flex-row justify-between items-center gap-2 w-full">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
               <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
@@ -627,9 +635,25 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                 يمكنك تسجيل حضور الطلاب للجلسات. اختر الحلقة والجلسة أولاً، ثم قم بتحديد حالة الحضور لكل طالب.
               </CardDescription>
             </div>
+            {/* زر الطي للكارد الرئيسي */}
+            <button
+              type="button"
+              onClick={() => setMainCardCollapsed(v => !v)}
+              aria-label={mainCardCollapsed ? 'فتح الكارد' : 'طي الكارد'}
+              aria-expanded={!mainCardCollapsed}
+              aria-controls="main-card-body"
+              className={`inline-flex items-center justify-center h-9 w-9 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${mainCardCollapsed ? 'rotate-180' : ''}`}
+              title={mainCardCollapsed ? 'عرض المحتوى' : 'إخفاء المحتوى'}
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-0 sm:space-y-0.5 px-1 sm:px-4 pt-3 pb-4">
+        <CardContent
+          id="main-card-body"
+          className={`space-y-0 sm:space-y-0.5 px-1 sm:px-4 pt-3 pb-4 transition-all duration-300 ease-in-out origin-top ${mainCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[3000px] opacity-100'}`}
+          aria-hidden={mainCardCollapsed}
+        >
           {/* قائمة الجوال */}
           <div className="md:hidden">
             <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
@@ -639,109 +663,126 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                   <BookOpen className="h-3.5 w-3.5 text-white" />
                   <h2 className="text-[12px] font-semibold text-white">{scsLabels.circlesListTitle || 'اختر الحلقة'}</h2>
                 </div>
-                {selectedCircle && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-white/80">{scsLabels.teacherShort || 'معلم'}</span>
-                    <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                      {filteredCircles.find(c => c.id === selectedCircle)?.teacher?.full_name?.split(" ")[0] || scsLabels.teacherUnknown || 'غير معروف'}
-                    </Badge>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  {selectedCircle && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-white/80">{scsLabels.teacherShort || 'معلم'}</span>
+                      <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
+                        {filteredCircles.find(c => c.id === selectedCircle)?.teacher?.full_name?.split(" ")[0] || scsLabels.teacherUnknown || 'غير معروف'}
+                      </Badge>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCirclesCardCollapsed(v => !v)}
+                    aria-label={circlesCardCollapsed ? 'فتح الحلقات' : 'طي الحلقات'}
+                    aria-expanded={!circlesCardCollapsed}
+                    aria-controls="mobile-circles-body"
+                    className={`inline-flex items-center justify-center h-7 w-7 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${circlesCardCollapsed ? 'rotate-180' : ''}`}
+                    title={circlesCardCollapsed ? 'عرض قائمة الحلقات' : 'إخفاء محتوى الحلقات'}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
-              {/* البحث */}
-              {isAdminOrSuperadmin && (
-                <div className="px-2 pt-2">
-                  <div className="relative">
-                    <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
-                    <Input
-                      placeholder={scsLabels.searchPlaceholder || "البحث..."}
-                      className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* العناصر */}
-              <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar">
-                {loading ? (
-                  <div className="w-full py-6 text-center flex flex-col items-center">
-                    <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                    <span className="text-green-700 text-[12px] font-medium">{scsLabels.loading || "جاري التحميل..."}</span>
-                  </div>
-                ) : filteredCircles.length === 0 ? (
-                  <div className="w-full py-6 text-center text-green-600 text-[12px]">{scsLabels.noResults || "لا توجد نتائج"}</div>
-                ) : (
-                  <div className="flex flex-col gap-1">
-                    {pagedMobileCircles.map(circle => {
-                      const active = selectedCircle === circle.id;
-                      return (
-                        <button
-                          key={circle.id}
-                          onClick={() => handleCircleChange(circle.id)}
-                          className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
-                      ${active
-                              ? 'bg-gradient-to-r from-blue-600 to-indigo-700 border-blue-300 text-white shadow-md'
-                              : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}
-                    `}
-                        >
-                          <span className="font-medium truncate">{circle.name}</span>
-                          <div className="flex items-center gap-1.5">
-                            {circle.teacher && (
-                              <span className={`text-[10px] ${active ? 'text-blue-100 font-medium' : 'text-green-500'}`}>
-                                {circle.teacher.full_name.split(" ")[0]}
-                              </span>
-                            )}
-                            {active && (
-                              <span className="inline-flex items-center bg-white text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-                                ✓
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                    {/* Pagination controls */}
-                    {totalMobileCirclePages > 1 && (
-                      <div className="mt-2 flex flex-col items-center gap-1 py-1">
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={goPrevMobileCircles}
-                            disabled={!canPrevMobileCircles}
-                            className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
-                              ${canPrevMobileCircles ? 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                            aria-label={scsLabels.prevLabel || "السابق"}
-                          >
-                            ‹
-                          </button>
-                          <div className="flex items-center gap-1" aria-label={scsLabels.pagesIndicatorAria || "ترقيم الصفحات"}>
-                            {Array.from({ length: totalMobileCirclePages }).map((_, i) => (
-                              <span
-                                key={i}
-                                className={`w-2 h-2 rounded-full transition-all ${i === mobileCirclesPage ? 'bg-blue-600 scale-125' : 'bg-gray-300'
-                                  }`}
-                                aria-label={`صفحة ${i + 1}`}
-                              />
-                            ))}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={goNextMobileCircles}
-                            disabled={!canNextMobileCircles}
-                            className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
-                              ${canNextMobileCircles ? 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                            aria-label={scsLabels.nextLabel || "التالي"}
-                          >
-                            ›
-                          </button>
-                        </div>
-                      </div>
-                    )}
+              <div
+                id="mobile-circles-body"
+                className={`transition-all duration-300 ease-in-out origin-top ${circlesCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[600px] opacity-100'}`}
+              >
+                {/* البحث */}
+                {isAdminOrSuperadmin && (
+                  <div className="px-2 pt-2">
+                    <div className="relative">
+                      <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
+                      <Input
+                        placeholder={scsLabels.searchPlaceholder || 'البحث...'}
+                        className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
                   </div>
                 )}
+
+                {/* العناصر */}
+                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar">
+                  {loading ? (
+                    <div className="w-full py-6 text-center flex flex-col items-center">
+                      <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
+                      <span className="text-green-700 text-[12px] font-medium">{scsLabels.loading || 'جاري التحميل...'}</span>
+                    </div>
+                  ) : filteredCircles.length === 0 ? (
+                    <div className="w-full py-6 text-center text-green-600 text-[12px]">{scsLabels.noResults || 'لا توجد نتائج'}</div>
+                  ) : (
+                    <div className="flex flex-col gap-1">
+                      {pagedMobileCircles.map(circle => {
+                        const active = selectedCircle === circle.id;
+                        return (
+                          <button
+                            key={circle.id}
+                            onClick={() => handleCircleChange(circle.id)}
+                            className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
+                      ${active
+                                ? 'bg-gradient-to-r from-blue-600 to-indigo-700 border-blue-300 text-white shadow-md'
+                                : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}
+                    `}
+                          >
+                            <span className="font-medium truncate">{circle.name}</span>
+                            <div className="flex items-center gap-1.5">
+                              {circle.teacher && (
+                                <span className={`text-[10px] ${active ? 'text-blue-100 font-medium' : 'text-green-500'}`}>
+                                  {circle.teacher.full_name.split(' ')[0]}
+                                </span>
+                              )}
+                              {active && (
+                                <span className="inline-flex items-center bg-white text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
+                                  ✓
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {/* Pagination controls */}
+                      {totalMobileCirclePages > 1 && (
+                        <div className="mt-2 flex flex-col items-center gap-1 py-1">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={goPrevMobileCircles}
+                              disabled={!canPrevMobileCircles}
+                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
+                              ${canPrevMobileCircles ? 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                              aria-label={scsLabels.prevLabel || 'السابق'}
+                            >
+                              ‹
+                            </button>
+                            <div className="flex items-center gap-1" aria-label={scsLabels.pagesIndicatorAria || 'ترقيم الصفحات'}>
+                              {Array.from({ length: totalMobileCirclePages }).map((_, i) => (
+                                <span
+                                  key={i}
+                                  className={`w-2 h-2 rounded-full transition-all ${i === mobileCirclesPage ? 'bg-blue-600 scale-125' : 'bg-gray-300'}`}
+                                  aria-label={`صفحة ${i + 1}`}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={goNextMobileCircles}
+                              disabled={!canNextMobileCircles}
+                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
+                              ${canNextMobileCircles ? 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
+                              aria-label={scsLabels.nextLabel || 'التالي'}
+                            >
+                              ›
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -749,13 +790,28 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
             <div className="md:col-span-1 hidden md:block">
               <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3">
-                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2">
+                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2 select-none">
                     <BookOpen className="h-5 w-5" />
                     {scsLabels.circlesHeading}
                   </h2>
+                  <button
+                    type="button"
+                    onClick={() => setCirclesCardCollapsed(v => !v)}
+                    aria-label={circlesCardCollapsed ? 'فتح الحلقات' : 'طي الحلقات'}
+                    aria-expanded={!circlesCardCollapsed}
+                    aria-controls="circles-card-body"
+                    className={`inline-flex items-center justify-center h-8 w-8 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${circlesCardCollapsed ? 'rotate-180' : ''}`}
+                    title={circlesCardCollapsed ? 'عرض قائمة الحلقات' : 'إخفاء محتوى الحلقات'}
+                  >
+                    <ChevronDown className="h-5 w-5" />
+                  </button>
                 </div>
-                <div className="p-4 space-y-4 md:space-y-5">
+                <div
+                  id="circles-card-body"
+                  className={`transition-all duration-300 ease-in-out origin-top ${circlesCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[1200px] opacity-100'}`}
+                >
+                  <div className="p-4 space-y-4 md:space-y-5">
                   {/* مربع البحث */}
                   <div className="relative">
                     {currentUser?.role !== 'teacher' && (
@@ -821,13 +877,14 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                       ))}
                     </div>
                   )}
+                  </div>
                 </div>
               </div>
             </div>
             <div className="md:col-span-3">
               <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm overflow-hidden">
                 <CardHeader className="pb-2 bg-gradient-to-r from-green-700 via-green-500 to-green-700 p-2 sm:p-4">
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center w-full">
                     <CardTitle className="text-[12px] sm:text-sm font-bold text-white flex flex-col items-start gap-1">
                       <div className="flex items-center gap-1.5 truncate">
                         <CalendarCheck className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-green-50 flex-shrink-0" />
@@ -838,11 +895,26 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                           </Badge>
                         )}
                       </div>
-
                     </CardTitle>
+                    {/* زر طي الجلسات */}
+                    <button
+                      onClick={() => setSessionsCardCollapsed(v => !v)}
+                      aria-label={sessionsCardCollapsed ? 'فتح الجلسات' : 'طي الجلسات'}
+                      aria-expanded={!sessionsCardCollapsed}
+                      aria-controls="sessions-card-body"
+                      className={`inline-flex items-center justify-center h-7 w-7 sm:h-8 sm:w-8 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${sessionsCardCollapsed ? 'rotate-180' : ''}`}
+                      title={sessionsCardCollapsed ? 'عرض الجلسات' : 'إخفاء محتوى الجلسات'}
+                      type="button"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
                   </div>
                 </CardHeader>
-                <CardContent className="p-4">
+                <CardContent
+                  id="sessions-card-body"
+                  className={`p-4 transition-all duration-300 ease-in-out origin-top ${sessionsCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[1400px] opacity-100'}`}
+                  aria-hidden={sessionsCardCollapsed}
+                >
                   {!selectedCircle ? (
                     <div className="text-center text-xs text-gray-500 mt-4">يرجى اختيار حلقة أولاً</div>
                   ) : loading ? (

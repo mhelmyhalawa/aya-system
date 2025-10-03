@@ -46,8 +46,7 @@ import { getLabels } from "@/lib/labels";
 const { studyCirclesLabels, errorMessages, commonLabels } = getLabels('ar');
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
-import { StudyCircleSchedule, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
-import { TeacherSessions } from "@/pages/TeacherSessions";
+import { StudyCircleSchedule, weekdayOptions, formatTime } from "@/types/study-circle-schedule";
 import { GenericTable, Column } from "../ui/generic-table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -687,12 +686,12 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 <TabsTrigger
                   value="all-records"
                   className="
-              flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
-              rounded-md text-green-800 py-1.5 px-2
-              hover:bg-green-100 hover:text-green-900
-              data-[state=active]:bg-islamic-green
-              data-[state=active]:text-white
-              transition-all duration-200
+                            flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium
+                            rounded-md text-green-800 py-1.5 px-2
+                            hover:bg-green-100 hover:text-green-900
+                            data-[state=active]:bg-islamic-green
+                            data-[state=active]:text-white
+                            transition-all duration-200
                 "
                   title='جميع السجلات'
                 >

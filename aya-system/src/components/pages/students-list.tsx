@@ -1355,7 +1355,20 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
       {/* جدول الطلاب بنمط محسّن مع ترقيم داخلي */}
       <GenericTable
-        title={studentsLabels.title}
+       title={
+                <div className="flex w-full items-center gap-2 min-w-0 justify-start" dir="rtl">
+                  <UserCircle className="h-4 w-4 text-yellow-300 shrink-0 drop-shadow" />
+                  <span className="text-white font-semibold text-[13px] sm:text-sm tracking-tight whitespace-nowrap">
+                    بيانات الطلاب
+                  </span>
+                  <span
+                    aria-label={`عدد الطلاب: ${filteredStudents.length}`}
+                    className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-gradient-to-br from-yellow-300 via-amber-300 to-yellow-400 text-green-900 text-[11px] sm:text-[12px] font-extrabold shadow-sm ring-1 ring-yellow-200/60 tracking-wide"
+                  >
+                    {filteredStudents.length.toLocaleString('ar-EG')}
+                  </span>
+                </div>
+              }        
         data={(listSortDirection ? [...filteredStudents].sort((a, b) => {
           if (listSortDirection === 'asc') return a.full_name.localeCompare(b.full_name, 'ar');
           if (listSortDirection === 'desc') return b.full_name.localeCompare(a.full_name, 'ar');
@@ -1638,7 +1651,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                         type="button"
                         onClick={() => handleSelectGuardian(item)}
                         className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
-                          ${sel ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
+                          ${sel ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
                         title={sel ? 'إزالة من التحديد' : 'تحديد'}
                       >
                         ✓
@@ -1671,7 +1684,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 placeholder={studentsLabels.teacherPlaceholder || '🔍 اسم المعلم'}
                 value={teacherSearchTerm}
                 onChange={(e) => setteacherSearchTerm(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
+                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 
+                dark:border-green-700 focus:ring-1 focus:ring-green-500"
               />
             </div>
           </div>

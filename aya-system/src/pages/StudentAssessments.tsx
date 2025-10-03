@@ -124,6 +124,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [circlePickerSearch, setCirclePickerSearch] = useState('');
   const [wizardStep, setWizardStep] = useState<number>(0);
+  // حالة طي الكارد الرئيسي للتقييمات
+  const [assessmentsMainCollapsed, setAssessmentsMainCollapsed] = useState(false);
 
   // دالة تحقق بسيطة لكل خطوة قبل الانتقال
   const validateWizardStep = (): boolean => {
@@ -916,21 +918,36 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
         {/* الهيدر */}
         <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+          <div className="flex flex-row justify-between items-center gap-2 w-full">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
               <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-yellow-300" />
                 تقييمات الطلاب
               </CardTitle>
-              <CardDescription className="text-xs md:text-sm text-blue-100">
+              <CardDescription className="text-xs md:text-sm text-blue-100 hidden sm:block">
                 هنا يمكنك عرض وتسجيل تقييمات الطلاب بشكل تفصيلي
               </CardDescription>
             </div>
+            <button
+              type="button"
+              onClick={() => setAssessmentsMainCollapsed(v => !v)}
+              aria-label={assessmentsMainCollapsed ? 'فتح المحتوى' : 'طي المحتوى'}
+              aria-expanded={!assessmentsMainCollapsed}
+              aria-controls="assessments-main-body"
+              className={`inline-flex items-center justify-center h-9 w-9 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${assessmentsMainCollapsed ? 'rotate-180' : ''}`}
+              title={assessmentsMainCollapsed ? 'عرض المحتوى' : 'إخفاء المحتوى'}
+            >
+              <ChevronDown className="h-5 w-5" />
+            </button>
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent
+          id="assessments-main-body"
+          className={`transition-all duration-300 ease-in-out origin-top ${assessmentsMainCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[3000px] opacity-100'}`}
+          aria-hidden={assessmentsMainCollapsed}
+        >
           {/* شريط علوي مضغوط مشابه للمطلوب */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-3 mb-1 rounded-lg bg-white dark:bg-gray-900 p-2 shadow-sm border border-green-200 dark:border-green-700">
             {/* التابات */}
@@ -1184,7 +1201,32 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             }));
             return (
               <GenericTable
-                title="تقييمات الطلاب"
+              title={(() => {
+                const filteredCount = tableData.length;
+                const totalCount = filteredAssessments.length; // إجمالي بعد الفلاتر (قد يساوي نفسه دائماً إن لم يتغير المصدر)
+                const showTotalHint = showLatestPerStudent && filteredCount < totalCount;
+                const filteredCountStr = filteredCount.toLocaleString('ar-EG');
+                const totalCountStr = totalCount.toLocaleString('ar-EG');
+                return (
+                  <div className="flex w-full items-center gap-2 min-w-0">
+                    <BookOpen className="h-4 w-4 text-yellow-300 shrink-0" />
+                    <span className="text-white font-semibold text-[13px] sm:text-sm tracking-tight break-words whitespace-normal">
+                      تقييمات الطلاب
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-500/80 to-emerald-600/80 text-white text-[10px] sm:text-[11px] font-bold shadow border border-white/20"
+                      title={`عدد السجلات الظاهرة: ${filteredCountStr}`}
+                    >
+                      {filteredCountStr}
+                    </span>
+                    {showTotalHint && (
+                      <span className="text-[10px] sm:text-[11px] text-yellow-200 truncate" title={`أحدث ${filteredCountStr} من إجمالي ${totalCountStr} سجل`}>
+                        أحدث {filteredCountStr} من إجمالي {totalCountStr}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
                 defaultView="table"
                 enablePagination
                 defaultPageSize={10}

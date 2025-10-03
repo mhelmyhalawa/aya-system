@@ -159,6 +159,11 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
     notes: "",
   });
 
+  // حالات تحميل منفصلة لأزرار الحفظ والحذف
+  const [savingNewSession, setSavingNewSession] = useState(false);
+  const [savingEditedSession, setSavingEditedSession] = useState(false);
+  const [deletingSession, setDeletingSession] = useState(false);
+
   // حالة نافذة التأكيد للحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<CircleSession | null>(null);
@@ -270,6 +275,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
     if (!selectedCircle) return;
 
     try {
+      setSavingNewSession(true);
       // تأكد من صحة البيانات
       if (!formData.session_date || !formData.start_time || !formData.end_time) {
         toast({
@@ -321,6 +327,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         description: "حدث خطأ أثناء حفظ الجلسة الجديدة",
         variant: "destructive",
       });
+    } finally {
+      setSavingNewSession(false);
     }
   };
 
@@ -341,6 +349,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
     if (!selectedCircle || !sessionToDelete) return;
 
     try {
+      setSavingEditedSession(true);
       // تأكد من صحة البيانات
       if (!formData.session_date || !formData.start_time || !formData.end_time) {
         toast({
@@ -394,6 +403,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         description: "حدث خطأ أثناء حفظ التعديلات",
         variant: "destructive",
       });
+    } finally {
+      setSavingEditedSession(false);
     }
   };
 
@@ -408,6 +419,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
     if (!selectedCircle || !sessionToDelete) return;
 
     try {
+      setDeletingSession(true);
       // حذف الجلسة
       await deleteSession(selectedCircle, sessionToDelete.session_date);
 
@@ -440,6 +452,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         description: "حدث خطأ أثناء حذف الجلسة",
         variant: "destructive",
       });
+    } finally {
+      setDeletingSession(false);
     }
   };
 
@@ -837,7 +851,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         cancelButtonText="إلغاء"
         maxWidth="600px"
         mode="add"
-        isLoading={loading}
+        isLoading={savingNewSession}
       >
         <FormRow label="التاريخ">
           <div className="flex flex-col gap-2">
@@ -898,7 +912,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         cancelButtonText="إلغاء"
         maxWidth="600px"
         mode="edit"
-        isLoading={loading}
+        isLoading={savingEditedSession}
       >
         <FormRow label="التاريخ">
           <div className="flex flex-col gap-2">
@@ -965,6 +979,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         } : null}
         deleteButtonText="نعم، قم بالحذف"
         cancelButtonText="إلغاء"
+        isLoading={deletingSession}
       />
     </div>
   );

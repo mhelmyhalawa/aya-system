@@ -2191,7 +2191,18 @@ function UsersTable({ users, onEdit, onDelete, onChangePassword, userRole, curre
         columns={columns as any}
         defaultView="table"
         hideSortToggle
-        title={userType === 'teacher' ? userManagementLabels.teachers : userType === 'admin' ? userManagementLabels.administrators : userManagementLabels.superadmins}
+        title={
+          <div className={`flex w-full items-center gap-2 min-w-0`}>
+            <BookOpen className="h-4 w-4 text-yellow-300 shrink-0" />
+            <span className="text-white font-semibold text-[13px] sm:text-sm tracking-tight break-words whitespace-normal">
+              {userType === 'teacher'
+                ? userManagementLabels.teachers
+                : userType === 'admin'
+                  ? userManagementLabels.administrators
+                  : userManagementLabels.superadmins}
+            </span>
+          </div>
+        }
         className="rounded-none border-0 text-sm w-full"
         getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
         enablePagination
