@@ -9,7 +9,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-islamic-green hover:text-white",
+        // Use explicit green styling instead of global primary (purple) for buttons
+        default: "bg-islamic-green text-white hover:bg-islamic-green/90 shadow-sm",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
@@ -17,7 +18,7 @@ const buttonVariants = cva(
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-islamic-green hover:text-white",
         ghost: "hover:bg-islamic-green hover:text-white",
-        link: "text-primary underline-offset-4 hover:underline hover:text-islamic-green",
+        link: "text-islamic-green underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
