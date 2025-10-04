@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
     Smartphone, Users, BookOpen, Award, Volume2, Calendar, ClipboardCheck,
-    Info, AlertCircle, CheckCircle, XCircle, Clock, School, UserCircle, Edit, Star, History
+    Info, AlertCircle, CheckCircle, XCircle, Clock, School, UserCircle, Edit, Star, History,
+    Phone, Search, Check, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 
 
 import { GenericTable } from "@/components/ui/generic-table";
+import { Footer } from "@/components/layout/footer";
 
 
 interface Grade {
@@ -81,9 +83,51 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [justSearched, setJustSearched] = useState(false); // لعرض علامة نجاح مؤقتة
+    const [triggerShake, setTriggerShake] = useState(false); // لتحريك الاهتزاز عند خطأ
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
     const [teacherHistory, setTeacherHistory] = useState<TeacherHistory[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [guardianExpanded, setGuardianExpanded] = useState(false);
+    const PERSIST_KEY = 'guardianExpandedPref';
+
+    // Load persisted preference (with desktop default override if no pref stored)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            const stored = window.localStorage.getItem(PERSIST_KEY);
+            if (stored !== null) {
+                setGuardianExpanded(stored === 'true');
+            } else if (window.innerWidth >= 1024) {
+                setGuardianExpanded(true);
+            }
+        } catch { /* ignore */ }
+    }, []);
+
+    // Persist preference whenever it changes
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            try { window.localStorage.setItem(PERSIST_KEY, String(guardianExpanded)); } catch { /* ignore */ }
+        }
+    }, [guardianExpanded]);
+
+    // Keyboard shortcut: press "g" (Arabic/English keyboards) to toggle when guardian exists
+    const handleKey = useCallback((e: KeyboardEvent) => {
+        if (!guardian) return;
+        const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return;
+        if (e.key.toLowerCase() === 'g') {
+            e.preventDefault();
+            setGuardianExpanded(prev => !prev);
+        }
+    }, [guardian]);
+
+    useEffect(() => {
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [handleKey]);
+    
+    // تم إزالة مؤقت العد التنازلي للتحميل لصالح عرض مؤشر تحميل بسيط
 
     // بيانات تجريبية للاختبار
     const mockStudents: Student[] = [];
@@ -298,31 +342,56 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
         }
     };
 
+    // عرض الرقم كما هو (أرقام متصلة بدون مسافات)
+    const formatPhone = (raw: string) => raw.replace(/\D/g, '');
+
+    const handlePhoneChange = (val: string) => {
+        const digits = val.replace(/[^0-9]/g, '');
+        setPhoneNumber(digits);
+        setError(null);
+        setTriggerShake(false);
+    };
+
     const handleSearch = async () => {
         if (!phoneNumber) {
             setError('يرجى إدخال رقم الهاتف');
+            setTriggerShake(true);
             return;
         }
-
         if (phoneNumber.length < 10) {
             setError('يرجى إدخال رقم هاتف صحيح (10 أرقام على الأقل)');
+            setTriggerShake(true);
             return;
         }
+        
+        // تفعيل حالة التحميل
         setLoading(true);
-        setSearched(true);
         setError(null);
+        setTriggerShake(false);
+        setJustSearched(false);
+        
         try {
+            // تنفيذ البحث وانتظار النتيجة
             const studentsData = await fetchStudentsByGuardianPhone(phoneNumber);
+            
+            // تحديث البيانات بعد استلامها مباشرة
             setStudents(studentsData);
+            
             if (studentsData.length === 0) {
                 setError('لم يتم العثور على بيانات حقيقية');
-                await new Promise(resolve => setTimeout(resolve, 500));
+            } else {
+                // إظهار علامة النجاح بشكل مؤقت
+                setJustSearched(true);
+                setTimeout(() => setJustSearched(false), 1500);
             }
         } catch (err) {
             console.error('خطأ في البحث:', err);
             setError('حدث خطأ أثناء البحث. الرجاء المحاولة مرة أخرى.');
+            setTriggerShake(true);
         } finally {
+            // إيقاف التحميل وإظهار القسم بغض النظر عن النتيجة
             setLoading(false);
+            setSearched(true);
         }
     };
 
@@ -444,334 +513,297 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
         return Math.round((presentCount / student.attendance.length) * 100);
     };
 
+    // (Replaced by persisted preference logic above)
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-islamic-light to-muted p-4">
-            <div className="w-full max-w-4xl mx-auto">
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="mx-auto mb-4 p-3 bg-gradient-to-br from-islamic-green to-accent rounded-full w-fit">
-                        <Users className="h-8 w-8 text-white" />
+        // استخدم div بدلاً من main لتجنب التداخل مع الـ main في App.tsx
+        <div className="flex flex-col h-full min-h-[calc(100vh-64px-160px)] bg-gradient-to-br from-background via-islamic-light to-muted/40 px-1 py-1 md:py-2">
+                <div className="mx-auto w-full max-w-3xl space-y-1 md:space-y-2">
+                {/* Hero */}
+                <header className="text-center space-y-2 md:space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 my-1 md:my-3">
+                    <div className="mx-auto h-14 w-14 md:h-20 md:w-20 grid place-items-center rounded-2xl bg-gradient-to-tr from-islamic-green via-islamic-green/80 to-accent shadow-lg ring-4 ring-islamic-green/10">
+                        <Users className="h-7 w-7 md:h-10 md:w-10 text-white drop-shadow-sm" />
                     </div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-islamic-green to-accent bg-clip-text text-transparent mb-2">
+                    <h1 className="text-xl md:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-islamic-green via-islamic-green/90 to-accent bg-clip-text text-transparent leading-snug">
                         استعلام أولياء الأمور
                     </h1>
-                    <p className="text-lg text-muted-foreground">
-                        تابع تقدم أبنائك في حفظ وتلاوة القرآن الكريم
+                    <p className="hidden md:block text-sm md:text-base text-muted-foreground max-w-xl mx-auto leading-relaxed">
+                        تابع تقدم أبنائك في الحفظ والتلاوة والتجويد وسجل حضورهم بشكلٍ مبسط وسريع.
                     </p>
-                </div>
+                </header>
 
-                {/* Search Card */}
-                <Card className="mb-10 rounded-2xl overflow-hidden shadow-xl border border-islamic-green/20 bg-white">
-                    {/* Header */}
-                    <CardHeader className="bg-gradient-to-r from-islamic-green to-green-700 text-white p-5">
-                        <CardTitle className="text-xl flex items-center gap-3 font-semibold">
-                            <Smartphone size={26} className="text-yellow-200" />
-                            البحث برقم الهاتف
-                        </CardTitle>
-                        <CardDescription className="text-white/80">
-                            أدخل رقم هاتف ولي الأمر للاطلاع على بيانات الطلاب
-                        </CardDescription>
-                    </CardHeader>
-
-                    {/* Content */}
-                    <CardContent className="p-6 space-y-5">
-                        {/* Input + Button */}
-                        <div className="space-y-2">
-                            <Label htmlFor="phone" className="text-base font-medium text-gray-700">
-                                رقم هاتف ولي الأمر
-                            </Label>
-                            <div className="flex w-full overflow-hidden rounded-xl border border-islamic-green/30 shadow-sm focus-within:ring-2 focus-within:ring-islamic-green">
-                                <Input
-                                    id="phone"
-                                    type="tel"
-                                    placeholder="مثال: 0100000000"
-                                    value={phoneNumber}
-                                    onChange={(e) => setPhoneNumber(e.target.value)}
-                                    className="flex-1 text-right px-4 py-2 border-0 focus:ring-0"
-                                    dir="rtl"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSearch();
-                                    }}
-                                />
-                                <Button
-                                    onClick={handleSearch}
-                                    disabled={loading}
-                                    className="px-8 rounded-none bg-gradient-to-r from-islamic-green to-accent hover:from-islamic-green/90 hover:to-accent/90"
-                                >
-                                    {loading ? "جاري البحث..." : "بحث"}
-                                </Button>
+                {/* Search Section */}
+                <section aria-labelledby="guardian-search" className="relative">
+                    <Card className="relative rounded-xl sm:rounded-2xl overflow-hidden shadow-lg border border-islamic-green/30 bg-gradient-to-br from-white via-emerald-50/70 to-white dark:from-[#0f1f17] dark:via-[#13261d] dark:to-[#0f1f17]">
+                        {/* زخرفة علوية */}
+                        <div className="absolute top-0 inset-x-0 h-1.5 bg-[linear-gradient(90deg,theme(colors.islamic-green)_0%,theme(colors.accent)_50%,theme(colors.islamic-green)_100%)] opacity-90" />
+                        {/* هالات زخرفية */}
+                        <div className="pointer-events-none absolute -top-6 -right-6 h-24 w-24 rounded-full bg-islamic-green/10 blur-xl" />
+                        <div className="pointer-events-none absolute -bottom-10 -left-10 h-32 w-32 rounded-full bg-accent/10 blur-2xl" />
+                        {/* نمط زخرفي خافت */}
+                        <div className="pointer-events-none absolute inset-0 opacity-[0.07] mix-blend-multiply bg-[radial-gradient(circle_at_25%_25%,#059669_0%,transparent_60%),radial-gradient(circle_at_75%_75%,#10b981_0%,transparent_55%)]" />
+                        <CardContent className="relative px-1 py-1 md:p-2 space-y-1 md:space-y-1">
+                            {loading && (
+                                <div className="absolute inset-0 bg-white/70 dark:bg-black/40 backdrop-blur-sm flex flex-col items-center justify-center gap-3 z-20 text-islamic-green">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-semibold animate-pulse">
+                                            جاري البحث...
+                                        </span>
+                                        <div className="h-5 w-5 border-2 border-islamic-green/30 border-t-islamic-green rounded-full animate-spin" aria-hidden="true" />
+                                    </div>
+                                </div>
+                            )}
+                            <div className="space-y-2" dir="rtl">
+                                <Label htmlFor="phone" className="text-sm md:text-base font-medium text-gray-700">
+                                    رقم هاتف ولي الأمر
+                                </Label>
+                                <div className={`relative group ${triggerShake ? 'animate-shake' : ''}`}>
+                                    {/* البحث والأيقونات كمجموعة */}
+                                    <div className="relative">
+                                        <div className="flex rounded-xl overflow-hidden border border-islamic-green/30 shadow-sm">
+                                            {/* أيقونة الهاتف (يمين) */}
+                                            <div className="flex items-center justify-center px-2 sm:px-3.5 bg-slate-50 border-r border-islamic-green/20">
+                                                <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-islamic-green/70 group-focus-within:text-islamic-green transition-colors" aria-hidden="true" />
+                                            </div>
+                                            
+                                            {/* حقل الإدخال */}
+                                            <Input
+                                                id="phone"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                type="tel"
+                                                placeholder="مثال: 01000000000"
+                                                value={formatPhone(phoneNumber)}
+                                                onChange={(e) => handlePhoneChange(e.target.value)}
+                                                className="peer h-10 md:h-12 px-3 text-left border-0 flex-1 rounded-none focus-visible:ring-2 focus-visible:ring-islamic-green/50 focus-visible:border-0 bg-white/90 dark:bg-white/10 backdrop-blur-sm text-sm md:text-base transition-all disabled:opacity-70 min-w-0"
+                                                dir="ltr"
+                                                aria-label="رقم هاتف ولي الأمر"
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                                                autoComplete="tel"
+                                                style={{ fontSize: phoneNumber.length > 10 ? '0.875rem' : '' }}
+                                            />
+                                            
+                                            {/* زر البحث (يسار) */}
+                                            <button
+                                                type="button"
+                                                onClick={handleSearch}
+                                                disabled={loading || !phoneNumber}
+                                                className={`h-10 md:h-12 w-10 sm:w-14 flex items-center justify-center
+                                                text-white
+                                                border-l border-islamic-green/30
+                                                bg-gradient-to-br from-islamic-green via-emerald-600 to-accent
+                                                hover:brightness-105 active:brightness-95
+                                                focus:outline-none focus-visible:ring-2 focus-visible:ring-islamic-green/60
+                                                disabled:opacity-50 disabled:cursor-not-allowed
+                                                ${justSearched ? 'ring-1 ring-green-400/60 animate-pulse' : ''}`}
+                                                aria-label={loading ? 'جارٍ البحث' : justSearched ? 'تم' : 'بحث'}
+                                                title={loading ? 'جارٍ البحث' : justSearched ? 'تم بنجاح' : 'بحث'}
+                                            >
+                                                {loading ? (
+                                                    <span className="animate-spin h-4 w-4 sm:h-5 sm:w-5 border-2 border-white/30 border-t-white rounded-full" />
+                                                ) : justSearched ? (
+                                                    <Check className="h-4 w-4 sm:h-5 sm:w-5 text-white drop-shadow" />
+                                                ) : (
+                                                    <Search className="h-4 w-4 sm:h-5 sm:w-5 text-white drop-shadow" />
+                                                )}
+                                            </button>
+                                        </div>
+                                        
+                                        {/* زر مسح داخل حقل الإدخال (على اليسار) */}
+                                        {phoneNumber && !loading && (
+                                            <button
+                                                type="button"
+                                                onClick={() => { setPhoneNumber(''); setError(null); setJustSearched(false); }}
+                                                className="absolute left-[3.75rem] top-1/2 -translate-y-1/2 h-6 w-6 rounded-full bg-gray-100/80 
+                                                hover:bg-gray-200/90 text-islamic-green/80 hover:text-islamic-green flex 
+                                                items-center justify-center border border-gray-200/40 z-10"
+                                                aria-label="مسح الرقم"
+                                                title="مسح"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-
-                        {/* Error Message */}
-                        {error && (
-                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm font-medium">
-                                <AlertCircle className="h-5 w-5 shrink-0 text-red-500" />
-                                <span>{error}</span>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            {error && (
+                                <div className="flex items-start gap-3 rounded-xl border border-red-300/60 bg-red-50/90 p-3 text-red-700 text-xs md:text-sm font-medium shadow-sm">
+                                    <AlertCircle className="h-5 w-5 shrink-0 text-red-500" />
+                                    <span>{error}</span>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <div className="pointer-events-none absolute -inset-x-6 -top-6 h-20 bg-gradient-to-b from-islamic-green/10 to-transparent blur-2xl opacity-50" />
+                </section>
 
 
                 {/* Results */}
                 {searched && (
-                    <div className="space-y-6">
+                    <section aria-live="polite" className="space-y-8" dir="rtl">
                         {/* Guardian Information */}
-                        {guardian && (
-                            <Card className="border border-green-200/40 shadow-xl rounded-2xl overflow-hidden mb-6 bg-gradient-to-b from-white to-green-50">
-                                <CardHeader className="bg-green-600/90 text-white p-4 flex flex-row items-center justify-between">
-                                    <CardTitle className="text-xl flex items-center gap-2 font-semibold">
-                                        <Users size={22} className="text-yellow-200" />
-                                        بيانات ولي الأمر
-                                    </CardTitle>
-                                </CardHeader>
-
-                                <CardContent className="p-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* الاسم */}
-                                        <div className="bg-white rounded-lg shadow-sm p-4 border border-green-100">
-                                            <Label className="text-sm text-green-700">الاسم</Label>
-                                            <p className="font-semibold text-lg text-gray-800 mt-1">{guardian.fullName}</p>
-                                        </div>
-
-                                        {/* رقم الهاتف */}
-                                        <div className="bg-white rounded-lg shadow-sm p-4 border border-green-100">
-                                            <Label className="text-sm text-green-700">رقم الهاتف</Label>
-                                            <p className="font-semibold text-lg text-gray-800 mt-1">{guardian.phoneNumber}</p>
-                                        </div>
-
-                                        {/* البريد الإلكتروني */}
-                                        {guardian.email && (
-                                            <div className="bg-white rounded-lg shadow-sm p-4 border border-green-100 md:col-span-2">
-                                                <Label className="text-sm text-green-700">البريد الإلكتروني</Label>
-                                                <p className="font-semibold text-gray-800 mt-1">{guardian.email}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                        )}
+                        {/* تم حذف كارد ولي الأمر حسب طلب المستخدم */}
 
                         {students.length > 0 ? (
-                            <>
-                                {/* Students Summary */}
-                                <div className="grid md:grid-cols-2 gap-4">
-                                    {students.map((student) => (
+                            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 
+                            xl:grid-cols-2 max-w-screen-2xl mx-auto">
+                                {students.map((student) => {
+                                    const gradeTrend = (student.grades || [])
+                                        .slice() // copy
+                                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                                        .map(g => Math.round((g.memorization + g.recitation + g.tajweed) / 3));
+                                    const recentTrend = gradeTrend.slice(-8); // last 8
+                                    return (
                                         <Card
                                             key={student.id}
-                                            className="rounded-2xl border border-islamic-green/10 hover:border-islamic-green/40 transition-all shadow-md hover:shadow-xl overflow-hidden cursor-pointer"
-
+                                            className="group relative overflow-hidden rounded-3xl border border-islamic-green/15 bg-white/90 dark:bg-white/5 shadow-md ring-1 ring-transparent hover:shadow-xl hover:ring-islamic-green/30 transition-all w-full"
                                         >
-                                            {/* Header */}
-                                            <CardHeader className="pb-3 bg-gradient-to-r from-islamic-green/5 to-accent/5">
-                                                <CardTitle className="text-lg font-bold text-islamic-green">{student.fullName}</CardTitle>
-                                                <CardDescription className="flex flex-col gap-1 text-sm">
-                                                    <div className="flex items-center gap-2">
-                                                        <School size={16} className="text-islamic-green" />
-                                                        <span>
-                                                            الصف: {getGradeArabicName(student.grade)}
-                                                        </span>
+                                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-islamic-green/5 via-transparent to-accent/10" />
+                                            <CardHeader className="relative pb-3 bg-gradient-to-r from-islamic-green/5 to-accent/5">
+                                                <CardTitle className="text-base md:text-lg font-bold text-islamic-green flex items-start justify-between gap-2">
+                                                    <div className="flex flex-col gap-1 max-w-[72%]">
+                                                        <span className="truncate" title={student.fullName}>{student.fullName}</span>
+                                                        {guardian && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-normal text-islamic-green/80 bg-islamic-green/10 rounded-md px-2 py-0.5 max-w-full truncate" title={`ولي الأمر: ${guardian.fullName}`}>
+                                                                <Users size={11} className="text-islamic-green" />
+                                                                <span className="truncate">{guardian.fullName}</span>
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <BookOpen size={16} className="text-islamic-green" />
-                                                        <span> الحلقة: {getCircleName(student.circleName)}</span>
+                                                    <span className="text-[10px] font-medium text-islamic-green/70 bg-islamic-green/10 px-2 py-0.5 rounded-full self-start">{getAverageGrade(student)}%</span>
+                                                </CardTitle>
+                                                <CardDescription className="flex flex-col gap-1 text-[11px] md:text-xs leading-relaxed" dir="rtl">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <School size={14} className="text-islamic-green shrink-0" />
+                                                        <span className="truncate">الصف: {getGradeArabicName(student.grade)}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <UserCircle size={16} className="text-islamic-green" />
-                                                        <span> المعلم: {student.teacherName || 'غير محدد'}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <BookOpen size={14} className="text-islamic-green shrink-0" />
+                                                        <span className="truncate">الحلقة: {getCircleName(student.circleName)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <UserCircle size={14} className="text-islamic-green shrink-0" />
+                                                        <span className="truncate">المعلم: {student.teacherName || 'غير محدد'}</span>
                                                     </div>
                                                 </CardDescription>
                                             </CardHeader>
-
-                                            {/* Content */}
-                                            <CardContent className="pb-4">
-                                                {/* Summary Boxes */}
-                                                <div className="grid grid-cols-2 gap-3 mb-4">
-                                                    <div className="bg-gradient-to-br from-islamic-green/10 to-green-50 rounded-xl p-3 text-center shadow-sm">
-                                                        <p className="text-xs text-muted-foreground mb-1">المعدل العام</p>
-                                                        <p className="text-xl font-extrabold text-islamic-green">{getAverageGrade(student)}%</p>
+                                            <CardContent className="relative pb-4 space-y-4">
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="rounded-xl p-3 text-center bg-gradient-to-br from-islamic-green/10 to-green-50 shadow-sm">
+                                                        <p className="text-[10px] text-muted-foreground mb-1 tracking-wide">المعدل العام</p>
+                                                        <p className="text-lg font-extrabold text-islamic-green">{getAverageGrade(student)}%</p>
                                                     </div>
-                                                    <div className="bg-gradient-to-br from-accent/10 to-green-50 rounded-xl p-3 text-center shadow-sm">
-                                                        <p className="text-xs text-muted-foreground mb-1">نسبة الحضور</p>
-                                                        <p className="text-xl font-extrabold text-islamic-green">{getAttendanceRate(student)}%</p>
+                                                    <div className="rounded-xl p-3 text-center bg-gradient-to-br from-accent/10 to-green-50 shadow-sm">
+                                                        <p className="text-[10px] text-muted-foreground mb-1 tracking-wide">نسبة الحضور</p>
+                                                        <p className="text-lg font-extrabold text-islamic-green">{getAttendanceRate(student)}%</p>
                                                     </div>
                                                 </div>
-
-                                                {/* Tabs */}
-                                                <Tabs defaultValue="grades" className="w-full">
-                                                    <TabsList className="w-full rounded-lg bg-gray-50 p-1">
-                                                        <TabsTrigger
-                                                            value="grades"
-                                                            className="flex-1 data-[state=active]:bg-islamic-green data-[state=active]:text-white rounded-md"
-                                                        >
-                                                            الدرجات
-                                                        </TabsTrigger>
-                                                        <TabsTrigger
-                                                            value="attendance"
-                                                            className="flex-1 data-[state=active]:bg-islamic-green data-[state=active]:text-white rounded-md"
-                                                        >
-                                                            الحضور
-                                                        </TabsTrigger>
-                                                        <TabsTrigger
-                                                            value="notes"
-                                                            className="flex-1 data-[state=active]:bg-islamic-green data-[state=active]:text-white rounded-md"
-                                                        >
-                                                            الملاحظات
-                                                        </TabsTrigger>
+                                                <Tabs defaultValue="grades" className="w-full" dir="rtl">
+                                                    <TabsList className="w-full rounded-xl bg-gray-50 p-1 grid grid-cols-3 text-[11px]">
+                                                        <TabsTrigger value="grades" className="data-[state=active]:bg-islamic-green data-[state=active]:text-white rounded-lg py-1">الدرجات</TabsTrigger>
+                                                        <TabsTrigger value="attendance" className="data-[state=active]:bg-islamic-green data-[state=active]:text-white rounded-lg py-1">الحضور</TabsTrigger>
+                                                        <TabsTrigger value="notes" className="data-[state=active]:bg-islamic-green data-[state=active]:text-white rounded-lg py-1">الملاحظات</TabsTrigger>
                                                     </TabsList>
-
-                                                    {/* Grades */}
-                                                    <TabsContent value="grades" className="mt-3">
+                                                    <TabsContent value="grades" className="mt-3 min-h-[82px]">
                                                         {student.grades.length > 0 ? (
                                                             <div className="space-y-2">
                                                                 {student.grades.slice(0, 3).map((grade) => (
-                                                                    <div key={grade.id} className="border rounded-lg p-3 text-sm shadow-sm">
-                                                                        <div className="flex justify-between mb-2">
-                                                                            <span className="text-muted-foreground text-xs">{formatDate(grade.date)}</span>
+                                                                    <div key={grade.id} className="border rounded-lg p-2.5 text-[11px] shadow-sm bg-white/60 backdrop-blur">
+                                                                        <div className="flex justify-between mb-1">
+                                                                            <span className="text-muted-foreground text-[10px]">{formatDate(grade.date)}</span>
                                                                         </div>
                                                                         <div className="grid grid-cols-3 gap-2 text-center">
                                                                             <div>
-                                                                                <span className="text-xs block text-muted-foreground">الحفظ</span>
-                                                                                <Badge className={getGradeColor(grade.memorization)}>
-                                                                                    {grade.memorization}%
-                                                                                </Badge>
+                                                                                <span className="text-[10px] block text-muted-foreground">الحفظ</span>
+                                                                                <Badge className={`${getGradeColor(grade.memorization)} px-1.5 py-0.5 text-[10px]`}>{grade.memorization}%</Badge>
                                                                             </div>
                                                                             <div>
-                                                                                <span className="text-xs block text-muted-foreground">التلاوة</span>
-                                                                                <Badge className={getGradeColor(grade.recitation)}>
-                                                                                    {grade.recitation}%
-                                                                                </Badge>
+                                                                                <span className="text-[10px] block text-muted-foreground">التلاوة</span>
+                                                                                <Badge className={`${getGradeColor(grade.recitation)} px-1.5 py-0.5 text-[10px]`}>{grade.recitation}%</Badge>
                                                                             </div>
                                                                             <div>
-                                                                                <span className="text-xs block text-muted-foreground">التجويد</span>
-                                                                                <Badge className={getGradeColor(grade.tajweed)}>
-                                                                                    {grade.tajweed}%
-                                                                                </Badge>
+                                                                                <span className="text-[10px] block text-muted-foreground">التجويد</span>
+                                                                                <Badge className={`${getGradeColor(grade.tajweed)} px-1.5 py-0.5 text-[10px]`}>{grade.tajweed}%</Badge>
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <p className="text-center text-muted-foreground py-4">لا توجد درجات مسجلة بعد</p>
+                                                            <p className="text-center text-muted-foreground py-4 text-[11px]">لا توجد درجات</p>
                                                         )}
                                                     </TabsContent>
-
-                                                    {/* Attendance */}
-                                                    <TabsContent value="attendance" className="mt-3">
+                                                    <TabsContent value="attendance" className="mt-3 min-h-[82px]">
                                                         {student.attendance.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                {student.attendance.slice(0, 5).map((record) => (
-                                                                    <div key={record.id} className="flex justify-between items-center border rounded-lg p-3 text-sm shadow-sm">
-                                                                        <div>
-                                                                            <span className="block text-xs text-muted-foreground">{formatDate(record.date)}</span>
+                                                                {student.attendance.slice(0, 4).map((record) => (
+                                                                    <div key={record.id} className="flex justify-between items-center border rounded-lg p-2.5 text-[11px] shadow-sm bg-white/60 backdrop-blur">
+                                                                        <div className="space-y-0.5">
+                                                                            <span className="block text-[10px] text-muted-foreground">{formatDate(record.date)}</span>
                                                                             {record.recordedBy && (
-                                                                                <span className="block text-xs text-gray-600 mt-1">
-                                                                                    <span className="text-gray-500">المسجل:</span> {record.recordedBy}
-                                                                                </span>
-                                                                            )}
-                                                                            {record.notes && (
-                                                                                <span className="block text-xs text-gray-600 mt-1">
-                                                                                    <span className="text-gray-500">ملاحظات:</span> {record.notes}
-                                                                                </span>
+                                                                                <span className="block text-[10px] text-gray-600">المسجل: {record.recordedBy}</span>
                                                                             )}
                                                                         </div>
-                                                                        <Badge className={getAttendanceColor(record.status)}>
-                                                                            {record.status === 'present' ? (
-                                                                                <CheckCircle className="h-3 w-3 mr-1" />
-                                                                            ) : record.status === 'late' ? (
-                                                                                <Clock className="h-3 w-3 mr-1" />
-                                                                            ) : (
-                                                                                <XCircle className="h-3 w-3 mr-1" />
-                                                                            )}
-                                                                            {record.status === "present" ? "حاضر"
-                                                                                : record.status === "absent" ? "غائب"
-                                                                                    : record.status === "late" ? "متأخر"
-                                                                                        : record.status === "excused" ? "معذور"
-                                                                                            : record.status}
-                                                                        </Badge>
+                                                                        <Badge className={`${getAttendanceColor(record.status)} flex items-center gap-1 px-2 py-0.5 text-[10px]`}>{record.status}</Badge>
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <p className="text-center text-muted-foreground py-4">لا توجد سجلات حضور بعد</p>
+                                                            <p className="text-center text-muted-foreground py-4 text-[11px]">لا يوجد حضور</p>
                                                         )}
                                                     </TabsContent>
-
-                                                    {/* Notes */}
-                                                    <TabsContent value="notes" className="mt-3">
+                                                    <TabsContent value="notes" className="mt-3 min-h-[82px]">
                                                         {student.notes.length > 0 ? (
                                                             <div className="space-y-2">
-                                                                {student.notes.map((note) => (
-                                                                    <div key={note.id} className="border rounded-lg p-3 text-sm shadow-sm">
-                                                                        <div className="flex justify-between items-center mb-2">
-                                                                            <Badge className={getNoteTypeColor(note.type)}>{note.type}</Badge>
-                                                                            <span className="text-xs text-muted-foreground">{formatDate(note.date)}</span>
+                                                                {student.notes.slice(0, 3).map((note) => (
+                                                                    <div key={note.id} className="border rounded-lg p-2.5 text-[11px] shadow-sm bg-white/60 backdrop-blur">
+                                                                        <div className="flex justify-between items-center mb-1">
+                                                                            <Badge className={`${getNoteTypeColor(note.type)} px-2 py-0.5 text-[10px]`}>{note.type}</Badge>
+                                                                            <span className="text-[10px] text-muted-foreground">{formatDate(note.date)}</span>
                                                                         </div>
-                                                                        <p className="text-gray-700">{note.note}</p>
+                                                                        <p className="text-gray-700 leading-relaxed line-clamp-3">{note.note}</p>
                                                                     </div>
                                                                 ))}
                                                             </div>
                                                         ) : (
-                                                            <p className="text-center text-muted-foreground py-4">لا توجد ملاحظات مسجلة بعد</p>
+                                                            <p className="text-center text-muted-foreground py-4 text-[11px]">لا توجد ملاحظات</p>
                                                         )}
                                                     </TabsContent>
                                                 </Tabs>
                                             </CardContent>
-
-                                            {/* Footer */}
-                                            <CardFooter>
+                                            <CardFooter className="pt-0">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    className="w-full rounded-lg border-islamic-green text-islamic-green hover:bg-islamic-green/10 font-medium"
-                                                    onClick={() => {
-                                                        setSelectedStudent(student);
-                                                        setDialogOpen(true);
+                                                    className="w-full rounded-xl border-islamic-green text-islamic-green hover:bg-islamic-green/10 font-medium text-[12px] tracking-wide"
+                                                    onClick={(e) => { 
+                                                        e.stopPropagation(); // منع انتشار الحدث للعناصر الأب
+                                                        console.log('تم النقر على عرض التفاصيل:', student.id);
+                                                        handleStudentClick(student);
                                                     }}
                                                 >
-                                                    عرض التفاصيل الكاملة
+                                                    عرض التفاصيل
                                                 </Button>
                                             </CardFooter>
                                         </Card>
-
-
-                                    ))}
-                                </div>
-                            </>
+                                    );
+                                })}
+                            </div>
                         ) : (
-                            <Card className="border-yellow-200 bg-yellow-50">
-                                <CardContent className="text-center py-8">
-                                    <p className="text-lg text-yellow-800">
-                                        لم يتم العثور على بيانات مرتبطة بهذا الرقم
-                                    </p>
-                                    <p className="text-yellow-600 mt-2">
-                                        تأكد من صحة رقم الهاتف أو تواصل مع إدارة المكتب
-                                    </p>
-                                    <p className="text-yellow-600 mt-2">
-                                        إذا كنت تبحث عن الرقم 0102000000 فنحن نقوم بتشخيص المشكلة، يرجى التحقق من سجلات الخادم
-                                    </p>
-                                </CardContent>
-                            </Card>
+                            <div className="text-center py-4"></div>
                         )}
-                    </div>
+                    </section>
                 )}
 
-                {/* Back to Home */}
-                <div className="text-center mt-8">
-                    <Button
-                        variant="outline"
-                        onClick={() => onNavigate('/')}
-                        className="border-islamic-green text-islamic-green hover:bg-islamic-green/30"
-                    >
-                        العودة للصفحة الرئيسية
-                    </Button>
-                </div>
-
                 {/* Student Details Dialog */}
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <Dialog 
+                    open={dialogOpen}
+                    onOpenChange={(open) => {
+                        console.log('تغيير حالة النافذة:', open);
+                        setDialogOpen(open);
+                        if (!open) setSelectedStudent(null);
+                    }}
+                >
                     <DialogContent
                         dir="rtl"
                         className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100 text-sm"
@@ -967,8 +999,6 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                         )}
                     </DialogContent>
                 </Dialog>
-
-
             </div>
         </div>
     );

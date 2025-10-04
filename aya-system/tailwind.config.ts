@@ -74,6 +74,23 @@ export default {
 				sm: 'calc(var(--radius) - 4px)'
 			},
 			keyframes: {
+				progress: {
+					'0%': {
+						width: '10%',
+					},
+					'20%': {
+						width: '30%',
+					},
+					'50%': {
+						width: '60%',
+					},
+					'80%': {
+						width: '85%',
+					},
+					'100%': {
+						width: '95%',
+					},
+				},
 				'accordion-down': {
 					from: {
 						height: '0'
@@ -89,11 +106,28 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				shake: {
+					'0%,100%': { transform: 'translateX(0)' },
+					'15%': { transform: 'translateX(-6px)' },
+					'30%': { transform: 'translateX(5px)' },
+					'45%': { transform: 'translateX(-4px)' },
+					'60%': { transform: 'translateX(3px)' },
+					'75%': { transform: 'translateX(-2px)' }
+				},
+				sheen: {
+					'0%': { transform: 'translateX(-120%) skewX(-10deg)', opacity: '0' },
+					'40%': { opacity: '0.6' },
+					'60%': { opacity: '0.4' },
+					'100%': { transform: 'translateX(220%) skewX(-10deg)', opacity: '0' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				shake: 'shake 0.55s cubic-bezier(.36,.07,.19,.97) both',
+				'sheen': 'sheen 1s ease',
+				'progress': 'progress 2s cubic-bezier(0.25, 0.1, 0.25, 1) forwards'
 			}
 		}
 	},

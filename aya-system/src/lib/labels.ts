@@ -186,7 +186,7 @@ const ar = {
     loginInfoMessage2: 'للحصول على حساب تواصل مع الإدارة',
     changePassword: 'تغيير كلمة المرور',
     backToHome: 'العودة للصفحة الرئيسية',
-    systemName: 'نظام آية',
+    systemName: 'مكتب آية',
     footerCopyright: 'جميع الحقوق محفوظة'
   },
   userManagementLabels: {
@@ -419,7 +419,7 @@ const ar = {
     }
   },
   footerLabels: {
-    systemName: 'نظام آية',
+    systemName: 'مكتب آية',
     poweredBy: 'تم التطوير بواسطة',
     lovePrefix: 'تم التطوير بكل',
     loveSuffix: 'لخدمة كتاب الله',
