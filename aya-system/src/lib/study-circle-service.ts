@@ -1,5 +1,5 @@
 // خدمة قاعدة بيانات Supabase لإدارة الحلقات الدراسية
-import { supabase, supabaseAdmin } from './supabase-client';
+import { supabase } from './supabase-client';
 import { StudyCircle, StudyCircleCreate, StudyCircleUpdate } from '@/types/study-circle';
 
 const STUDY_CIRCLES_TABLE = 'study_circles';
@@ -197,24 +197,8 @@ export const getStudyCircleById = async (id: string): Promise<StudyCircle | null
  */
 export const createStudyCircle = async (circle: StudyCircleCreate): Promise<{ success: boolean, id?: string, message?: string }> => {
   try {
-    const { data, error } = await supabaseAdmin
-      .from(STUDY_CIRCLES_TABLE)
-      .insert([circle])
-      .select();
-    
-    if (error) {
-      console.error('خطأ في إنشاء الحلقة الدراسية:', error);
-      return {
-        success: false,
-        message: `فشل في إنشاء الحلقة الدراسية: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      id: data && data[0] ? data[0].id : undefined,
-      message: 'تم إنشاء الحلقة الدراسية بنجاح'
-    };
+    console.warn('createStudyCircle: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في إنشاء الحلقة الدراسية:', error);
     return {
@@ -253,23 +237,8 @@ export const getTeacherIdForStudyCircle = async (circleId: string): Promise<stri
  */
 export const updateStudyCircle = async (circle: StudyCircleUpdate): Promise<{ success: boolean, message?: string }> => {
   try {
-    const { error } = await supabaseAdmin
-      .from(STUDY_CIRCLES_TABLE)
-      .update(circle)
-      .eq('id', circle.id);
-    
-    if (error) {
-      console.error('خطأ في تحديث الحلقة الدراسية:', error);
-      return {
-        success: false,
-        message: `فشل في تحديث الحلقة الدراسية: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم تحديث الحلقة الدراسية بنجاح'
-    };
+    console.warn('updateStudyCircle: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في تحديث الحلقة الدراسية:', error);
     return {
@@ -284,23 +253,8 @@ export const updateStudyCircle = async (circle: StudyCircleUpdate): Promise<{ su
  */
 export const deleteStudyCircle = async (id: string): Promise<{ success: boolean, message?: string }> => {
   try {
-    const { error } = await supabaseAdmin
-      .from(STUDY_CIRCLES_TABLE)
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    
-    if (error) {
-      console.error('خطأ في حذف الحلقة الدراسية:', error);
-      return {
-        success: false,
-        message: `فشل في حذف الحلقة الدراسية: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم حذف الحلقة الدراسية بنجاح'
-    };
+    console.warn('deleteStudyCircle: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في حذف الحلقة الدراسية:', error);
     return {

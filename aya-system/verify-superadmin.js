@@ -4,8 +4,8 @@ const bcrypt = require('bcryptjs');
 
 // بيانات المستخدم المسؤول الرئيسي
 const SUPER_ADMIN_ID = '550e8400-e29b-41d4-a716-446655440000';
-const SUPER_ADMIN_USERNAME = 'superadmin';
-const SUPER_ADMIN_PASSWORD = 'Ketama@Admin2025';
+const SUPER_ADMIN_USERNAME = '*****';
+const SUPER_ADMIN_PASSWORD = '*****';
 const SUPER_ADMIN_PASSWORD_HASH = '$2a$10$0lnhiRBBZs4o8HsV5fWAR.ZsqR09MK0YO6iqpqFRhLfBGgw7gaJXq';
 
 /**
@@ -41,17 +41,7 @@ async function verifySuperAdminCredentials() {
     const newHash = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 10);
     console.log('   هاش جديد:', newHash);
     
-    // التحقق من الهاش الجديد
-    const isNewHashValid = await bcrypt.compare(SUPER_ADMIN_PASSWORD, newHash);
-    console.log('   صحة الهاش الجديد:', isNewHashValid ? '✅ صحيح' : '❌ غير صحيح');
-    
-    console.log('\n3. خطوات التالية:');
-    console.log('   1. قم بتنفيذ ملف SQL (create-superadmin.sql) في واجهة SQL في Supabase');
-    console.log('   2. بعد تنفيذ الملف، يجب أن تتمكن من تسجيل الدخول باستخدام:');
-    console.log('      • اسم المستخدم: superadmin');
-    console.log('      • كلمة المرور: Ketama@Admin2025');
-    console.log('      • نوع المستخدم: superadmin');
-    
+
   } catch (error) {
     console.error('\n❌ حدث خطأ أثناء التحقق من بيانات المستخدم:', error);
   }

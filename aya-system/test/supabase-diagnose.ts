@@ -139,7 +139,7 @@ async function diagnoseSupabaseConnection() {
     }
     
   console.log('\nتوصيات لحل المشاكل:');
-  console.log('1. تأكد من تكوين متغيرات البيئة VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY (أو VITE_SUPABASE_KEY) بشكل صحيح في ملف .env');
+  console.log('1. تأكد من تكوين متغيرات البيئة VITE_SUPABASE_URL و (أو VITE_SUPABASE_KEY) بشكل صحيح في ملف .env');
     console.log('2. تأكد من إنشاء جدول students في Supabase بالهيكل الصحيح');
     console.log('3. تأكد من تكوين سياسات RLS للسماح بالوصول والكتابة والتعديل');
     console.log('4. تحقق من صلاحيات المستخدم المجهول (anon) للوصول إلى الجدول');

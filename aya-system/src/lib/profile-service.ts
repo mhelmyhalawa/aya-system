@@ -1,7 +1,7 @@
 // خدمة قاعدة بيانات Supabase لإدارة الملفات الشخصية
 // توفر واجهة للتعامل مع جدول profiles
 
-import { supabase, supabaseAdmin, PROFILES_TABLE, setUserJWTToken } from './supabase-client';
+import { supabase, PROFILES_TABLE, setUserJWTToken } from './supabase-client';
 import { 
   createProfileDirectly, 
   updateProfileDirectly, 
@@ -11,7 +11,7 @@ import {
   updateLoginAttemptsDirectly
 } from './direct-supabase-api';
 import * as supabaseREST from './supabase-rest';
-import * as authService from './auth-service';
+import * as authService from './auth-service'; // الآن المصادقة مخصصة فقط بدون supabase.auth
 import type { Profile, ProfileCreate, ProfileUpdate, LoginCredentials } from '@/types/profile';
 import { mapProfileToSupabase, mapSupabaseToProfile, mapSupabaseResultsToProfiles } from './supabase-mapper';
 import { hashPassword, comparePassword } from './auth-utils';
@@ -101,32 +101,8 @@ export const createProfileWithHashedPassword = async (
       login_attempts: 0
     };
     
-    const { data, error } = await supabaseAdmin
-      .from(PROFILES_TABLE)
-      .insert([newProfile])
-      .select();
-    
-    if (error) {
-      console.error('خطأ في إنشاء الملف الشخصي باستخدام كلمة مرور مشفرة:', error);
-      
-      if (error.code === '23505') {
-        return {
-          success: false,
-          message: 'اسم المستخدم موجود بالفعل. يرجى اختيار اسم مستخدم آخر.'
-        };
-      }
-      
-      return {
-        success: false,
-        message: `فشل في إنشاء الملف الشخصي: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      id: data && data[0] ? data[0].id : undefined,
-      message: 'تم إنشاء الملف الشخصي بنجاح'
-    };
+    console.warn('createProfileWithHashedPassword: لم يعد مسموحًا بإنشاء سجل محمي من الواجهة بدون backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في إنشاء الملف الشخصي باستخدام كلمة مرور مشفرة:', error);
     return {
@@ -176,29 +152,8 @@ export const createProfile = async (profile: ProfileCreate): Promise<{ success: 
       };
     }
     
-    // إنشاء المستخدم في نظام المصادقة المدمج في Supabase
-    console.log('محاولة تسجيل المستخدم في نظام المصادقة المدمج...');
-    
-    // نحن بحاجة إلى الـ ID الذي تم إنشاؤه إذا لم يتم توفيره
-    const userId = result.data && result.data[0] ? result.data[0].id : profile.id;
-    
-    if (userId) {
-      // إضافة المستخدم الجديد إلى نظام المصادقة المدمج
-      const authProfileData = {
-        id: userId,
-        username: profile.username,
-        role: profile.role
-      };
-      
-      const registerResult = await authService.registerCustomUserInAuth(authProfileData, profile.password);
-      
-      if (registerResult.success) {
-        console.log('تم تسجيل المستخدم بنجاح في نظام المصادقة المدمج');
-      } else {
-        console.warn('لم يتم تسجيل المستخدم في نظام المصادقة المدمج:', registerResult.error);
-        // نستمر حتى لو فشل التسجيل في نظام المصادقة المدمج لأننا تمكنا من إنشاء الملف الشخصي
-      }
-    }
+    const userId = (result as any).data && (result as any).data[0] ? (result as any).data[0].id : profile.id;
+    // في الوضع المخصص لا حاجة لتسجيل في نظام Auth منفصل
     
     return {
       success: true,
@@ -340,46 +295,13 @@ export const login = async (credentials: LoginCredentials): Promise<{ success: b
       await authService.signOut();
     }
     
-    // أولاً: محاولة تسجيل الدخول مباشرة باستخدام نظام المصادقة المدمج
-    console.log('محاولة تسجيل الدخول باستخدام نظام مصادقة Supabase المدمج...');
-    const directAuthResult = await authService.signInWithUsername(credentials.username, credentials.password);
-    
-    if (directAuthResult.success && directAuthResult.token) {
-      console.log('نجاح تسجيل الدخول باستخدام نظام المصادقة المدمج');
-      
-      // نحن بحاجة للحصول على بيانات المستخدم - استخدام apikey_only لشاشة الدخول
-      const userDataResult = await supabaseREST.findProfileByUsername(credentials.username);
-      
-      if (userDataResult.success && userDataResult.data) {
-        const userData = userDataResult.data;
-        const user = mapSupabaseToProfile(userData);
-        
-        // تخزين الـ token أولاً لاستخدامه في التحديثات
-        setUserJWTToken(directAuthResult.token);
-        
-        // تحديث وقت آخر تسجيل دخول
-        const lastLoginAt = new Date().toISOString();
-        await supabaseREST.updateLoginAttempts(userData.id, 0, lastLoginAt);
-        
-        return {
-          success: true,
-          user,
-          token: directAuthResult.token,
-          message: 'تم تسجيل الدخول بنجاح'
-        };
-      } else {
-        console.log('تم تسجيل الدخول ولكن لم يتم العثور على ملف المستخدم. إنشاء ملف مستخدم جديد...');
-        // يمكن هنا إنشاء ملف مستخدم جديد إذا لزم الأمر
-      }
-    }
-    
-    // إذا فشل تسجيل الدخول المباشر، جرب طريقة التحقق المخصصة
-    console.log('فشل تسجيل الدخول المباشر، محاولة البحث عن المستخدم باستخدام REST API...');
+    // الوضع المخصص: تخطي أي محاولة لـ supabase.auth مباشرة
+    console.log('الوضع المخصص: البحث عن المستخدم في profiles...');
     
     // البحث عن المستخدم باستخدام REST API - استخدام apikey_only لشاشة الدخول
     const result = await supabaseREST.findProfileByUsername(credentials.username);
     
-    if (!result.success || !result.data) {
+  if (!(result as any).success || !(result as any).data) {
       console.error('خطأ في العثور على المستخدم:', result.error);
       return {
         success: false,
@@ -387,7 +309,7 @@ export const login = async (credentials: LoginCredentials): Promise<{ success: b
       };
     }
     
-    const userData = result.data;
+  const userData = (result as any).data;
     
     console.log('تم العثور على المستخدم:', { 
       id: userData.id, 
@@ -396,7 +318,7 @@ export const login = async (credentials: LoginCredentials): Promise<{ success: b
     });
     
     // تسجيل الدخول باستخدام خدمة المصادقة المخصصة للحصول على JWT token
-    const authResult = await authService.signInCustomUser(userData, credentials.password);
+  const authResult = await authService.signInCustomUser(userData, credentials.password);
     
     if (!authResult.success) {
       // زيادة عداد محاولات تسجيل الدخول الفاشلة - استخدام apikey_only لشاشة الدخول
@@ -469,23 +391,8 @@ export const changePassword = async (userId: string, currentPassword: string, ne
     // تشفير كلمة المرور الجديدة وتحديثها
     const password_hash = await hashPassword(newPassword);
     
-    const { error: updateError } = await supabaseAdmin
-      .from(PROFILES_TABLE)
-      .update({ password_hash })
-      .eq('id', userId);
-    
-    if (updateError) {
-      console.error('خطأ في تحديث كلمة المرور:', updateError);
-      return {
-        success: false,
-        message: 'فشل في تحديث كلمة المرور'
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم تحديث كلمة المرور بنجاح'
-    };
+    console.warn('changePassword: تحديث كلمة المرور يتطلب Backend أو RLS مناسب. العملية مرفوضة من الواجهة');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في تغيير كلمة المرور:', error);
     return {
@@ -504,23 +411,8 @@ export const adminChangePassword = async (userId: string, newPassword: string): 
     const password_hash = await hashPassword(newPassword);
     
     // تحديث كلمة المرور
-    const { error: updateError } = await supabaseAdmin
-      .from(PROFILES_TABLE)
-      .update({ password_hash })
-      .eq('id', userId);
-    
-    if (updateError) {
-      console.error('خطأ في تحديث كلمة المرور:', updateError);
-      return {
-        success: false,
-        message: 'فشل في تحديث كلمة المرور'
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم تحديث كلمة المرور بنجاح'
-    };
+    console.warn('adminChangePassword: تغيير كلمة المرور يتطلب Backend. العملية مرفوضة من الواجهة');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في تغيير كلمة المرور:', error);
     return {
@@ -536,31 +428,8 @@ export const adminChangePassword = async (userId: string, newPassword: string): 
 export const deleteProfile = async (id: string): Promise<{ success: boolean, message?: string }> => {
   try {
     // حذف المستخدم من نظام Supabase
-    const { error } = await supabaseAdmin
-      .from(PROFILES_TABLE)
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      console.error('خطأ في حذف الملف الشخصي:', error);
-      return {
-        success: false,
-        message: `فشل في حذف الملف الشخصي: ${error.message}`
-      };
-    }
-    
-    // محاولة حذف المستخدم من نظام المصادقة المدمج إذا وجد
-    try {
-      await authService.deleteUser(id);
-    } catch (authError) {
-      console.warn('لم يتم حذف المستخدم من نظام المصادقة المدمج:', authError);
-      // نستمر حتى لو فشل الحذف من نظام المصادقة لأننا تمكنا من حذف الملف الشخصي
-    }
-    
-    return {
-      success: true,
-      message: 'تم حذف الملف الشخصي بنجاح'
-    };
+    console.warn('deleteProfile: حذف الملف الشخصي يتطلب Backend. العملية مرفوضة من الواجهة');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في حذف الملف الشخصي:', error);
     return {

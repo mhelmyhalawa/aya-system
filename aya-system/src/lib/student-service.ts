@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin, STUDENTS_TABLE } from './supabase-client';
+import { supabase, STUDENTS_TABLE } from './supabase-client';
 import type { Student, StudentCreate, StudentUpdate } from '@/types/student';
 import { mapStudentToSupabase, mapSupabaseToStudent, mapSupabaseResultsToStudents } from './supabase-mapper';
 import { addNewteacherHistory } from './teacher-history-service';
@@ -8,56 +8,10 @@ export const createStudent = async (student: StudentCreate): Promise<{ success: 
   try {
     const formattedStudent = mapStudentToSupabase(student);
     
-    const { data, error } = await supabaseAdmin
-      .from(STUDENTS_TABLE)
-      .insert([formattedStudent])
-      .select()
-      .single();
-    
-    if (error) {
-      console.error('خطأ في إنشاء الطالب:', error);
-      return {
-        success: false,
-        message: `فشل في إنشاء الطالب: ${error.message}`
-      };
-    }
+    console.warn('createStudent: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
 
-    // إضافة سجل المعلم الأول للطالب
-    console.log('Student data:', student);
-    console.log('Formatted student:', formattedStudent);
-    
-    if (student.study_circle_id || formattedStudent.study_circle_id) {
-      const circleId = student.study_circle_id || formattedStudent.study_circle_id;
-      // الحصول على معرف المعلم من الحلقة الدراسية
-      const teacherId = await getTeacherIdForStudyCircle(circleId);
-      
-      if (teacherId) {
-        console.log('Adding teacher history with:', { studentId: data.id, teacherId, circleId });
-        
-        const { success: historySuccess, message: historyMessage } = await addNewteacherHistory(
-          data.id,
-          teacherId,
-          new Date(),
-          circleId  // إضافة معرف الحلقة
-        );
-
-        if (!historySuccess) {
-          console.error('خطأ في إضافة سجل المعلم:', historyMessage);
-        } else {
-          console.log('تم إضافة سجل المعلم بنجاح');
-        }
-      } else {
-        console.log('لم يتم العثور على معلم للحلقة المحددة');
-      }
-    } else {
-      console.log('لا توجد حلقة دراسية محددة للطالب');
-    }
-    
-    return {
-      success: true,
-      id: data.id,
-      message: 'تم إنشاء الطالب بنجاح'
-    };
+    // لم تعد العملية مدعومة بدون Backend
   } catch (error) {
     console.error('خطأ في إنشاء الطالب:', error);
     return {
@@ -80,18 +34,8 @@ export const updateStudent = async (id: string, student: StudentUpdate): Promise
 
     console.log('بيانات الطالب الحالية:', currentStudent);
 
-    const { error } = await supabaseAdmin
-      .from(STUDENTS_TABLE)
-      .update(student)
-      .eq('id', id);
-    
-    if (error) {
-      console.error('خطأ في تحديث الطالب:', error);
-      return {
-        success: false,
-        message: `فشل في تحديث الطالب: ${error.message}`
-      };
-    }
+    console.warn('updateStudent: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
 
     // إذا تم تغيير الحلقة الدراسية، نضيف سجل جديد للمعلم
     const newCircleId = student.study_circle_id;
@@ -154,18 +98,8 @@ export const updateStudentWithHistory = async (id: string, student: StudentUpdat
     console.log('بيانات الطالب الحالية:', currentStudent);
 
     // تحديث بيانات الطالب
-    const { error } = await supabaseAdmin
-      .from(STUDENTS_TABLE)
-      .update(student)
-      .eq('id', id);
-    
-    if (error) {
-      console.error('خطأ في تحديث الطالب:', error);
-      return {
-        success: false,
-        message: `فشل في تحديث الطالب: ${error.message}`
-      };
-    }
+    console.warn('updateStudentWithHistory: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
 
     // إذا تم تغيير الحلقة الدراسية، نضيف سجل جديد للمعلم
     const newCircleId = student.study_circle_id;

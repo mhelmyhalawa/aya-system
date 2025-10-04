@@ -4,10 +4,10 @@ import dotenv from 'dotenv';
 // تحميل المتغيرات البيئية
 dotenv.config();
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_KEY;
+const supabaseKey = process.env.VITE_SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.warn('⚠️ مفقود متغيرات البيئة. تأكد من ضبط VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY (أو VITE_SUPABASE_KEY).');
+  console.warn('⚠️ مفقود متغيرات البيئة. تأكد من ضبط VITE_SUPABASE_URL و VITE_SUPABASE_KEY.');
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);

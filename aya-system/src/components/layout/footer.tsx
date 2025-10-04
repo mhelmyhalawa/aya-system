@@ -1,5 +1,6 @@
 import { Heart } from "lucide-react";
 import { getLabels } from "@/lib/labels";
+import { BUILD_VERSION } from "@/lib/version";
 
 export function Footer() {
   const { footerLabels } = getLabels('ar');
@@ -15,7 +16,7 @@ export function Footer() {
           {footerLabels.loveSuffix}
         </span>
         <span className="hidden sm:inline text-green-400">•</span>
-        <span className="text-green-600 dark:text-green-300">{footerLabels.version} 1.0.0</span>
+        <span className="text-green-600 dark:text-green-300">{footerLabels.version} {BUILD_VERSION}</span>
         <span className="hidden sm:inline text-green-400">•</span>
         <span className="text-green-500 dark:text-green-400">{footerLabels.rightsReserved} © {year}</span>
       </div>

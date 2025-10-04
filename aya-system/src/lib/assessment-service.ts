@@ -1,4 +1,4 @@
-import { supabase, supabaseAdmin } from './supabase-client';
+import { supabase } from './supabase-client';
 import type { Assessment, AssessmentCreate, AssessmentUpdate } from '@/types/assessment';
 
 const ASSESSMENTS_TABLE = 'assessments';
@@ -149,19 +149,8 @@ export const assessmentService = {
         ) / 3; // متوسط الدرجات
       }
 
-      const { data, error } = await supabaseAdmin
-        .from(ASSESSMENTS_TABLE)
-        .insert([assessment])
-        .select(`
-          *,
-          student:student_id (id, full_name),
-          recorder:recorded_by (id, full_name)
-        `)
-        .single();
-
-      if (error) throw error;
-
-      return data;
+      console.warn('createAssessment: عملية غير مسموحة من الواجهة بدون Backend');
+      throw new Error('عملية غير مسموحة من الواجهة');
     } catch (error) {
       console.error('خطأ في إنشاء تقييم جديد:', error);
       throw error;
@@ -189,20 +178,8 @@ export const assessmentService = {
         ) / 3; // متوسط الدرجات
       }
 
-      const { data, error } = await supabaseAdmin
-        .from(ASSESSMENTS_TABLE)
-        .update(updateData)
-        .eq('id', id)
-        .select(`
-          *,
-          student:student_id (id, full_name),
-          recorder:recorded_by (id, full_name)
-        `)
-        .single();
-
-      if (error) throw error;
-
-      return data;
+      console.warn('updateAssessment: عملية غير مسموحة من الواجهة بدون Backend');
+      throw new Error('عملية غير مسموحة من الواجهة');
     } catch (error) {
       console.error('خطأ في تحديث التقييم:', error);
       throw error;
@@ -214,12 +191,8 @@ export const assessmentService = {
    */
   deleteAssessment: async (id: number): Promise<void> => {
     try {
-      const { error } = await supabaseAdmin
-        .from(ASSESSMENTS_TABLE)
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      console.warn('deleteAssessment: عملية غير مسموحة من الواجهة بدون Backend');
+      throw new Error('عملية غير مسموحة من الواجهة');
     } catch (error) {
       console.error('خطأ في حذف التقييم:', error);
       throw error;

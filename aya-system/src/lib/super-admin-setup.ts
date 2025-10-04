@@ -9,7 +9,7 @@ import { hashPassword } from './auth-utils';
 const SUPER_ADMIN_ID = '550e8400-e29b-41d4-a716-446655440000';  // معرف ثابت لضمان نفس المستخدم دائمًا
 const SUPER_ADMIN_USERNAME = 'superadmin';
 // كلمة المرور المشفرة مباشرة (تم تشفيرها مسبقًا باستخدام bcrypt)
-const SUPER_ADMIN_PASSWORD_HASH = '$2a$10$0lnhiRBBZs4o8HsV5fWAR.ZsqR09MK0YO6iqpqFRhLfBGgw7gaJXq';  // هذه كلمة المرور المشفرة لـ Ketama@Admin2025
+const SUPER_ADMIN_PASSWORD_HASH = '$2a$10$0lnhiRBBZs4o8HsV5fWAR.ZsqR09MK0YO6iqpqFRhLfBGgw7gaJXq';  
 const SUPER_ADMIN_NAME = 'المسؤول الرئيسي';
 
 /**

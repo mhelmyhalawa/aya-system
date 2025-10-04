@@ -1,16 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
-import { SUPABASE_URL, ANON_KEY, SERVICE_KEY } from './supabase-keys';
+import { SUPABASE_URL, SUPABASE_KEY } from './supabase-keys';
 
-// تعريف المتغيرات بناء على الاسماء التي يتوقعها بقية الكود
-export const SUPABASE_KEY = ANON_KEY;
-export const SUPABASE_SERVICE_KEY = SERVICE_KEY;
+// سجلات تصحيح
+console.log('supabase-client: URL:', SUPABASE_URL);
+console.log('supabase-client: KEY (first 12):', SUPABASE_KEY ? SUPABASE_KEY.substring(0, 12) + '...' : 'NONE');
 
-// إضافة سجلات للتأكد من تحميل المفاتيح بشكل صحيح (لأغراض التصحيح)
-console.log('SUPABASE_URL:', SUPABASE_URL);
-console.log('SUPABASE_KEY (أول 15 حرف):', SUPABASE_KEY ? SUPABASE_KEY.substring(0, 15) + '...' : 'غير موجود');
-console.log('SUPABASE_SERVICE_KEY (أول 15 حرف):', SUPABASE_SERVICE_KEY ? SUPABASE_SERVICE_KEY.substring(0, 15) + '...' : 'غير موجود');
-
-// إنشاء عميل Supabase العادي (للقراءة)
+// عميل واحد فقط بالمفتاح العام (لا نستخدم service_role أبداً في الواجهة)
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     persistSession: true,
@@ -19,24 +14,6 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     detectSessionInUrl: true
   }
 });
-
-// إنشاء عميل Supabase مع مفتاح الخدمة (للكتابة مع تجاوز RLS)
-export const supabaseAdmin = createClient(
-  SUPABASE_URL, 
-  SUPABASE_SERVICE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    },
-    global: {
-      headers: {
-        'apikey': SUPABASE_SERVICE_KEY,
-        'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`
-      }
-    }
-  }
-);
 
 // أسماء الجداول
 export const PROFILES_TABLE = 'profiles';
@@ -105,7 +82,7 @@ export const clearUserJWTToken = () => {
  * إنشاء عميل Supabase باستخدام JWT token للمستخدم
  */
 export const createSupabaseClientWithToken = (token: string) => {
-  console.log('إنشاء عميل Supabase مع JWT token:', token.substring(0, 15) + '...');
+  console.log('إنشاء عميل Supabase (session override):', token.substring(0, 15) + '...');
   return createClient(SUPABASE_URL, SUPABASE_KEY, {
     global: {
       headers: {

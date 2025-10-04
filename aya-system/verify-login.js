@@ -6,9 +6,9 @@ const bcrypt = require('bcryptjs');
  */
 async function verifyLogin() {
   // بيانات الاعتماد
-  const username = 'superadmin';
-  const password = 'Ketama@Admin2025';
-  const storedHash = '$2a$10$0lnhiRBBZs4o8HsV5fWAR.ZsqR09MK0YO6iqpqFRhLfBGgw7gaJXq';
+  const username = 'admin';
+  const password = '*****';
+  const storedHash = '************************'; // استبدلها بالهاش الحقيقي
   
   try {
     console.log('===== التحقق من بيانات تسجيل الدخول =====');

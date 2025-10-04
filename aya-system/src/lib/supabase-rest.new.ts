@@ -5,7 +5,7 @@ import { getUserJWTToken } from './supabase-client';
 
 // الحصول على مفاتيح Supabase من ملف البيئة
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_KEY || '';
+const ANON_KEY = import.meta.env.VITE_SUPABASE_KEY || '';
 const SERVICE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
 
 // طباعة المفاتيح للتصحيح

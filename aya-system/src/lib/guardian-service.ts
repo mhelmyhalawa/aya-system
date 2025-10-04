@@ -1,7 +1,7 @@
 // خدمة قاعدة بيانات Supabase لإدارة أولياء الأمور
 // توفر واجهة للتعامل مع جدول guardians
 
-import { supabase, supabaseAdmin, GUARDIANS_TABLE } from './supabase-client';
+import { supabase, GUARDIANS_TABLE } from './supabase-client';
 import type { Guardian, GuardianCreate, GuardianUpdate } from '@/types/guardian';
 import { mapGuardianToSupabase, mapSupabaseToGuardian, mapSupabaseResultsToGuardians } from './supabase-mapper';
 
@@ -93,42 +93,8 @@ export const addGuardian = async (guardian: GuardianCreate): Promise<{ success: 
     // Make sure we're using the correct table name
     console.log('Using table:', GUARDIANS_TABLE);
     
-    const { data, error } = await supabaseAdmin
-      .from(GUARDIANS_TABLE)
-      .insert([formattedGuardian])
-      .select();
-    
-    if (error) {
-      console.error('خطأ في إضافة ولي الأمر:', error);
-      return {
-        success: false,
-        message: `فشل في إضافة ولي الأمر: ${error.message}`
-      };
-    }
-    
-    console.log('Guardian added successfully, response data:', data);
-    
-    // Double check that the guardian was actually created
-    setTimeout(() => {
-      // Non-blocking verification
-      supabase
-        .from(GUARDIANS_TABLE)
-        .select('*')
-        .eq('id', guardianId)
-        .then(({ data, error }) => {
-          if (error) {
-            console.error('Verification error:', error);
-          } else {
-            console.log('Verification check found guardian:', data);
-          }
-        });
-    }, 500);
-    
-    return {
-      success: true,
-      id: guardianId,
-      message: 'تم إضافة ولي الأمر بنجاح'
-    };
+    console.warn('addGuardian: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في إضافة ولي الأمر:', error);
     return {
@@ -150,23 +116,8 @@ export const updateGuardian = async (guardian: GuardianUpdate): Promise<{ succes
       };
     }
     
-    const { error } = await supabaseAdmin
-      .from(GUARDIANS_TABLE)
-      .update(guardian)
-      .eq('id', guardian.id);
-    
-    if (error) {
-      console.error('خطأ في تحديث بيانات ولي الأمر:', error);
-      return {
-        success: false,
-        message: `فشل في تحديث بيانات ولي الأمر: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم تحديث بيانات ولي الأمر بنجاح'
-    };
+    console.warn('updateGuardian: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في تحديث بيانات ولي الأمر:', error);
     return {
@@ -207,23 +158,8 @@ export const searchGuardians = async (searchTerm: string): Promise<Guardian[]> =
  */
 export const deleteGuardian = async (id: string): Promise<{ success: boolean, message?: string }> => {
   try {
-    const { error } = await supabaseAdmin
-      .from(GUARDIANS_TABLE)
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      console.error('خطأ في حذف ولي الأمر:', error);
-      return {
-        success: false,
-        message: `فشل في حذف ولي الأمر: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم حذف ولي الأمر بنجاح'
-    };
+    console.warn('deleteGuardian: عملية غير مسموحة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في حذف ولي الأمر:', error);
     return {

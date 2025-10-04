@@ -1,7 +1,7 @@
 // خدمة قاعدة بيانات Supabase لإدارة الطلاب
 // توفر واجهة للتعامل مع جدول students
 
-import { supabase, supabaseAdmin, STUDENTS_TABLE } from './supabase-client';
+import { supabase, STUDENTS_TABLE } from './supabase-client';
 import type { Student, StudentCreate, StudentUpdate } from '@/types/student';
 import { mapStudentToSupabase, mapSupabaseToStudent, mapSupabaseResultsToStudents } from './supabase-mapper';
 
@@ -146,23 +146,8 @@ export const updateStudent = async (student: StudentUpdate): Promise<{ success: 
     
     console.log('تحديث بيانات الطالب في Supabase:', updatedStudent);
     
-    const { error } = await supabaseAdmin
-      .from(STUDENTS_TABLE)
-      .update(updatedStudent)
-      .eq('id', student.id);
-    
-    if (error) {
-      console.error('خطأ في تحديث بيانات الطالب في Supabase:', error);
-      return {
-        success: false,
-        message: `فشل في تحديث بيانات الطالب: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم تحديث بيانات الطالب بنجاح'
-    };
+    console.warn('updateStudent: عملية محظورة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في تحديث بيانات الطالب:', error);
     return {
@@ -177,23 +162,8 @@ export const updateStudent = async (student: StudentUpdate): Promise<{ success: 
  */
 export const deleteStudent = async (id: string): Promise<{ success: boolean, message?: string }> => {
   try {
-    const { error } = await supabaseAdmin
-      .from(STUDENTS_TABLE)
-      .delete()
-      .eq('id', id);
-    
-    if (error) {
-      console.error('خطأ في حذف الطالب من Supabase:', error);
-      return {
-        success: false,
-        message: `فشل في حذف الطالب: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      message: 'تم حذف الطالب بنجاح'
-    };
+    console.warn('deleteStudent: عملية محظورة من الواجهة بدون Backend');
+    return { success: false, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في حذف الطالب:', error);
     return {
@@ -556,24 +526,8 @@ export const importDataToSupabase = async (students: StudentCreate[]): Promise<{
     );
     
     // استيراد البيانات إلى Supabase
-    const { data, error } = await supabaseAdmin
-      .from(STUDENTS_TABLE)
-      .insert(formattedStudents);
-    
-    if (error) {
-      console.error('خطأ في استيراد البيانات إلى Supabase:', error);
-      return {
-        success: false,
-        count: 0,
-        message: `فشل في استيراد البيانات: ${error.message}`
-      };
-    }
-    
-    return {
-      success: true,
-      count: formattedStudents.length,
-      message: `تم استيراد ${formattedStudents.length} طالب بنجاح`
-    };
+    console.warn('importDataToSupabase: عملية محظورة من الواجهة بدون Backend');
+    return { success: false, count: 0, message: 'عملية غير مسموحة من الواجهة' };
   } catch (error) {
     console.error('خطأ في استيراد البيانات:', error);
     return {

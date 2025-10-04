@@ -32,7 +32,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-    base: env.VITE_PUBLIC_URL || '/', // استخدم قيمة VITE_PUBLIC_URL من env
+    base: '/aya-system/', // ثابت لنشر gh-pages
     server: {
       host: "::",
       port: 8080,

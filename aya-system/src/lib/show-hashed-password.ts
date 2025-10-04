@@ -25,4 +25,4 @@ export const showHashedPassword = async (plainPassword: string): Promise<string 
 
 // تشغيل الدالة لعرض كلمة المرور المشفرة للمسؤول الرئيسي
 // قم بإزالة هذا السطر بعد الحصول على كلمة المرور المشفرة
-showHashedPassword('Ketama@Admin2025');
+showHashedPassword('**********');
