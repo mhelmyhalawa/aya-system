@@ -5,20 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-    Smartphone, Users, BookOpen, Award, Volume2, Calendar, ClipboardCheck,
-    Info, AlertCircle, CheckCircle, XCircle, Clock, School, UserCircle, Edit, Star, History,
-    Phone, Search, Check, X
+    Smartphone, Users, BookOpen,
+    AlertCircle, School, UserCircle, Edit, Star, History,
+    Search, Check, X, ChevronDown, ChevronUp
 } from "lucide-react";
 import { supabase } from "@/lib/supabase-client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { studentsLabels, studyCirclesLabels } from "@/lib/arabic-labels";
 import { getStudentsByGuardianId } from "@/lib/supabase-service";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-
-
+import { cn } from "@/lib/utils";
 import { GenericTable } from "@/components/ui/generic-table";
-import { Footer } from "@/components/layout/footer";
-
 
 interface Grade {
     id: string;
@@ -77,9 +74,15 @@ interface TeacherHistory {
 }
 
 export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
+    
     const [phoneNumber, setPhoneNumber] = useState('');
     const [students, setStudents] = useState<Student[]>([]);
     const [guardian, setGuardian] = useState<Guardian | null>(null);
+    const [personalInfoCollapsed, setPersonalInfoCollapsed] = useState(true); // حالة طي المعلومات الشخصية، مطوية افتراضيًا
+    const [attendanceCollapsed, setAttendanceCollapsed] = useState(true); // حالة طي سجل الحضور
+    const [gradesCollapsed, setGradesCollapsed] = useState(true); // حالة طي سجل الحفظ والتقييم
+    const [notesCollapsed, setNotesCollapsed] = useState(true); // حالة طي ملاحظات المعلم
+    const [teacherHistoryCollapsed, setTeacherHistoryCollapsed] = useState(true); // حالة طي سجل المعلمين
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -89,6 +92,8 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
     const [teacherHistory, setTeacherHistory] = useState<TeacherHistory[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [guardianExpanded, setGuardianExpanded] = useState(false);
+    
+    // تم إزالة مفتاح إعادة التحميل، غير ضروري
     const PERSIST_KEY = 'guardianExpandedPref';
 
     // Load persisted preference (with desktop default override if no pref stored)
@@ -126,7 +131,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
         window.addEventListener('keydown', handleKey);
         return () => window.removeEventListener('keydown', handleKey);
     }, [handleKey]);
-    
+
     // تم إزالة مؤقت العد التنازلي للتحميل لصالح عرض مؤشر تحميل بسيط
 
     // بيانات تجريبية للاختبار
@@ -363,20 +368,20 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
             setTriggerShake(true);
             return;
         }
-        
+
         // تفعيل حالة التحميل
         setLoading(true);
         setError(null);
         setTriggerShake(false);
         setJustSearched(false);
-        
+
         try {
             // تنفيذ البحث وانتظار النتيجة
             const studentsData = await fetchStudentsByGuardianPhone(phoneNumber);
-            
+
             // تحديث البيانات بعد استلامها مباشرة
             setStudents(studentsData);
-            
+
             if (studentsData.length === 0) {
                 setError('لم يتم العثور على بيانات حقيقية');
             } else {
@@ -458,7 +463,9 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                 console.error('خطأ في استرجاع سجل المعلمين:', error);
                 return [];
             }
-
+            
+            if (!data) return [];
+            
             return data.map((record: any) => ({
                 id: record.id,
                 teacherName: record.profiles?.full_name || 'غير معروف',
@@ -471,12 +478,17 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
         }
     };
 
-    // فتح نافذة تفاصيل الطالب
-    const handleStudentClick = async (student: Student) => {
+    // فتح نافذة تفاصيل الطالب (مباشر + تسجيل واضح)
+    const handleStudentClick = (student: Student) => {
+        console.log('%c[handleStudentClick]','color:green', student.id, student.fullName);
         setSelectedStudent(student);
-        const history = await fetchTeacherHistory(student.id);
-        setTeacherHistory(history);
         setDialogOpen(true);
+        fetchTeacherHistory(student.id)
+            .then(history => {
+                setTeacherHistory(history);
+                console.log('[TeacherHistory] count =', history.length);
+            })
+            .catch(err => console.error('خطأ في جلب سجل المعلمين:', err));
     };
 
     const getNoteTypeColor = (type: string) => {
@@ -518,7 +530,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
     return (
         // استخدم div بدلاً من main لتجنب التداخل مع الـ main في App.tsx
         <div className="flex flex-col h-full min-h-[calc(100vh-64px-160px)] bg-gradient-to-br from-background via-islamic-light to-muted/40 px-1 py-1 md:py-2">
-                <div className="mx-auto w-full max-w-3xl space-y-1 md:space-y-2">
+            <div className="mx-auto w-full max-w-3xl space-y-1 md:space-y-2">
                 {/* Hero */}
                 <header className="text-center space-y-2 md:space-y-3 animate-in fade-in slide-in-from-top-4 duration-500 my-1 md:my-3">
                     <div className="mx-auto h-14 w-14 md:h-20 md:w-20 grid place-items-center rounded-2xl bg-gradient-to-tr from-islamic-green via-islamic-green/80 to-accent shadow-lg ring-4 ring-islamic-green/10">
@@ -563,9 +575,9 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                         <div className="flex rounded-xl overflow-hidden border border-islamic-green/30 shadow-sm">
                                             {/* أيقونة الهاتف (يمين) */}
                                             <div className="flex items-center justify-center px-2 sm:px-3.5 bg-slate-50 border-r border-islamic-green/20">
-                                                <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-islamic-green/70 group-focus-within:text-islamic-green transition-colors" aria-hidden="true" />
+                                                <Smartphone className="h-4 w-4 sm:h-5 sm:w-5 text-islamic-green/70 group-focus-within:text-islamic-green transition-colors" aria-hidden="true" />
                                             </div>
-                                            
+
                                             {/* حقل الإدخال */}
                                             <Input
                                                 id="phone"
@@ -582,7 +594,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                                 autoComplete="tel"
                                                 style={{ fontSize: phoneNumber.length > 10 ? '0.875rem' : '' }}
                                             />
-                                            
+
                                             {/* زر البحث (يسار) */}
                                             <button
                                                 type="button"
@@ -608,7 +620,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                                 )}
                                             </button>
                                         </div>
-                                        
+
                                         {/* زر مسح داخل حقل الإدخال (على اليسار) */}
                                         {phoneNumber && !loading && (
                                             <button
@@ -645,8 +657,13 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                         {/* تم حذف كارد ولي الأمر حسب طلب المستخدم */}
 
                         {students.length > 0 ? (
-                            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 
-                            xl:grid-cols-2 max-w-screen-2xl mx-auto">
+                            <div
+                                className={cn(
+                                    students.length === 1
+                                        ? 'flex justify-center max-w-screen-2xl mx-auto'
+                                        : 'grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-2 max-w-screen-2xl mx-auto'
+                                )}
+                            >
                                 {students.map((student) => {
                                     const gradeTrend = (student.grades || [])
                                         .slice() // copy
@@ -656,9 +673,13 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                     return (
                                         <Card
                                             key={student.id}
-                                            className="group relative overflow-hidden rounded-3xl border border-islamic-green/15 bg-white/90 dark:bg-white/5 shadow-md ring-1 ring-transparent hover:shadow-xl hover:ring-islamic-green/30 transition-all w-full"
+                                            className={cn(
+                                                'group relative overflow-hidden rounded-3xl border border-islamic-green/15 bg-white/90 dark:bg-white/5 shadow-md ring-1 ring-transparent hover:shadow-xl hover:ring-islamic-green/30 transition-all w-full',
+                                                students.length === 1 && 'max-w-md'
+                                            )}
                                         >
-                                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-islamic-green/5 via-transparent to-accent/10" />
+                                            <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-islamic-green/5 via-transparent to-accent/10" />
+                                            
                                             <CardHeader className="relative pb-3 bg-gradient-to-r from-islamic-green/5 to-accent/5">
                                                 <CardTitle className="text-base md:text-lg font-bold text-islamic-green flex items-start justify-between gap-2">
                                                     <div className="flex flex-col gap-1 max-w-[72%]">
@@ -773,12 +794,13 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                             </CardContent>
                                             <CardFooter className="pt-0">
                                                 <Button
+                                                    type="button"
                                                     variant="outline"
                                                     size="sm"
-                                                    className="w-full rounded-xl border-islamic-green text-islamic-green hover:bg-islamic-green/10 font-medium text-[12px] tracking-wide"
-                                                    onClick={(e) => { 
-                                                        e.stopPropagation(); // منع انتشار الحدث للعناصر الأب
-                                                        console.log('تم النقر على عرض التفاصيل:', student.id);
+                                                    className="w-full rounded-xl border-islamic-green text-islamic-green hover:bg-islamic-green/10 font-medium text-[12px] tracking-wide focus-visible:ring-2 focus-visible:ring-islamic-green/50"
+                                                    data-btn="student-details"
+                                                    onClick={(e) => {
+                                                        console.log('%c[Button onClick fired]','color:purple', 'studentId=', student.id);
                                                         handleStudentClick(student);
                                                     }}
                                                 >
@@ -796,44 +818,60 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                 )}
 
                 {/* Student Details Dialog */}
-                <Dialog 
+                <Dialog
                     open={dialogOpen}
                     onOpenChange={(open) => {
-                        console.log('تغيير حالة النافذة:', open);
                         setDialogOpen(open);
                         if (!open) setSelectedStudent(null);
                     }}
                 >
                     <DialogContent
                         dir="rtl"
-                        className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-xl p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100 text-sm"
+                        className="w-[94vw] max-w-[320px] max-h-[90vh] sm:max-w-3xl overflow-y-auto rounded-xl p-2 sm:p-3 shadow-lg bg-gradient-to-r from-blue-50 to-green-50 border border-gray-100 text-xs sm:text-sm"
                     >
                         {selectedStudent && (
                             <>
                                 <div className="space-y-4 mt-2">
                                     <div></div>
                                     {/* Personal Information */}
-                                    <div className="bg-gradient-to-b from-green-900 via-green-500 to-green-200 dark:from-green-900 dark:via-green-800 dark:to-green-600 rounded-2xl p-4 shadow-md border border-green-200 dark:border-green-700">
-                                        <h3 className="flex items-center gap-2 text-sm font-semibold text-white dark:text-white mb-4 border-b border-green-200 dark:border-green-700 pb-2">
-                                            🧾 المعلومات الشخصية :
-                                            <UserCircle className="h-5 w-5" />
-                                            <span className="text-yellow-300">{selectedStudent.fullName}</span>
+                                    <div className="bg-gradient-to-b from-green-900 via-green-500 to-green-200 dark:from-green-900 dark:via-green-800 dark:to-green-600 rounded-xl p-2 sm:p-4 shadow-md border border-green-200 dark:border-green-700">
+                                        <h3 className="flex flex-wrap items-center justify-between gap-1 sm:gap-2 text-xs sm:text-sm font-semibold text-white dark:text-white mb-2 sm:mb-4 border-b border-green-200 dark:border-green-700 pb-1 sm:pb-2">
+                                            <div className="flex items-center gap-1 sm:gap-2">
+                                                🧾 المعلومات الشخصية :
+                                                <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                                                <span className="text-yellow-300 text-xs sm:text-sm truncate">{selectedStudent.fullName}</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setPersonalInfoCollapsed(!personalInfoCollapsed);
+                                                }}
+                                                className={cn(
+                                                    'h-7 w-7 inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/10 text-white hover:bg-white/20 transition-all shadow-sm transform',
+                                                    !personalInfoCollapsed && 'rotate-180'
+                                                )}
+                                                aria-label={personalInfoCollapsed ? "عرض المعلومات الشخصية" : "إخفاء المعلومات الشخصية"}
+                                                title={personalInfoCollapsed ? "عرض المعلومات الشخصية" : "إخفاء المعلومات الشخصية"}
+                                            >
+                                                <ChevronDown className="h-4 w-4 transition-transform" />
+                                            </button>
                                         </h3>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 ${personalInfoCollapsed ? 'hidden' : ''}`}>
 
                                             {/* الصف الدراسي */}
-                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-3 border border-green-200 dark:border-green-700">
-                                                <Label className="text-xs text-gray-500 dark:text-gray-300">الصف الدراسي</Label>
-                                                <p className="font-medium text-gray-800 dark:text-green-200 mt-1">
+                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-2 border border-green-200 dark:border-green-700">
+                                                <Label className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300">الصف الدراسي</Label>
+                                                <p className="font-medium text-[11px] sm:text-sm text-gray-800 dark:text-green-200 mt-0.5 sm:mt-1 truncate">
                                                     {getGradeArabicName(selectedStudent.grade)}
                                                 </p>
                                             </div>
 
                                             {/* الحلقة */}
-                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-3 border border-green-200 dark:border-green-700">
-                                                <Label className="text-xs text-gray-500 dark:text-gray-300">الحلقة</Label>
-                                                <p className="font-medium text-gray-800 dark:text-green-200 mt-1">
+                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-2 border border-green-200 dark:border-green-700">
+                                                <Label className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300">الحلقة</Label>
+                                                <p className="font-medium text-[11px] sm:text-sm text-gray-800 dark:text-green-200 mt-0.5 sm:mt-1 truncate">
                                                     {getCircleName(selectedStudent.circleName)}
                                                 </p>
                                             </div>
@@ -853,12 +891,33 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
 
                                     {/* Attendance */}
                                     <div>
-                                        <h3 className="text-sm font-medium text-green-700 mb-2 border-b border-green-200 pb-1">
-                                            📅 سجل الحضور (آخر 5 جلسات)
-                                        </h3>
                                         <GenericTable
-                                            data={selectedStudent.attendance.slice(0, 5)}
+                                            title={<h3 className="flex flex-wrap items-center gap-1 sm:gap-2 
+                                                                            text-xs sm:text-sm font-semibold text-white dark:text-purple-500 
+                                                                            mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
+                                                📅 سجل الحضور
+                                            </h3>}
+                                            defaultView="table"
+                                            enablePagination
+                                            defaultPageSize={5}
+                                            pageSizeOptions={[5, 10, 15, 20]}
+                                            data={selectedStudent.attendance}
+                                            hideSortToggle={false}
+                                            isCollapsed={attendanceCollapsed}
+                                            collapsible={true}
+                                            onCollapseChange={(collapsed) => setAttendanceCollapsed(collapsed)}
+                                            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+                                            getRowClassName={(_, index) =>
+                                                `${index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} transition-colors`
+                                            }
                                             columns={[
+                                                {
+                                                    key: 'row_index',
+                                                    header: '🔢',
+                                                    width: '40px',
+                                                    align: 'center',
+                                                    render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+                                                },
                                                 {
                                                     key: 'recordedBy',
                                                     header: '👤 المسجل',
@@ -901,22 +960,40 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                                 }
                                             ]}
                                             emptyMessage="لا توجد سجلات حضور"
-                                            className="overflow-hidden rounded-lg text-xs"
-                                            getRowClassName={(_, index) =>
-                                                `${index % 2 === 0 ? "bg-white" : "bg-green-50/70"} hover:bg-green-100/60`
-                                            }
                                         />
                                     </div>
 
                                     {/* Grades/Assessments */}
                                     <div>
-                                        <h3 className="text-sm font-medium text-green-700 mb-2 border-b border-green-200 pb-1">
-                                            📖 الحفظ والتقييم (آخر 5 تسجيلات)
-                                        </h3>
                                         {selectedStudent.grades && selectedStudent.grades.length > 0 ? (
                                             <GenericTable
-                                                data={selectedStudent.grades.slice(0, 5)}
+                                                title={<h3 className="flex flex-wrap items-center gap-1 sm:gap-2 
+                                                                                text-xs sm:text-sm font-semibold text-white 
+                                                                                dark:text-white 
+                                                                                mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
+                                                    📖 سجل الحفظ والتقييم
+                                                </h3>}
+                                                defaultView="table"
+                                                enablePagination
+                                                defaultPageSize={5}
+                                                pageSizeOptions={[5, 10, 15, 20]}
+                                                data={selectedStudent.grades}
+                                                hideSortToggle={false}
+                                                isCollapsed={gradesCollapsed}
+                                                collapsible={true}
+                                                onCollapseChange={(collapsed) => setGradesCollapsed(collapsed)}
+                                                className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+                                                getRowClassName={(_, index) =>
+                                                    `${index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} transition-colors`
+                                                }
                                                 columns={[
+                                                    {
+                                                        key: 'row_index',
+                                                        header: '🔢',
+                                                        width: '40px',
+                                                        align: 'center',
+                                                        render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+                                                    },
                                                     { key: 'date', header: '📅 التاريخ', align: 'center', render: (grade) => formatDate(grade.date) },
                                                     { key: 'recordedBy', header: '👤 المقيم', align: 'right', render: (grade) => <span className="font-medium text-gray-700 text-xs">{grade.recordedBy || <span className="text-gray-400">غير معروف</span>}</span> },
                                                     { key: 'memorization', header: '📝 الحفظ', align: 'center', render: (grade) => <span className="text-xs">{grade.memorization}%</span> },
@@ -930,10 +1007,6 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                                     }
                                                 ]}
                                                 emptyMessage="لا توجد تقييمات مسجلة"
-                                                className="overflow-hidden rounded-lg text-xs"
-                                                getRowClassName={(_, index) =>
-                                                    `${index % 2 === 0 ? "bg-white" : "bg-blue-50/70"} hover:bg-blue-100/60`
-                                                }
                                             />
                                         ) : (
                                             <div className="text-center py-2 bg-white rounded-lg shadow-sm border border-blue-100 text-xs">
@@ -944,53 +1017,97 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
 
                                     {/* Notes */}
                                     <div>
-                                        <h3 className="text-sm font-medium text-green-700 mb-2 border-b border-green-200 pb-1">
-                                            📝 ملاحظات المعلم
-                                        </h3>
-                                        <div className="space-y-1">
-                                            {selectedStudent.notes.map(note => (
-                                                <div key={note.id} className="bg-white rounded-lg shadow-sm p-2 border border-green-200 text-xs">
-                                                    <div className="flex justify-between items-start">
-                                                        <Badge className={getNoteTypeColor(note.type)}>{note.type}</Badge>
-                                                        <span className="text-xs text-gray-500">{formatDate(note.date)}</span>
-                                                    </div>
-                                                    <p className="mt-1">{note.note}</p>
-                                                </div>
-                                            ))}
-                                            {selectedStudent.notes.length === 0 && (
-                                                <div className="text-center text-gray-400 py-2 text-xs">
-                                                    لا توجد ملاحظات مسجلة
-                                                </div>
-                                            )}
-                                        </div>
+                                        <GenericTable
+                                            title={<h3 className="flex flex-wrap items-center gap-1 sm:gap-2 
+                                                                            text-xs sm:text-sm font-semibold text-white dark:text-purple-500 
+                                                                            mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
+                                                📝 ملاحظات المعلم
+                                            </h3>}
+                                            defaultView="table"
+                                            enablePagination
+                                            defaultPageSize={5}
+                                            pageSizeOptions={[5, 10, 15, 20]}
+                                            data={selectedStudent.notes}
+                                            hideSortToggle={false}
+                                            isCollapsed={notesCollapsed}
+                                            collapsible={true}
+                                            onCollapseChange={(collapsed) => setNotesCollapsed(collapsed)}
+                                            className="rounded-xl border border-amber-300 shadow-sm text-[10px] sm:text-[11px]"
+                                            getRowClassName={(_, index) =>
+                                                `${index % 2 === 0 ? 'bg-white hover:bg-amber-50' : 'bg-amber-50/30 hover:bg-amber-100/50'} transition-colors`
+                                            }
+                                            columns={[
+                                                {
+                                                    key: 'row_index',
+                                                    header: '🔢',
+                                                    width: '40px',
+                                                    align: 'center',
+                                                    render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+                                                },
+                                                {
+                                                    key: 'type',
+                                                    header: '📌 النوع',
+                                                    align: 'center',
+                                                    render: (record) => <Badge className={getNoteTypeColor(record.type)}>{record.type}</Badge>
+                                                },
+                                                {
+                                                    key: 'date',
+                                                    header: '📅 التاريخ',
+                                                    align: 'center',
+                                                    render: (record) => formatDate(record.date)
+                                                },
+                                                {
+                                                    key: 'note',
+                                                    header: '📝 الملاحظة',
+                                                    align: 'right',
+                                                    render: (record) => <span className="text-gray-600 text-xs">{record.note}</span>
+                                                }
+                                            ]}
+                                            emptyMessage="لا توجد ملاحظات مسجلة"
+                                        />
                                     </div>
 
                                     {/* Teacher History */}
                                     <div>
-                                        <h3 className="text-sm font-medium text-green-700 mb-2 border-b border-green-200 pb-1">
-                                            👨‍🏫 سجل المعلمين السابقين
-                                        </h3>
                                         <GenericTable
+                                            title={<h3 className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-semibold text-white dark:text-purple-500 mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
+                                                👨‍🏫 سجل المعلمين السابقين
+                                            </h3>}
+                                            defaultView="table"
+                                            enablePagination
+                                            defaultPageSize={5}
+                                            pageSizeOptions={[5, 10, 15, 20]}
                                             data={teacherHistory}
+                                            hideSortToggle={false}
+                                            isCollapsed={teacherHistoryCollapsed}
+                                            collapsible={true}
+                                            onCollapseChange={(collapsed) => setTeacherHistoryCollapsed(collapsed)}
+                                            className="rounded-b-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+                                            getRowClassName={(_, index) =>
+                                                `${index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} transition-colors`
+                                            }
                                             columns={[
+                                                {
+                                                    key: 'row_index',
+                                                    header: '�',
+                                                    width: '40px',
+                                                    align: 'center',
+                                                    render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
+                                                },
                                                 { key: 'teacherName', header: '👨‍🏫 المعلم', align: 'right' },
                                                 { key: 'startDate', header: '📅 تاريخ البداية', align: 'center', render: (record) => formatDate(record.startDate) },
                                                 { key: 'endDate', header: '📅 تاريخ النهاية', align: 'center', render: (record) => record.endDate ? formatDate(record.endDate) : 'حتى الآن' }
                                             ]}
                                             emptyMessage="لا يوجد سجل معلمين سابقين"
-                                            className="overflow-hidden rounded-lg text-xs"
-                                            getRowClassName={(_, index) =>
-                                                `${index % 2 === 0 ? "bg-white" : "bg-purple-50/50"} hover:bg-purple-100/40`
-                                            }
                                         />
                                     </div>
 
                                 </div>
 
-                                <DialogFooter dir="rtl" className="flex justify-center mt-3">
+                                <DialogFooter dir="rtl" className="flex justify-center mt-2 sm:mt-3">
                                     <Button
                                         onClick={() => setDialogOpen(false)}
-                                        className="bg-yellow-300 hover:bg-yellow-400 text-gray-800 text-xs px-4 py-1 rounded-lg shadow-md"
+                                        className="bg-yellow-300 hover:bg-yellow-400 text-gray-800 text-[10px] sm:text-xs px-4 py-1 rounded-lg shadow-md"
                                     >
                                         إغلاق
                                     </Button>
