@@ -1,10 +1,15 @@
 import React from 'react';
-import Link from 'next/link';
+// Using plain <a> tags instead of next/link since this app is not Next.js.
+// @ts-ignore - allow importing CSS module without type declaration
 import styles from '../styles/Footer.module.css';
 
-const Footer = ({ compact = false }) => {
+interface FooterProps {
+  compact?: boolean;
+}
+
+const Footer: React.FC<FooterProps> = ({ compact = false }) => {
   const currentYear = new Date().getFullYear();
-  
+
   return (
     <footer className={`${styles.footer} ${compact ? styles.compact : ''}`}>
       <div className={styles.container}>
@@ -16,10 +21,10 @@ const Footer = ({ compact = false }) => {
           <div className={styles.footerCol}>
             <h3>Quick Links</h3>
             <ul>
-              <li><Link href="/">Home</Link></li>
-              <li><Link href="/about">About</Link></li>
-              <li><Link href="/services">Services</Link></li>
-              <li><Link href="/contact">Contact</Link></li>
+              <li><a href="/">Home</a></li>
+              <li><a href="/about">About</a></li>
+              <li><a href="/services">Services</a></li>
+              <li><a href="/contact">Contact</a></li>
             </ul>
           </div>
           <div className={styles.footerCol}>

@@ -249,7 +249,11 @@ const App = () => {
             <main
               className={`flex-1 transition-all duration-300 ease-in-out ${
                 userRole ? (sidebarOpen ? 'md:mr-64' : 'md:mr-16') : ''
-              } min-h-[calc(100vh-64px-196px)] md:min-h-[calc(100vh-64px-160px)] pb-4 px-2 sm:px-4 overflow-x-hidden`}
+              } ${
+                userRole
+                  ? 'min-h-[calc(100vh-64px-196px)] md:min-h-[calc(100vh-64px-160px)] pb-4'
+                  : 'flex items-center justify-center py-4'
+              } px-2 sm:px-4 overflow-x-hidden`}
             >
               <div className="max-w-full mx-auto">
                 {renderPage()}
@@ -270,8 +274,8 @@ const App = () => {
             )}
           </div>
           
-          {/* الفوتر ثابت في جميع الشاشات */}
-          <Footer />
+          {/* الفوتر ثابت في جميع الشاشات - وضع مضغوط في شاشة الدخول */}
+          <Footer compact={!userRole} />
         </div>
         <Toaster />
         <Sonner />

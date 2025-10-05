@@ -11,6 +11,10 @@ import { Profile, UserRole } from "@/types/profile";
 import { getLabels } from '@/lib/labels';
 import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import logoImage from "@/assets/logo.png";
+// استيراد الفوتر العام (موجود في مجلد components في جذر المشروع)
+// ملاحظة: هذا المكون يستخدم next/link؛ إذا لم تكن تستخدم Next.js يمكن لاحقاً استبدال الروابط بعناصر <a>
+// أو إنشاء نسخة مبسطة. حالياً نستخدمه كما هو ليظهر أسفل صفحة الدخول.
+// Removed direct Footer usage here to avoid duplicate footer; global layout already renders it.
 // Removed hero background usage for simplified clean layout
 
 interface LoginProps {
@@ -159,9 +163,11 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
   };
 
   return (
-    <div dir="rtl" className="min-h-screen flex flex-col bg-white dark:bg-gray-950">
-      <div className="flex-1 flex items-start justify-center px-3 py-4 sm:py-8 sm:px-4">
-        <div className="w-full max-w-[340px] sm:max-w-md mt-2 sm:mt-8">
+    <div dir="rtl" className="flex flex-col h-full bg-white dark:bg-gray-950">
+      {/* المحتوى الرئيسي */}
+      <main className="flex-1 flex items-center justify-center px-3 py-2 sm:py-4 sm:px-4">
+        {/* نحافظ على نفس عرض بطاقة تسجيل الدخول دون إزاحات رأسية تسبب سكرول */}
+        <div className="w-full max-w-[340px] sm:max-w-md">
           <Card className="shadow-md sm:shadow-lg border border-gray-200 dark:border-gray-800 rounded-xl sm:rounded-2xl bg-white dark:bg-gray-900">
             <CardHeader className="text-center space-y-1 sm:space-y-3 pb-1 sm:pb-3 px-3 sm:px-6 pt-3 sm:pt-6">
               <div className="flex justify-center">
@@ -366,7 +372,7 @@ export function Login({ onLogin, onNavigate }: LoginProps) {
             </FormRow>
           </FormDialog>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
