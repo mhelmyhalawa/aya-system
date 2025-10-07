@@ -58,6 +58,12 @@ export interface TeacherCircleFilterBarProps {
     onExportClick?: () => void;
     exportButtonLabel?: string;
     requireCircleBeforeAdd?: boolean; // إظهار زر الإضافة فقط بعد اختيار حلقة
+    // ==== اختيار الجلسة (اختياري) ====
+    sessions?: { id: string; dateLabel: string; isToday?: boolean }[]; // قائمة الجلسات (بتنسيق جاهز للعرض)
+    selectedSessionId?: string | null;                                   // الجلسة المختارة
+    onSessionChange?: (id: string | null) => void;                       // تغيير الجلسة
+    showSessionSelect?: boolean;                                         // تفعيل إظهار حقل اختيار الجلسة
+    sessionLabel?: string;                                               // نص حقل الجلسة
 }
 
 export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
@@ -88,7 +94,13 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
     showExportButton = false,
     onExportClick,
     exportButtonLabel = 'تصدير',
-    requireCircleBeforeAdd = false
+    requireCircleBeforeAdd = false,
+    // props الخاصة بالجلسات
+    sessions,
+    selectedSessionId,
+    onSessionChange,
+    showSessionSelect = false,
+    sessionLabel = 'الجلسة'
 }) => {
     const selectedTeacher = selectedTeacherId ? teachers.find(t => t.id === selectedTeacherId) : undefined;
     const selectedCircle = selectedCircleId ? circles.find(c => c.id === selectedCircleId) : undefined;
@@ -315,6 +327,78 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* اختيار الجلسة (اختياري) */}
+            {showSessionSelect && (
+                <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+                    {useInlineSelects ? (
+                        <div className="w-full">
+                            <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1 block mb-1">{sessionLabel || 'الجلسة'}</label>
+                            {useShadSelect ? (
+                                <Select
+                                    disabled={disabled || !sessions || sessions.length === 0}
+                                    value={selectedSessionId || ''}
+                                    onValueChange={(val) => onSessionChange && onSessionChange(val || null)}
+                                >
+                                    <SelectTrigger
+                                        dir="rtl"
+                                        className={cn(
+                                            'h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all',
+                                            'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                                            selectedSessionId
+                                                ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                                                : 'border-gray-300 dark:border-gray-600 text-gray-500',
+                                            (disabled || !sessions || sessions.length === 0) && 'opacity-60 cursor-not-allowed'
+                                        )}
+                                    >
+                                        <SelectValue placeholder={(!sessions || sessions.length === 0) ? 'لا توجد جلسات' : (sessionLabel || 'اختر جلسة')} />
+                                    </SelectTrigger>
+                                    <SelectContent
+                                        position="popper"
+                                        dir="rtl"
+                                        className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
+                                    >
+                                        {sessions && sessions.length > 0 ? (
+                                            sessions.map(s => (
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={s.id}
+                                                    className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white flex items-center justify-between gap-2"
+                                                >
+                                                    <span className="truncate">{s.dateLabel}</span>
+                                                    {s.isToday && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white">اليوم</span>}
+                                                </SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem value="no-sessions" disabled>لا توجد جلسات</SelectItem>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <select
+                                    disabled={disabled || !sessions || sessions.length === 0}
+                                    value={selectedSessionId || ''}
+                                    onChange={(e) => onSessionChange && onSessionChange(e.target.value || null)}
+                                    className={`h-9 w-full text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-8 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${selectedSessionId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${(disabled || !sessions || sessions.length===0) ? 'opacity-60 cursor-not-allowed' : ''} appearance-none`}
+                                >
+                                    <option value="">{(!sessions || sessions.length === 0) ? 'لا توجد جلسات' : (sessionLabel || 'اختر جلسة')}</option>
+                                    {sessions && sessions.map(s => (
+                                        <option key={s.id} value={s.id}>{s.dateLabel}{s.isToday ? ' (اليوم)' : ''}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            disabled
+                            className="h-10 rounded-xl border border-dashed border-emerald-300 text-emerald-500 text-sm opacity-50 cursor-not-allowed"
+                        >
+                            الجلسة (فعّل useInlineSelects)
+                        </button>
+                    )}
+                </div>
+            )}
             {/* زر الإضافة (سطح المكتب) */}
             {showAddButton && (
                 <div className="hidden md:flex md:w-auto flex-col gap-1 items-stretch justify-end">

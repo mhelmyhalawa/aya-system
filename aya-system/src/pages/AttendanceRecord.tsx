@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,8 @@ import {
   ChevronDown,
   Calendar,
   CheckCircle2,
+  Filter,
+  RefreshCw as RefreshCwIcon,
 } from "lucide-react";
 
 import { Profile } from "@/types/profile";
@@ -55,7 +57,8 @@ import {
 } from "@/lib/attendance-service";
 import { getStudentsCountInCircles } from "@/lib/student-count-service";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
-
+import { TeacherCircleFilterBar } from '@/components/filters/TeacherCircleFilterBar';
+// ================== تعريف الأنواع الداخلية ==================
 interface StudentWithAttendance {
   student: Student;
   attendance: Attendance | null;
@@ -73,6 +76,7 @@ interface AttendanceRecordProps {
   currentUser: Profile | null;
 }
 
+
 export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordProps) {
   const { toast } = useToast();
 
@@ -82,8 +86,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   const [selectedCircle, setSelectedCircle] = useState<string>("");
   const [circleSessions, setCircleSessions] = useState<CircleSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<CircleSession | null>(null);
-  // مؤشر الجلسة في الموبايل (عرض بطاقة واحدة فقط + أزرار التالي والسابق)
-  const [mobileSessionIndex, setMobileSessionIndex] = useState(0);
+  const [mobileSessionIndex, setMobileSessionIndex] = useState(0); // مؤشر الجلسة في الموبايل
 
   // بيانات الطلاب والحضور
   const [studentsWithAttendance, setStudentsWithAttendance] = useState<StudentWithAttendance[]>([]);
@@ -93,99 +96,71 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   // عدد الطلاب في كل حلقة
   const [studentsCount, setStudentsCount] = useState<Record<string, number>>({});
 
-  // حالة التحميل والحفظ
+  // حالة التحميل المختلفة
   const [loading, setLoading] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
-  // تأكيد تسجيل حضور في تاريخ مستقبلي
   const [showFutureConfirm, setShowFutureConfirm] = useState(false);
   const [pendingFutureSave, setPendingFutureSave] = useState(false);
 
-  // حالة تصفح الحلقات للجوال
-  const [mobileCirclesPage, setMobileCirclesPage] = useState(0);
-  const mobileCirclesPerPage = 2;
+  // فلترة المعلمين (للأدمن/المشرف) - مدمجة لاحقاً مع TeacherCircleFilterBar
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
 
-  // حالة تصفح الجلسات
+  // تصفح الجلسات
   const [sessionsPage, setSessionsPage] = useState(0);
   const sessionsPerPage = 8;
 
-  // حالة التحرير ونوافذ الحوار
+  // التحرير
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [editForm, setEditForm] = useState<{
-    status: AttendanceStatus;
-    late_minutes?: number;
-    note?: string;
-  }>({
+  const [editForm, setEditForm] = useState<{ status: AttendanceStatus; late_minutes?: number; note?: string; }>({
     status: 'present',
     late_minutes: 0,
     note: '',
   });
+
   const labels = getLabels('ar');
   const scsLabels = labels.studyCircleSchedulesLabels;
-  // للتحقق ما إذا كان المستخدم مدير أو مشرف
   const isAdminOrSuperadmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin';
 
   // تحميل الحلقات عند تحميل الصفحة
   useEffect(() => {
     const loadData = async () => {
       if (!currentUser) {
-        toast({
-          title: "تنبيه",
-          description: "يرجى تسجيل الدخول أولاً",
-          variant: "destructive",
-        });
+        toast({ title: 'تنبيه', description: 'يرجى تسجيل الدخول أولاً', variant: 'destructive' });
         onNavigate('/login');
         return;
       }
-
       setLoading(true);
       try {
         if (isAdminOrSuperadmin) {
-          // جلب جميع الحلقات للمشرفين والمديرين
           const circles = await getAllStudyCircles();
           setAllCircles(circles);
-
-          // جلب عدد الطلاب في كل حلقة
           if (circles.length > 0) {
-            const circleIds = circles.map(circle => circle.id);
-            const counts = await getStudentsCountInCircles(circleIds);
+            const counts = await getStudentsCountInCircles(circles.map(c => c.id));
             setStudentsCount(counts);
-            setSelectedCircle(circles[0].id);
+            setSelectedCircle(prev => prev || circles[0].id);
           }
         } else if (currentUser.role === 'teacher') {
-          // جلب حلقات المعلم فقط
           const circles = await getStudyCirclesByTeacherId(currentUser.id);
           setTeacherCircles(circles);
-
-          // جلب عدد الطلاب في كل حلقة
           if (circles.length > 0) {
-            const circleIds = circles.map(circle => circle.id);
-            const counts = await getStudentsCountInCircles(circleIds);
+            const counts = await getStudentsCountInCircles(circles.map(c => c.id));
             setStudentsCount(counts);
-            setSelectedCircle(circles[0].id);
+            setSelectedCircle(prev => prev || circles[0].id);
           }
         } else {
-          toast({
-            title: "تنبيه",
-            description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
-            variant: "destructive",
-          });
+          toast({ title: 'تنبيه', description: 'ليس لديك صلاحية للوصول إلى هذه الصفحة', variant: 'destructive' });
           onNavigate('/');
         }
       } catch (error) {
-        console.error("خطأ في جلب البيانات:", error);
-        toast({
-          title: "خطأ",
-          description: "حدث خطأ أثناء جلب البيانات",
-          variant: "destructive",
-        });
+        console.error('خطأ في جلب البيانات:', error);
+        toast({ title: 'خطأ', description: 'حدث خطأ أثناء جلب البيانات', variant: 'destructive' });
       } finally {
         setLoading(false);
       }
     };
-
     loadData();
   }, [currentUser, onNavigate, toast, isAdminOrSuperadmin]);
 
@@ -214,7 +189,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
         );
 
         setCircleSessions(sortedSessions);
-        setSelectedSession(null); // إعادة تعيين الجلسة المختارة
+        // تعيين أول جلسة (اليوم أو القادمة) تلقائياً لعرض الطلاب مباشرة
+        setSelectedSession(sortedSessions[0] || null);
         setSessionsPage(0); // إعادة تعيين صفحة الجلسات عند تحميل جلسات جديدة
       } catch (error) {
         console.error("خطأ في جلب جلسات الحلقة:", error);
@@ -391,8 +367,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     if (!selectedSession) return;
     const sessionDate = new Date(selectedSession.session_date);
     const today = new Date();
-    today.setHours(0,0,0,0);
-    sessionDate.setHours(0,0,0,0);
+    today.setHours(0, 0, 0, 0);
+    sessionDate.setHours(0, 0, 0, 0);
     if (sessionDate.getTime() > today.getTime()) {
       // جلسة مستقبلية
       setShowFutureConfirm(true);
@@ -443,12 +419,62 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     return gradeOption ? gradeOption.label : gradeCode;
   };
 
-  // Filter circles based on search term
-  const filteredCircles = allCircles.filter(
-    circle =>
-      circle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (circle.teacher?.full_name && circle.teacher.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // ===== إعداد بيانات المعلمين والحلقات لشريط الفلترة الموحد =====
+  const baseCircles = isAdminOrSuperadmin ? allCircles : teacherCircles;
+
+  // استخراج قائمة المعلمين (للأدمن/المشرف فقط) مع عدد الحلقات
+  const teachersForFilter = useMemo(() => {
+    if (!isAdminOrSuperadmin) {
+      if (currentUser?.role === 'teacher') {
+        return [{ id: currentUser.id, name: currentUser.full_name || 'المعلم', circles_count: teacherCircles.length }];
+      }
+      return [];
+    }
+    const map = new Map<string, { id: string; name: string; circles_count: number }>();
+    baseCircles.forEach(c => {
+      const t = c.teacher;
+      if (t && t.id) {
+        if (!map.has(t.id)) {
+          map.set(t.id, { id: t.id, name: t.full_name, circles_count: 1 });
+        } else {
+          map.get(t.id)!.circles_count += 1;
+        }
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  }, [baseCircles, isAdminOrSuperadmin, currentUser, teacherCircles.length]);
+
+  // تعيين المعلم الحالي تلقائياً إذا كان المستخدم معلماً
+  useEffect(() => {
+    if (currentUser?.role === 'teacher') {
+      setSelectedTeacherId(currentUser.id);
+    }
+  }, [currentUser]);
+
+  // حلقات بعد تطبيق فلتر المعلم
+  const circlesAfterTeacher = useMemo(() => {
+    if (isAdminOrSuperadmin && selectedTeacherId) {
+      return baseCircles.filter(c => c.teacher?.id === selectedTeacherId);
+    }
+    return baseCircles;
+  }, [baseCircles, isAdminOrSuperadmin, selectedTeacherId]);
+
+  // فلترة حسب البحث (اسم الحلقة أو اسم المعلم)
+  const filteredCircles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return circlesAfterTeacher;
+    return circlesAfterTeacher.filter(circle =>
+      circle.name.toLowerCase().includes(term) ||
+      (circle.teacher?.full_name && circle.teacher.full_name.toLowerCase().includes(term))
+    );
+  }, [circlesAfterTeacher, searchTerm]);
+
+  // إذا تغيّرت الفلترة وأصبحت الحلقة المختارة خارج النطاق، اختر أول حلقة متاحة
+  useEffect(() => {
+    if (selectedCircle && !filteredCircles.some(c => c.id === selectedCircle)) {
+      setSelectedCircle(filteredCircles[0]?.id || '');
+    }
+  }, [filteredCircles, selectedCircle]);
 
   // تصفح الجلسات
   const totalSessionPages = Math.max(1, Math.ceil(circleSessions.length / sessionsPerPage));
@@ -590,33 +616,42 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     );
   };
 
-  // تصفح الحلقات للجوال
-  const totalMobileCirclePages = Math.ceil(filteredCircles.length / mobileCirclesPerPage);
-  const pagedMobileCircles = filteredCircles.slice(
-    mobileCirclesPage * mobileCirclesPerPage,
-    (mobileCirclesPage + 1) * mobileCirclesPerPage
-  );
-  const canPrevMobileCircles = mobileCirclesPage > 0;
-  const canNextMobileCircles = mobileCirclesPage < totalMobileCirclePages - 1;
-
-  const goPrevMobileCircles = () => {
-    if (canPrevMobileCircles) {
-      setMobileCirclesPage(mobileCirclesPage - 1);
-    }
-  };
-
-  const goNextMobileCircles = () => {
-    if (canNextMobileCircles) {
-      setMobileCirclesPage(mobileCirclesPage + 1);
-    }
-  };
-
-  // طي/فتح كارد الحلقات (ديسكتوب)
-  const [circlesCardCollapsed, setCirclesCardCollapsed] = useState(false);
+  // أزيلت قائمة الحلقات القديمة (تم استبدالها بشريط TeacherCircleFilterBar)
   // حالة طي كارد الجلسات
   const [sessionsCardCollapsed, setSessionsCardCollapsed] = useState(false);
   // حالة طي الكارد الرئيسي (سجل حضور الطلاب)
   const [mainCardCollapsed, setMainCardCollapsed] = useState(false);
+  // إظهار/إخفاء شريط الفلترة
+  const [showFilters, setShowFilters] = useState(true);
+
+  const handleResetSelections = () => {
+    // إعادة تعيين الفلاتر واختيار المعلم تلقائياً
+    setSearchTerm("");
+
+    if (currentUser?.role === 'teacher') {
+      // المعلّم: إعادة ضبط لاختيار نفسه ثم أول حلقة تخصه
+      setSelectedTeacherId(currentUser.id);
+      const firstCircle = teacherCircles[0];
+      setSelectedCircle(firstCircle?.id || '');
+    } else if (isAdminOrSuperadmin) {
+      // أدمن / سوبر: اختيار أول معلم (إن وُجد) وأول حلقة مرتبطة به، وإلا أول حلقة عامة
+      const firstTeacher = teachersForFilter[0];
+      if (firstTeacher) {
+        setSelectedTeacherId(firstTeacher.id);
+        const circleForTeacher = allCircles.find(c => c.teacher?.id === firstTeacher.id);
+        if (circleForTeacher) {
+          setSelectedCircle(circleForTeacher.id);
+          return;
+        }
+      }
+      // fallback
+      setSelectedCircle(allCircles[0]?.id || '');
+    } else {
+      // أدوار أخرى (إن وُجدت لاحقاً) فقط نختار أول حلقة متاحة
+      const circlesPool = teacherCircles.length ? teacherCircles : allCircles;
+      setSelectedCircle(circlesPool[0]?.id || '');
+    }
+  };
 
   return (
     <div className="w-full max-w-[1600px] mx-auto">
@@ -654,818 +689,354 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           className={`space-y-0 sm:space-y-0.5 px-1 sm:px-4 pt-3 pb-4 transition-all duration-300 ease-in-out origin-top ${mainCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[3000px] opacity-100'}`}
           aria-hidden={mainCardCollapsed}
         >
-          {/* قائمة الجوال */}
-          <div className="md:hidden">
-            <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
-              {/* الهيدر */}
-              <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
-                <div className="flex items-center gap-1">
-                  <BookOpen className="h-3.5 w-3.5 text-white" />
-                  <h2 className="text-[12px] font-semibold text-white">{scsLabels.circlesListTitle || 'اختر الحلقة'}</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  {selectedCircle && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-white/80">{scsLabels.teacherShort || 'معلم'}</span>
-                      <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                        {filteredCircles.find(c => c.id === selectedCircle)?.teacher?.full_name?.split(" ")[0] || scsLabels.teacherUnknown || 'غير معروف'}
-                      </Badge>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setCirclesCardCollapsed(v => !v)}
-                    aria-label={circlesCardCollapsed ? 'فتح الحلقات' : 'طي الحلقات'}
-                    aria-expanded={!circlesCardCollapsed}
-                    aria-controls="mobile-circles-body"
-                    className={`inline-flex items-center justify-center h-7 w-7 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${circlesCardCollapsed ? 'rotate-180' : ''}`}
-                    title={circlesCardCollapsed ? 'عرض قائمة الحلقات' : 'إخفاء محتوى الحلقات'}
-                  >
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
 
-              <div
-                id="mobile-circles-body"
-                className={`transition-all duration-300 ease-in-out origin-top ${circlesCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[600px] opacity-100'}`}
+
+          {/* شريط التحكم بالفلاتر (الأزرار) */}
+          <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-2 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
+            <div className="flex gap-2 items-center ">
+              {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
+              <Button
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
+                onClick={() => setShowFilters(p => !p)}
+                title={showFilters ? 'إخفاء شريط الفلترة' : 'إظهار شريط الفلترة'}
               >
-                {/* البحث */}
-                {isAdminOrSuperadmin && (
-                  <div className="px-2 pt-2">
-                    <div className="relative">
-                      <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
-                      <Input
-                        placeholder={scsLabels.searchPlaceholder || 'البحث...'}
-                        className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* العناصر */}
-                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar">
-                  {loading ? (
-                    <div className="w-full py-6 text-center flex flex-col items-center">
-                      <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                      <span className="text-green-700 text-[12px] font-medium">{scsLabels.loading || 'جاري التحميل...'}</span>
-                    </div>
-                  ) : filteredCircles.length === 0 ? (
-                    <div className="w-full py-6 text-center text-green-600 text-[12px]">{scsLabels.noResults || 'لا توجد نتائج'}</div>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      {pagedMobileCircles.map(circle => {
-                        const active = selectedCircle === circle.id;
-                        return (
-                          <button
-                            key={circle.id}
-                            onClick={() => handleCircleChange(circle.id)}
-                            className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
-                      ${active
-                                ? 'bg-gradient-to-r from-blue-600 to-indigo-700 border-blue-300 text-white shadow-md'
-                                : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}
-                    `}
-                          >
-                            <span className="font-medium truncate">{circle.name}</span>
-                            <div className="flex items-center gap-1.5">
-                              {circle.teacher && (
-                                <span className={`text-[10px] ${active ? 'text-blue-100 font-medium' : 'text-green-500'}`}>
-                                  {circle.teacher.full_name.split(' ')[0]}
-                                </span>
-                              )}
-                              {active && (
-                                <span className="inline-flex items-center bg-white text-blue-700 text-[10px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-                                  ✓
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                      {/* Pagination controls */}
-                      {totalMobileCirclePages > 1 && (
-                        <div className="mt-2 flex flex-col items-center gap-1 py-1">
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={goPrevMobileCircles}
-                              disabled={!canPrevMobileCircles}
-                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
-                              ${canPrevMobileCircles ? 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label={scsLabels.prevLabel || 'السابق'}
-                            >
-                              ‹
-                            </button>
-                            <div className="flex items-center gap-1" aria-label={scsLabels.pagesIndicatorAria || 'ترقيم الصفحات'}>
-                              {Array.from({ length: totalMobileCirclePages }).map((_, i) => (
-                                <span
-                                  key={i}
-                                  className={`w-2 h-2 rounded-full transition-all ${i === mobileCirclesPage ? 'bg-blue-600 scale-125' : 'bg-gray-300'}`}
-                                  aria-label={`صفحة ${i + 1}`}
-                                />
-                              ))}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={goNextMobileCircles}
-                              disabled={!canNextMobileCircles}
-                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
-                              ${canNextMobileCircles ? 'bg-white border-blue-300 text-blue-700 hover:bg-blue-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label={scsLabels.nextLabel || 'التالي'}
-                            >
-                              ›
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
+              </Button>
+              {/* زر التحديث لإلغاء التحديد */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8"
+                onClick={handleResetSelections}
+                title='تحديث / إلغاء التحديد'
+              >
+                <RefreshCwIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
             </div>
           </div>
-          {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
-          <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
-            <div className="md:col-span-1 hidden md:block">
-              <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2 select-none">
-                    <BookOpen className="h-5 w-5" />
-                    {scsLabels.circlesHeading}
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setCirclesCardCollapsed(v => !v)}
-                    aria-label={circlesCardCollapsed ? 'فتح الحلقات' : 'طي الحلقات'}
-                    aria-expanded={!circlesCardCollapsed}
-                    aria-controls="circles-card-body"
-                    className={`inline-flex items-center justify-center h-8 w-8 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${circlesCardCollapsed ? 'rotate-180' : ''}`}
-                    title={circlesCardCollapsed ? 'عرض قائمة الحلقات' : 'إخفاء محتوى الحلقات'}
-                  >
-                    <ChevronDown className="h-5 w-5" />
-                  </button>
-                </div>
-                <div
-                  id="circles-card-body"
-                  className={`transition-all duration-300 ease-in-out origin-top ${circlesCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[1200px] opacity-100'}`}
-                >
-                  <div className="p-4 space-y-4 md:space-y-5">
-                  {/* مربع البحث */}
-                  <div className="relative">
-                    {currentUser?.role !== 'teacher' && (
-                      <div className="relative mt-1">
-                        <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
-                        <Input
-                          placeholder={scsLabels.searchPlaceholder}
-                          className="pr-10 pl-3 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm text-sm"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {loading ? (
-                    <div className="flex flex-col items-center justify-center p-8 gap-2">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-                      <span className="text-sm text-green-600">{scsLabels.loadingCircles}</span>
-                    </div>
-                  ) : filteredCircles.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-8 text-center gap-2">
-                      <BookOpen className="h-12 w-12 text-green-200" />
-                      <h3 className="text-lg font-semibold text-green-800">{scsLabels.noCircles}</h3>
-                      <p className="text-sm text-green-600">
-                        {scsLabels.noCirclesSearch}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-green-100">
-                      {filteredCircles.map((circle) => (
-                        <div
-                          key={circle.id}
-                          className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2.5 shadow-sm text-sm ${selectedCircle === circle.id
-                            ? 'bg-green-700 text-white ring-1 ring-green-400'
-                            : 'bg-green-50 hover:bg-green-100 text-green-800'
-                            }`}
-                          onClick={() => handleCircleChange(circle.id)}
-                        >
-                          <div className="flex items-center justify-between font-medium gap-1">
-                            {/* اسم الحلقة مع أيقونة كتاب صغيرة */}
-                            <div className="flex items-center gap-1 truncate">
-                              <span className="text-green-500">📖</span>
-                              <span className="truncate">{circle.name}</span>
-                              {circle.teacher && (
-                                <span className={`flex items-center gap-1 text-[11px] truncate ${selectedCircle === circle.id ? 'text-white' : 'text-green-700'
-                                  }`}>
-                                  👨‍🏫 {circle.teacher.full_name}
-                                </span>
-                              )}
-                            </div>
 
-                            {selectedCircle === circle.id && (
-                              <Badge
-                                variant="outline"
-                                className={`${selectedCircle === circle.id ? 'text-white border-white' : 'text-green-800 border-green-400'
-                                  } text-xs`}
-                              >
-                                {scsLabels.selectedBadge}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  </div>
-                </div>
-              </div>
+          {showFilters && (
+            <div className="mb-3 mt-1">
+              <TeacherCircleFilterBar
+                teachers={teachersForFilter}
+                circles={filteredCircles.map(c => ({ id: c.id, name: c.name, teacher_id: c.teacher?.id }))}
+                selectedTeacherId={selectedTeacherId}
+                selectedCircleId={selectedCircle}
+                showSessionSelect
+                sessions={circleSessions.map(s => {
+                  const d = new Date(s.session_date); const t = new Date();
+                  d.setHours(0, 0, 0, 0); t.setHours(0, 0, 0, 0);
+                  return { id: String(s.id), dateLabel: formatDateDisplay(s.session_date), isToday: d.getTime() === t.getTime() };
+                })}
+                selectedSessionId={selectedSession ? String(selectedSession.id) : null}
+                onSessionChange={(id) => {
+                  const found = circleSessions.find(s => String(s.id) === id);
+                  if (found) handleSessionChange(found);
+                }}
+                searchQuery={searchTerm}
+                onSearchChange={(val) => setSearchTerm(val)}
+                onTeacherChange={(id) => {
+                  setSelectedTeacherId(id);
+                  if (id) {
+                    const first = baseCircles.find(c => c.teacher?.id === id);
+                    setSelectedCircle(first?.id || '');
+                  } else {
+                    setSelectedCircle(baseCircles[0]?.id || '');
+                  }
+                }}
+                onCircleChange={(id) => { if (id) handleCircleChange(id); }}
+                useInlineSelects
+                useShadSelect
+                teacherLabel="اختر معلماً"
+                circleLabel="اختر حلقة"
+                sessionLabel="اختر جلسة"
+                searchPlaceholder="بحث..."
+              />
             </div>
-            <div className="md:col-span-3">
-              <div className="bg-green-50 border border-green-200 rounded-xl shadow-sm overflow-hidden">
-                <CardHeader className="pb-2 bg-gradient-to-r from-green-700 via-green-500 to-green-700 p-2 sm:p-4">
-                  <div className="flex justify-between items-center w-full">
-                    <CardTitle className="text-[12px] sm:text-sm font-bold text-white flex flex-col items-start gap-1">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <CalendarCheck className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-green-50 flex-shrink-0" />
-                        <span className="truncate">{selectedCircle ? `جلسات ${getCircleName(selectedCircle)}` : 'اختر الحلقة'}</span>
-                        {selectedCircle && (
-                          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-[10px] whitespace-nowrap flex-shrink-0">
-                            {studentsCount[selectedCircle] || 0} طالب
-                          </Badge>
-                        )}
-                      </div>
-                    </CardTitle>
-                    {/* زر طي الجلسات */}
-                    <button
-                      onClick={() => setSessionsCardCollapsed(v => !v)}
-                      aria-label={sessionsCardCollapsed ? 'فتح الجلسات' : 'طي الجلسات'}
-                      aria-expanded={!sessionsCardCollapsed}
-                      aria-controls="sessions-card-body"
-                      className={`inline-flex items-center justify-center h-7 w-7 sm:h-8 sm:w-8 rounded-full border border-white/30 text-white transition-all hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${sessionsCardCollapsed ? 'rotate-180' : ''}`}
-                      title={sessionsCardCollapsed ? 'عرض الجلسات' : 'إخفاء محتوى الجلسات'}
-                      type="button"
-                    >
-                      <ChevronDown className="h-4 w-4" />
-                    </button>
-                  </div>
-                </CardHeader>
-                <CardContent
-                  id="sessions-card-body"
-                  className={`p-4 transition-all duration-300 ease-in-out origin-top ${sessionsCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[1400px] opacity-100'}`}
-                  aria-hidden={sessionsCardCollapsed}
-                >
-                  {!selectedCircle ? (
-                    <div className="text-center text-xs text-gray-500 mt-4">يرجى اختيار حلقة أولاً</div>
-                  ) : loading ? (
-                    <div className="text-center text-xs text-gray-500 mt-4">جارٍ تحميل الجلسات...</div>
-                  ) : circleSessions.length === 0 ? (
-                    <div className="text-center text-xs text-gray-500 mt-4">
-                      <div className="flex flex-col items-center justify-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                        <AlertCircle className="h-6 w-6 text-yellow-500 mb-2" />
-                        <p className="font-medium text-yellow-700 mb-1">لا توجد جلسات مستقبلية لهذه الحلقة</p>
-                        <p className="text-gray-600">تظهر فقط جلسات اليوم والتواريخ المستقبلية</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2">
-                      {/* عرض الجلسات (موبايل) بنمط بطاقة واحدة + زر عرض المزيد */}
-                      <div className="md:hidden mb-4" role="region" aria-label="جلسات الحلقة (موبايل)">
-                        {circleSessions.length === 0 ? (
-                          <div className="text-center text-[11px] text-gray-500 py-4">لا توجد جلسات حالياً</div>
-                        ) : (
-                          <div className="flex flex-col items-stretch gap-2">
-                            {/* بطاقة الجلسة الحالية */}
-                            {(() => {
-                              const session = circleSessions[mobileSessionIndex];
-                              if (!session) return null;
-                              const sessionDate = new Date(session.session_date);
-                              const today = new Date();
-                              sessionDate.setHours(0,0,0,0);
-                              today.setHours(0,0,0,0);
-                              const isToday = sessionDate.getTime() === today.getTime();
-                              return (
-                                <div
-                                  key={session.id}
-                                  className={`relative border rounded-lg p-3 flex flex-col gap-2 text-[11px] transition-all shadow-sm bg-white ring-2 ring-blue-400 border-blue-300`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 font-semibold text-green-700">
-                                      <CalendarCheck className="h-4 w-4 text-blue-600" />
-                                      <span className="truncate text-blue-700">{formatDateDisplay(session.session_date)}</span>
-                                    </div>
-                                    {isToday && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-600 text-white shadow border border-green-400 animate-pulse">اليوم</span>
-                                    )}
-                                  </div>
-                                  {session.start_time && session.end_time ? (
-                                    <div className="flex items-center gap-2 text-[10px]">
-                                      <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md text-blue-700">
-                                        <Clock className="h-3 w-3 text-blue-600" />
-                                        {formatTimeDisplay(session.start_time)}
-                                      </div>
-                                      <div className="flex items-center gap-1 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md text-purple-700">
-                                        <Clock className="h-3 w-3 text-purple-600" />
-                                        {formatTimeDisplay(session.end_time)}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="text-[10px] italic text-gray-500 border border-dashed border-gray-200 rounded-md px-2 py-1 text-center">بدون توقيت</div>
-                                  )}
-                                </div>
-                              );
-                            })()}
+          )}
+          {/* اختيار الجلسة مدمج الآن في شريط الفلترة عبر TeacherCircleFilterBar */}
+          {/* تم استبدال قائمة الحلقات القديمة بشريط الفلترة أعلاه */}
 
-                            {/* أزرار التنقل */}
-                            {circleSessions.length > 1 && (
-                              <div className="flex items-center justify-center gap-4 mt-1">
-                                <Button
-                                  size="sm"
-                                  onClick={goPrevMobileSession}
-                                  disabled={mobileSessionIndex === 0}
-                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 disabled:opacity-40"
-                                  aria-label="جلسة سابقة"
-                                >
-                                  <ChevronRight className="h-4 w-4 text-blue-600" />
-                                </Button>
-                                <div className="text-[10px] text-blue-700 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200 shadow-sm">
-                                  {mobileSessionIndex + 1} / {circleSessions.length}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  onClick={goNextMobileSession}
-                                  disabled={mobileSessionIndex >= circleSessions.length - 1}
-                                  className="h-8 w-8 p-0 flex items-center justify-center rounded-full bg-blue-100 hover:bg-blue-200 disabled:opacity-40"
-                                  aria-label="جلسة تالية"
-                                >
-                                  <ChevronLeft className="h-4 w-4 text-blue-600" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {/* عرض الجلسات في شكل سلايدر (ديسكتوب) */}
-                      <div className="hidden md:flex flex-col">
-                        <div className="w-full relative flex items-center gap-2 mb-1 justify-center">
-
-                          {/* زر السابق */}
-                          {pagedSessions.length > sessionsGroupSize && (
-                            <button
-                              onClick={goPrevSessionCarousel}
-                              disabled={sessionCarouselIndex === 0}
-                              className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-blue-300"
-                              aria-label="السابق"
-                            >
-                              <ChevronRight className="h-5 w-5" />
-                            </button>
-                          )}
-
-                          {/* شبكة الجلسات */}
-                          <div className="grid grid-cols-4 gap-1 w-full max-w-2xl">
-                            {visibleSessionGroup.map((session) => {
-                              const isSelected = selectedSession?.id === session.id;
-                              const sessionDate = new Date(session.session_date);
-                              const today = new Date();
-                              sessionDate.setHours(0, 0, 0, 0);
-                              today.setHours(0, 0, 0, 0);
-                              const isToday = sessionDate.getTime() === today.getTime();
-
-                              return (
-                                <div
-                                  key={`${session.study_circle_id}-${session.id}`}
-                                  className={`group relative border rounded-lg cursor-pointer overflow-hidden transition-all duration-300 bg-white flex flex-col shadow-sm hover:shadow-md justify-start
-                ${isSelected ? 'ring-2 ring-blue-300 scale-[1.01] border-blue-400' : 'border-green-200 hover:border-green-400'}`}
-                                  onClick={() => handleSessionChange(session)}
-                                  role="listitem"
-                                >
-                                  {/* شريط علوي */}
-                                  <div className={`h-0.5 w-full ${isSelected ? 'bg-gradient-to-r from-blue-500 to-indigo-600' : 'bg-green-200 group-hover:bg-green-300'} transition-all`} />
-
-                                  {/* محتوى الجلسة */}
-                                  <div className="flex flex-col p-2 text-[10px] grow gap-1">
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-1 font-semibold text-green-700 leading-none">
-                                        <CalendarCheck className={`h-3.5 w-3.5 ${isSelected ? 'text-blue-600' : 'text-green-700'}`} />
-                                        <span className={`text-[11px] ${isSelected ? 'text-blue-700' : ''}`}>
-                                          {formatDateDisplay(session.session_date)}
-                                        </span>
-                                      </div>
-                                      {isToday && (
-                                        <span className="flex items-center gap-0.5 text-[9px] text-white bg-green-600 px-2 py-0.5 rounded-full border border-green-400 font-semibold shadow-sm animate-pulse">
-                                          اليوم
-                                        </span>
-                                      )}
-                                    </div>
-
-                                    {/* التوقيت */}
-                                    {session.start_time && session.end_time ? (
-                                      <div className="flex flex-col gap-0.5">
-                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[9px] font-medium justify-center shadow-sm leading-none">
-                                          <Clock className="h-3 w-3 text-blue-600" />
-                                          {formatTimeDisplay(session.start_time)}
-                                        </div>
-                                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200 text-[9px] font-medium justify-center shadow-sm leading-none">
-                                          <Clock className="h-3 w-3 text-purple-600" />
-                                          {formatTimeDisplay(session.end_time)}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center justify-center py-1 text-gray-500 italic text-[9px] border border-dashed border-gray-200 rounded-md">
-                                        بدون توقيت
-                                      </div>
-                                    )}
-
-                                    {isSelected && (
-                                      <div className="mt-auto">
-                                        <div className="w-full h-0.5 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 animate-pulse" />
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* زر التالي */}
-                          {pagedSessions.length > sessionsGroupSize && (
-                            <button
-                              onClick={goNextSessionCarousel}
-                              disabled={sessionCarouselIndex >= totalSessionCarouselGroups - 1}
-                              className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg hover:from-blue-600 hover:to-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-blue-300"
-                              aria-label="التالي"
-                            >
-                              <ChevronLeft className="h-5 w-5" />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* المؤشرات + العدد */}
-                        <div className="flex flex-col items-center mt-4 gap-3">
-                          {pagedSessions.length > sessionsGroupSize && (
-                            <div className="flex items-center gap-1">
-                              {Array.from({ length: totalSessionCarouselGroups }).map((_, i) => (
-                                <button
-                                  key={i}
-                                  id={`session-indicator-${i}`}
-                                  onClick={() => setSessionCarouselIndex(i)}
-                                  className={`w-2.5 h-2.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-400/50 ${i === sessionCarouselIndex ? 'bg-blue-600 scale-110' : 'bg-blue-300 hover:bg-blue-400'}`}
-                                  aria-label={`مجموعة ${i + 1}`}
-                                />
-                              ))}
-                            </div>
-                          )}
-
-                          <div className="text-[10px] flex items-center gap-2 text-blue-700 font-medium bg-blue-50 px-3 py-1 rounded-full border border-blue-200 shadow-sm">
-                            <span>مجموعة {sessionCarouselIndex + 1} / {totalSessionCarouselGroups}</span>
-                            <span className="w-px h-3 bg-blue-300" />
-                            <span>
-                              الجلسات: {visibleSessionGroup.length === 0 ? 0 : (sessionCarouselIndex * sessionsGroupSize + 1)} - {Math.min((sessionCarouselIndex * sessionsGroupSize) + visibleSessionGroup.length, pagedSessions.length)} من {pagedSessions.length}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                    </div>
-
-                  )}
-
-                  {/* تحكم الترقيم للجلسات */}
-                  {selectedCircle && circleSessions.length > 0 && totalSessionPages > 1 && (
-                    <div className="flex flex-col items-center gap-1 mt-4" aria-label="ترقيم الجلسات">
-                      <div className="flex items-center justify-center gap-4">
-                        <button
-                          onClick={prevSessionPage}
-                          disabled={sessionsPage === 0}
-                          className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 disabled:opacity-40 disabled:hover:bg-blue-100 text-blue-700 transition"
-                          aria-label="السابق"
-                        >
-                          <ChevronRight className="w-5 h-5" />
-                        </button>
-                        <div className="flex items-center gap-2" aria-label="الصفحات">
-                          {Array.from({ length: totalSessionPages }).map((_, i) => (
-                            <button
-                              key={i}
-                              onClick={() => { setSessionsPage(i); setSessionCarouselIndex(0); }}
-                              className={`w-2.5 h-2.5 rounded-full transition ${i === sessionsPage ? 'bg-blue-600 scale-110' : 'bg-blue-300 hover:bg-blue-400'}`}
-                              aria-label={`صفحة ${i + 1}`}
-                            />
-                          ))}
-                        </div>
-                        <button
-                          onClick={nextSessionPage}
-                          disabled={sessionsPage >= totalSessionPages - 1}
-                          className="p-2 rounded-full bg-blue-100 hover:bg-blue-200 disabled:opacity-40 disabled:hover:bg-blue-100 text-blue-700 transition"
-                          aria-label="التالي"
-                        >
-                          <ChevronLeft className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <div className="text-[10px] text-gray-400 mt-1">يمكنك التنقل داخل كل صفحة بين مجموعات الجلسات (٣ في كل مجموعة)</div>
-                      <div className="text-[11px] text-gray-500">
-                        <div className="flex flex-col items-center gap-1 w-full">
-                          <div className="flex items-center gap-2 font-medium text-blue-700">
-                            <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                            <span>إجمالي الجلسات</span>
-                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-semibold">
-                              {circleSessions.length}
-                            </span>
-                            <span className="text-gray-400 text-[10px]">
-                              ({sessionsPage + 1} / {totalSessionPages})
-                            </span>
-                          </div>
-                          <div className="w-40 h-1.5 rounded-full bg-gray-200 overflow-hidden">
-                            <div
-                              className="h-full bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 transition-all duration-500"
-                              style={{ width: `${((sessionsPage + 1) / totalSessionPages) * 100}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-
-                </CardContent>
-              </div>
-
-              {/* تمت إزالة الفراغ السفلي الزائد */}
-              {selectedCircle && selectedSession && (
-                <Card className="hidden md:block border border-green-300 rounded-xl shadow-md overflow-hidden">
-                  {/* الهيدر */}
-                  <CardHeader className="bg-gradient-to-r from-green-700 to-green-600 text-white px-3 py-2 border-b border-green-400">
-                    <div className="flex items-center justify-between w-full">
-                      {/* العنوان + التاريخ */}
-                      <div className="flex flex-col">
-                        <CardTitle className="text-[13px] font-bold flex items-center gap-1">
-                          <CalendarCheck className="h-3.5 w-3.5 text-yellow-300" />
-                          <span className="line-clamp-1">{getCircleName(selectedCircle)}</span>
-                        </CardTitle>
-                        <CardDescription className="text-[10px] text-green-50 flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-green-200" />
-                          {formatDateDisplay(selectedSession.session_date)}
-                          {selectedSession.start_time && selectedSession.end_time && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-green-200" />
-                              {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
-                            </span>
-                          )}
-                        </CardDescription>
-                      </div>
-
-                      {/* أزرار سريعة */}
-                      <div className="flex items-center gap-1">
-                        <Button
-                          size="sm"
-                          onClick={() => setAllStudentsStatus("present")}
-                          className="flex items-center h-6 px-2 rounded bg-green-100 hover:bg-green-200 text-green-800 text-[10px] border border-green-300"
-                        >
-                          <Check className="h-3 w-3 mr-0.5" />
-                          حاضر
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => setAllStudentsStatus("absent")}
-                          className="flex items-center h-6 px-2 rounded bg-red-100 hover:bg-red-200 text-red-800 text-[10px] border border-red-300"
-                        >
-                          <X className="h-3 w-3 mr-0.5" />
-                          غائب
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* ملخص الحضور (سطر صغير تحت لو ضروري) */}
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {renderAttendanceSummary()}
-                    </div>
-                  </CardHeader>
-
-                  {/* المحتوى */}
-                  <CardContent className="p-3">
-                    {loadingStudents ? (
-                      <div className="text-center py-6">
-                        <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-green-600" />
-                        <p className="text-gray-500 text-xs">جارٍ تحميل بيانات الطلاب...</p>
-                      </div>
-                    ) : studentsWithAttendance.length === 0 ? (
-                      <div className="text-center py-6 bg-green-50 rounded-lg">
-                        <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500" />
-                        <p className="text-sm font-medium text-green-800">لا يوجد طلاب</p>
-                        <p className="text-[11px] text-gray-600">
-                          يرجى إضافة طلاب لهذه الحلقة.
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="w-full flex justify-center pt-2 pb-3">
-                          <div className="flex items-center gap-2">
-
-                            {/* زر السابق */}
-                            {studentsWithAttendance.length > studentsGroupSize && (
-                              <button
-                                onClick={goPrevStudentCarousel}
-                                disabled={studentCarouselIndex === 0}
-                                className="h-8 w-8 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                aria-label="السابق"
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </button>
-                            )}
-
-                            {/* شبكة الطلاب */}
-                            <div className="grid grid-cols-4 gap-3 w-full max-w-2xl mx-auto">
-                              {visibleStudentsGroup.map((item, idx) => {
-                                const absoluteIndex = studentCarouselIndex * studentsGroupSize + idx;
-                                return (
-                                  <div
-                                    key={item.student.id}
-                                    className="group relative border rounded-lg cursor-pointer overflow-hidden transition-all duration-300 bg-white flex flex-col shadow-sm hover:shadow-md hover:scale-[1.005] border-emerald-200 hover:border-emerald-400"
-                                  >
-                                    <div className="h-0.5 w-full bg-gradient-to-r from-emerald-200 to-emerald-300 group-hover:from-emerald-300 group-hover:to-emerald-400 transition-all" />
-                                    <div className="p-2 flex flex-col gap-1.5 text-[10px] grow">
-                                      <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <div className="h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                                            {absoluteIndex + 1}
-                                          </div>
-                                          <div className="min-w-0">
-                                            <p className="text-[11px] font-medium truncate text-emerald-800 leading-tight">{item.student.full_name}</p>
-                                            <p className="text-[10px] text-gray-500 truncate leading-tight">{item.student.guardian?.full_name}</p>
-                                          </div>
-                                        </div>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => handleEditAttendance(item.student.id)}
-                                          className="h-7 w-7 p-0 flex-shrink-0"
-                                        >
-                                          <Edit className="h-4 w-4" />
-                                        </Button>
-                                      </div>
-
-                                      <div className="grid grid-cols-2 gap-1.5 mt-0.5">
-                                        {/* حالة الحضور */}
-                                        <Select
-                                          value={attendanceFormData[item.student.id]?.status || 'present'}
-                                          onValueChange={(value) => handleStatusChange(item.student.id, value as AttendanceStatus)}
-                                        >
-                                          <SelectTrigger
-                                            id={`attendance-status-${item.student.id}`}
-                                            dir="rtl"
-                                            className={`h-7 text-right truncate max-w-full min-w-0 text-[10px] leading-none rounded-md border px-2 pr-2 transition-all
-                                              focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 bg-white dark:bg-gray-800
-                                              ${(() => {
-                                                const st = attendanceFormData[item.student.id]?.status || 'present';
-                                                if (st === 'present') return 'border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold';
-                                                if (st === 'absent') return 'border-red-300 bg-red-50 text-red-700 font-semibold';
-                                                if (st === 'late') return 'border-amber-300 bg-amber-50 text-amber-700 font-semibold';
-                                                if (st === 'excused') return 'border-blue-300 bg-blue-50 text-blue-700 font-semibold';
-                                                return 'border-gray-300 text-gray-600';
-                                              })()}`}
-                                          >
-                                            <SelectValue placeholder="اختر الحالة">
-                                              {getAttendanceStatusName(attendanceFormData[item.student.id]?.status || 'present')}
-                                            </SelectValue>
-                                          </SelectTrigger>
-                                          <SelectContent
-                                            position="popper"
-                                            dir="rtl"
-                                            className="text-right text-[10px] sm:text-[11px] rounded-md border border-emerald-200 dark:border-emerald-700 shadow-md bg-white dark:bg-gray-900"
-                                          >
-                                            {attendanceStatusOptions.map((option) => (
-                                              <SelectItem
-                                                key={option.value}
-                                                value={option.value}
-                                                className={`cursor-pointer data-[highlighted]:bg-emerald-900/80 data-[state=checked]:font-semibold rounded-sm text-[11px]
-                                                  ${option.value === 'present' ? 'text-emerald-700' :
-                                                     option.value === 'absent' ? 'text-red-700' :
-                                                     option.value === 'late' ? 'text-amber-700' :
-                                                     option.value === 'excused' ? 'text-blue-700' : 'text-gray-700'}`}
-                                              >
-                                                {option.label}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-
-                                        {attendanceFormData[item.student.id]?.status === 'late' && (
-                                          <Input
-                                            title="أدخل دقائق التأخير"
-                                            type="number"
-                                            min={0}
-                                            value={attendanceFormData[item.student.id]?.late_minutes || 0}
-                                            onChange={(e) => {
-                                              const value = parseInt(e.target.value) || 0;
-                                              setAttendanceFormData((prev) => ({
-                                                ...prev,
-                                                [item.student.id]: {
-                                                  ...prev[item.student.id],
-                                                  late_minutes: value < 0 ? 0 : value,
-                                                },
-                                              }));
-                                              setHasChanges(true);
-                                            }}
-                                            className="h-7 text-center text-[10px] bg-amber-50 border-amber-300 px-1"
-                                            placeholder="دقائق التأخير"
-                                          />
-                                        )}
-                                      </div>
-
-                                      {attendanceFormData[item.student.id]?.note && (
-                                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-600">
-                                          <FileText className="h-3 w-3 flex-shrink-0" />
-                                          <span className="truncate">{attendanceFormData[item.student.id]?.note}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* زر التالي */}
-                            {studentsWithAttendance.length > studentsGroupSize && (
-                              <button
-                                onClick={goNextStudentCarousel}
-                                disabled={studentCarouselIndex >= totalStudentCarouselGroups - 1}
-                                className="h-8 w-8 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                                aria-label="التالي"
-                              >
-                                <ChevronLeft className="h-4 w-4" />
-                              </button>
-                            )}
-
-                          </div>
-                        </div>
-
-                        {/* مؤشرات + عداد */}
-                        <div className="flex flex-col items-center mt-2 gap-3">
-                          {studentsWithAttendance.length > studentsGroupSize && (
-                            <div className="flex items-center gap-2 bg-white/60 backdrop-blur px-2 py-1.5 rounded-xl border border-emerald-200 shadow-sm">
-                              {Array.from({ length: totalStudentCarouselGroups }).map((_, i) => (
-                                <button
-                                  key={i}
-                                  id={`student-indicator-${i}`}
-                                  onClick={() => setStudentCarouselIndex(i)}
-                                  className="w-2.5 h-2.5 rounded-full bg-emerald-300 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                                  aria-label={`مجموعة الطلاب ${i + 1}`}
-                                />
-                              ))}
-                            </div>
-                          )}
-                          <div className="text-[10px] flex items-center gap-2 text-emerald-700 font-medium bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-sm">
-                            <span>مجموعة {studentCarouselIndex + 1} / {totalStudentCarouselGroups}</span>
-                            <span className="w-px h-3 bg-emerald-300" />
-                            <span>
-                              الطلاب: {visibleStudentsGroup.length === 0 ? 0 : (studentCarouselIndex * studentsGroupSize + 1)} - {Math.min((studentCarouselIndex * studentsGroupSize) + visibleStudentsGroup.length, studentsWithAttendance.length)} من {studentsWithAttendance.length}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                    )}
-                  </CardContent>
-
-                  {/* الفوتر */}
-                  <CardFooter className="bg-green-50 px-3 py-2 border-t border-green-200">
-                    <div className="w-full space-y-1">
-                      <Button
-                        onClick={attemptSaveAttendance}
-                        disabled={
-                          !hasChanges ||
-                          savingAttendance ||
-                          studentsWithAttendance.length === 0
-                        }
-                        className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2 rounded-lg"
-                      >
-                        {savingAttendance ? (
-                          <>
-                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            جارٍ الحفظ...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-2" />
-                            حفظ الحضور
-                          </>
-                        )}
-                      </Button>
-
-                      {hasChanges && (
-                        <p className="text-amber-600 text-[11px] flex items-center gap-1 font-medium">
-                          <AlertCircle className="h-3 w-3" />
-                          تغييرات غير محفوظة
-                        </p>
-                      )}
-                    </div>
-                  </CardFooter>
-                </Card>
-              )}
-            </div>
-          </div>
         </CardContent>
       </Card>
 
+      <div className="grid md:grid-cols-1 gap-2 p-2">
+        <div className="md:col-span-1">
+          {/* تمت إزالة الفراغ السفلي الزائد */}
+          {selectedCircle && selectedSession && (
+            <Card className="hidden md:block border border-green-300 rounded-xl shadow-md overflow-hidden">
+              {/* الهيدر */}
+              <CardHeader className="bg-gradient-to-r from-green-700 to-green-600 text-white px-3 py-2 border-b border-green-400">
+                <div className="flex items-center justify-between w-full">
+                  {/* العنوان + التاريخ */}
+                  <div className="flex flex-col">
+                    <CardTitle className="text-[13px] font-bold flex items-center gap-1">
+                      <CalendarCheck className="h-3.5 w-3.5 text-yellow-300" />
+                      <span className="line-clamp-1">{getCircleName(selectedCircle)}</span>
+                    </CardTitle>
+                    <CardDescription className="text-[10px] text-green-50 flex items-center gap-1">
+                      <Calendar className="h-3 w-3 text-green-200" />
+                      {formatDateDisplay(selectedSession.session_date)}
+                      {selectedSession.start_time && selectedSession.end_time && (
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-green-200" />
+                          {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
+                        </span>
+                      )}
+                    </CardDescription>
+                  </div>
+
+                  {/* أزرار سريعة */}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      onClick={() => setAllStudentsStatus("present")}
+                      className="flex items-center h-6 px-2 rounded bg-green-100 hover:bg-green-200 text-green-800 text-[10px] border border-green-300"
+                    >
+                      <Check className="h-3 w-3 mr-0.5" />
+                      حاضر
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setAllStudentsStatus("absent")}
+                      className="flex items-center h-6 px-2 rounded bg-red-100 hover:bg-red-200 text-red-800 text-[10px] border border-red-300"
+                    >
+                      <X className="h-3 w-3 mr-0.5" />
+                      غائب
+                    </Button>
+                  </div>
+                </div>
+
+                {/* ملخص الحضور (سطر صغير تحت لو ضروري) */}
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {renderAttendanceSummary()}
+                </div>
+              </CardHeader>
+
+              {/* المحتوى */}
+              <CardContent className="p-3">
+                {loadingStudents ? (
+                  <div className="text-center py-6">
+                    <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-green-600" />
+                    <p className="text-gray-500 text-xs">جارٍ تحميل بيانات الطلاب...</p>
+                  </div>
+                ) : studentsWithAttendance.length === 0 ? (
+                  <div className="text-center py-6 bg-green-50 rounded-lg">
+                    <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500" />
+                    <p className="text-sm font-medium text-green-800">لا يوجد طلاب</p>
+                    <p className="text-[11px] text-gray-600">
+                      يرجى إضافة طلاب لهذه الحلقة.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="w-full flex justify-center pt-2 pb-3">
+                      <div className="flex items-center gap-2">
+
+                        {/* زر السابق */}
+                        {studentsWithAttendance.length > studentsGroupSize && (
+                          <button
+                            onClick={goPrevStudentCarousel}
+                            disabled={studentCarouselIndex === 0}
+                            className="h-8 w-8 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            aria-label="السابق"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {/* شبكة الطلاب */}
+                        <div className="grid grid-cols-4 gap-3 w-full max-w-2xl mx-auto">
+                          {visibleStudentsGroup.map((item, idx) => {
+                            const absoluteIndex = studentCarouselIndex * studentsGroupSize + idx;
+                            return (
+                              <div
+                                key={item.student.id}
+                                className="group relative border rounded-lg cursor-pointer overflow-hidden transition-all duration-300 bg-white flex flex-col shadow-sm hover:shadow-md hover:scale-[1.005] border-emerald-200 hover:border-emerald-400"
+                              >
+                                <div className="h-0.5 w-full bg-gradient-to-r from-emerald-200 to-emerald-300 group-hover:from-emerald-300 group-hover:to-emerald-400 transition-all" />
+                                <div className="p-2 flex flex-col gap-1.5 text-[10px] grow">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div className="h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
+                                        {absoluteIndex + 1}
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-[11px] font-medium truncate text-emerald-800 leading-tight">{item.student.full_name}</p>
+                                        <p className="text-[10px] text-gray-500 truncate leading-tight">{item.student.guardian?.full_name}</p>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEditAttendance(item.student.id)}
+                                      className="h-7 w-7 p-0 flex-shrink-0"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+
+                                  <div className="grid grid-cols-2 gap-1.5 mt-0.5">
+                                    {/* حالة الحضور */}
+                                    <Select
+                                      value={attendanceFormData[item.student.id]?.status || 'present'}
+                                      onValueChange={(value) => handleStatusChange(item.student.id, value as AttendanceStatus)}
+                                    >
+                                      <SelectTrigger
+                                        id={`attendance-status-${item.student.id}`}
+                                        dir="rtl"
+                                        className={`h-7 text-right truncate max-w-full min-w-0 text-[10px] leading-none rounded-md border px-2 pr-2 transition-all
+                                              focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 bg-white dark:bg-gray-800
+                                              ${(() => {
+                                            const st = attendanceFormData[item.student.id]?.status || 'present';
+                                            if (st === 'present') return 'border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold';
+                                            if (st === 'absent') return 'border-red-300 bg-red-50 text-red-700 font-semibold';
+                                            if (st === 'late') return 'border-amber-300 bg-amber-50 text-amber-700 font-semibold';
+                                            if (st === 'excused') return 'border-blue-300 bg-blue-50 text-blue-700 font-semibold';
+                                            return 'border-gray-300 text-gray-600';
+                                          })()}`}
+                                      >
+                                        <SelectValue placeholder="اختر الحالة">
+                                          {getAttendanceStatusName(attendanceFormData[item.student.id]?.status || 'present')}
+                                        </SelectValue>
+                                      </SelectTrigger>
+                                      <SelectContent
+                                        position="popper"
+                                        dir="rtl"
+                                        className="text-right text-[10px] sm:text-[11px] rounded-md border border-emerald-200 dark:border-emerald-700 shadow-md bg-white dark:bg-gray-900"
+                                      >
+                                        {attendanceStatusOptions.map((option) => (
+                                          <SelectItem
+                                            key={option.value}
+                                            value={option.value}
+                                            className={`cursor-pointer data-[highlighted]:bg-emerald-900/80 data-[state=checked]:font-semibold rounded-sm text-[11px]
+                                                  ${option.value === 'present' ? 'text-emerald-700' :
+                                                option.value === 'absent' ? 'text-red-700' :
+                                                  option.value === 'late' ? 'text-amber-700' :
+                                                    option.value === 'excused' ? 'text-blue-700' : 'text-gray-700'}`}
+                                          >
+                                            {option.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+
+                                    {attendanceFormData[item.student.id]?.status === 'late' && (
+                                      <Input
+                                        title="أدخل دقائق التأخير"
+                                        type="number"
+                                        min={0}
+                                        value={attendanceFormData[item.student.id]?.late_minutes || 0}
+                                        onChange={(e) => {
+                                          const value = parseInt(e.target.value) || 0;
+                                          setAttendanceFormData((prev) => ({
+                                            ...prev,
+                                            [item.student.id]: {
+                                              ...prev[item.student.id],
+                                              late_minutes: value < 0 ? 0 : value,
+                                            },
+                                          }));
+                                          setHasChanges(true);
+                                        }}
+                                        className="h-7 text-center text-[10px] bg-amber-50 border-amber-300 px-1"
+                                        placeholder="دقائق التأخير"
+                                      />
+                                    )}
+                                  </div>
+
+                                  {attendanceFormData[item.student.id]?.note && (
+                                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-600">
+                                      <FileText className="h-3 w-3 flex-shrink-0" />
+                                      <span className="truncate">{attendanceFormData[item.student.id]?.note}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* زر التالي */}
+                        {studentsWithAttendance.length > studentsGroupSize && (
+                          <button
+                            onClick={goNextStudentCarousel}
+                            disabled={studentCarouselIndex >= totalStudentCarouselGroups - 1}
+                            className="h-8 w-8 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                            aria-label="التالي"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                        )}
+
+                      </div>
+                    </div>
+
+                    {/* مؤشرات + عداد */}
+                    <div className="flex flex-col items-center mt-2 gap-3">
+                      {studentsWithAttendance.length > studentsGroupSize && (
+                        <div className="flex items-center gap-2 bg-white/60 backdrop-blur px-2 py-1.5 rounded-xl border border-emerald-200 shadow-sm">
+                          {Array.from({ length: totalStudentCarouselGroups }).map((_, i) => (
+                            <button
+                              key={i}
+                              id={`student-indicator-${i}`}
+                              onClick={() => setStudentCarouselIndex(i)}
+                              className="w-2.5 h-2.5 rounded-full bg-emerald-300 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
+                              aria-label={`مجموعة الطلاب ${i + 1}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-[10px] flex items-center gap-2 text-emerald-700 font-medium bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-sm">
+                        <span>مجموعة {studentCarouselIndex + 1} / {totalStudentCarouselGroups}</span>
+                        <span className="w-px h-3 bg-emerald-300" />
+                        <span>
+                          الطلاب: {visibleStudentsGroup.length === 0 ? 0 : (studentCarouselIndex * studentsGroupSize + 1)} - {Math.min((studentCarouselIndex * studentsGroupSize) + visibleStudentsGroup.length, studentsWithAttendance.length)} من {studentsWithAttendance.length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                )}
+              </CardContent>
+
+              {/* الفوتر */}
+              <CardFooter className="bg-green-50 px-3 py-2 border-t border-green-200">
+                <div className="w-full space-y-1">
+                  <Button
+                    onClick={attemptSaveAttendance}
+                    disabled={
+                      !hasChanges ||
+                      savingAttendance ||
+                      studentsWithAttendance.length === 0
+                    }
+                    className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2 rounded-lg"
+                  >
+                    {savingAttendance ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        جارٍ الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        حفظ الحضور
+                      </>
+                    )}
+                  </Button>
+                  {hasChanges && (
+                    <p className="text-amber-600 text-[11px] flex items-center gap-1 font-medium">
+                      <AlertCircle className="h-3 w-3" />
+                      تغييرات غير محفوظة
+                    </p>
+                  )}
+                </div>
+              </CardFooter>
+            </Card>
+          )}
+        </div>
+      </div>
 
       <div className="mb-4"></div>
       {selectedCircle && selectedSession && (
@@ -1753,39 +1324,36 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           </FormRow>
         </div>
       </FormDialog>
-          <DeleteConfirmationDialog
-            isOpen={showFutureConfirm}
-            onOpenChange={setShowFutureConfirm}
-            title="تأكيد تسجيل حضور مبكر"
-            description={
-              <div className="space-y-2 text-right">
-                <p>أنت على وشك تسجيل حضور لجلسة بتاريخ مستقبلي.</p>
-                <p className="font-medium text-red-700">هل أنت متأكد أنك تريد المتابعة؟</p>
-                {selectedSession && (
-                  <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2 text-[13px]">
-                    <div className="flex items-center gap-2 font-semibold text-blue-800">
-                      <CalendarCheck className="h-4 w-4" />
-                      <span>تفاصيل الجلسة</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-[12px] text-blue-700">
-                      <span className="font-medium">التاريخ:</span>
-                      <span>{formatDateDisplay(selectedSession.session_date)}</span>
-                      <span className="font-medium">الوقت:</span>
-                      <span>{selectedSession.start_time && selectedSession.end_time ? `${formatTimeDisplay(selectedSession.start_time)} - ${formatTimeDisplay(selectedSession.end_time)}` : '-'}</span>
-                    </div>
-                  </div>
-                )}
+      <DeleteConfirmationDialog
+        isOpen={showFutureConfirm}
+        onOpenChange={setShowFutureConfirm}
+        title="تأكيد تسجيل حضور مبكر"
+        description={
+          <div className="space-y-2 text-right">
+            <p>أنت على وشك تسجيل حضور لجلسة بتاريخ مستقبلي.</p>
+            <p className="font-medium text-red-700">هل أنت متأكد أنك تريد المتابعة؟</p>
+            {selectedSession && (
+              <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2 text-[13px]">
+                <div className="flex items-center gap-2 font-semibold text-blue-800">
+                  <CalendarCheck className="h-4 w-4" />
+                  <span>تفاصيل الجلسة</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-[12px] text-blue-700">
+                  <span className="font-medium">التاريخ:</span>
+                  <span>{formatDateDisplay(selectedSession.session_date)}</span>
+                  <span className="font-medium">الوقت:</span>
+                  <span>{selectedSession.start_time && selectedSession.end_time ? `${formatTimeDisplay(selectedSession.start_time)} - ${formatTimeDisplay(selectedSession.end_time)}` : '-'}</span>
+                </div>
               </div>
-            }
-            deleteButtonText={pendingFutureSave ? 'جارٍ الحفظ...' : 'نعم، متابعة الحفظ'}
-            cancelButtonText="إلغاء"
-            onConfirm={confirmFutureAttendanceSave}
-            isLoading={pendingFutureSave}
-          />
+            )}
+          </div>
+        }
+        deleteButtonText={pendingFutureSave ? 'جارٍ الحفظ...' : 'نعم، متابعة الحفظ'}
+        cancelButtonText="إلغاء"
+        onConfirm={confirmFutureAttendanceSave}
+        isLoading={pendingFutureSave}
+      />
     </div>
   );
-}
-function loadCircleSchedules(id: string) {
-  throw new Error("Function not implemented.");
 }
 
