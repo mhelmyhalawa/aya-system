@@ -215,8 +215,10 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circleId, allCircles]);
 
-  // عند تغيير المعلم نصفر اختيار الحلقة
-  useEffect(() => { setCircleId(null); }, [teacherId]);
+  // عند تغيير المعلم: لا نصفر اختيار الحلقة فوراً إن كانت الحلقة الوحيدة لديه وتم تعيينها تلقائياً
+  // بدلاً من ذلك نتحقق في effect أعلاه الخاص بالمعلم والحلقات.
+  // إزالة التصفير التلقائي هنا كان يمنع اختيار الحلقة الوحيدة لأن هذا التأثير كان ينفذ بعد التعيين.
+  // إذا احتجنا لاحقاً لتصفير يدوي يتم عبر handleResetSelections أو عند عدم صلاحية الحلقة في التأثيرات الأخرى.
 
   // اختيار الحلقة
   const handleSelectCircle = async (circle: StudyCircle) => {
