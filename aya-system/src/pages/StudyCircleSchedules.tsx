@@ -11,7 +11,7 @@ import { StudyCircle } from "@/types/study-circle";
 import { StudyCircleSchedule, StudyCircleScheduleCreate, StudyCircleScheduleUpdate, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
 import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
-import { Calendar, Clock, Plus, Pencil, Trash2, Info, MapPin, X, BookOpen, Filter, RefreshCwIcon } from "lucide-react";
+import { Calendar, Clock, Plus, Pencil, Trash2, Info, MapPin, X, BookOpen, Filter, RefreshCwIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { checkAuthStatus } from '@/lib/auth-service';
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { getLabels } from '@/lib/labels';
@@ -520,7 +520,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
   const tableSchedules = sortedSchedules.map((s, idx) => ({ ...s, row_index: idx + 1, id: s.id ?? `sch-${idx}`, __conflict: conflictIds.has(s.id) }));
 
   // تبويبات (جميع السجلات / سجلاتي)
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
+  const [cardCollapsed, setCardCollapsed] = useState(false);
 
   // حالة المصادقة الفعلية
   const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
@@ -597,74 +598,91 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       <Card className="pt-1 pb-0 px-0 sm:px-0 shadow-md border-0">
         {/* الهيدر */}
         <CardHeader className="pb-1 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-            {/* العنوان والوصف */}
-            <div className="flex flex-col">
-              <CardTitle className="text-base md:text-lg font-extrabold text-green-50 flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
-                <span className="line-clamp-1">{scsLabels.pageTitle} </span>
-              </CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs text-green-100/90 mt-0.5">
+          <div className="flex flex-col gap-1">
+            <CardTitle className="text-base md:text-lg font-extrabold text-green-50 flex items-center gap-1.5">
+              <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
+              <span className="line-clamp-1 flex-1">
+                {scsLabels.pageTitle}
+              </span>
+              {/* زر الطي (في نفس مستوى العنوان) */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCardCollapsed(prev => !prev)}
+                className="bg-green-700/30 hover:bg-green-600/50 text-white rounded-full h-7 w-7 p-0 flex items-center justify-center shadow-sm transition-colors shrink-0"
+                title={cardCollapsed ? "عرض المحتوى" : "طي المحتوى"}
+                aria-label={cardCollapsed ? "Expand" : "Collapse"}
+              >
+                {cardCollapsed ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronUp className="h-4 w-4" />
+                )}
+              </Button>
+            </CardTitle>
+            {!cardCollapsed && (
+              <CardDescription className="text-[10px] sm:text-xs text-green-100/90 mt-0.5 pr-8">
                 {scsLabels.pageDescription}
               </CardDescription>
-            </div>
-
+            )}
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-0 sm:space-y-0 px-2 sm:px-3 pt-2 pb-3">
-          <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-1 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
-            <div className="flex gap-2 items-center ">
-              {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
-              <Button
-                variant={showFilters ? 'default' : 'outline'}
-                className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
-                onClick={() => setShowFilters(p => !p)}
-                title={showFilters ? 'إخفاء شريط الفلترة' : 'إظهار شريط الفلترة'}
-              >
-                <Filter className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">فلتر</span>
-              </Button>
-              {/* زر التحديث لإلغاء التحديد */}
-              <Button
-                variant="outline"
-                className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8"
-                onClick={handleResetSelections}
-                title='تحديث / إلغاء التحديد'
-              >
-                <RefreshCwIcon className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">تحديث</span>
-              </Button>
+        {!cardCollapsed && (
+          <CardContent className="space-y-0 sm:space-y-0 px-2 sm:px-3 pt-2 pb-3 transition-all duration-300">
+            <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-1 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
+              <div className="flex gap-2 items-center ">
+                {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
+                <Button
+                  variant={showFilters ? 'default' : 'outline'}
+                  className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
+                  onClick={() => setShowFilters(p => !p)}
+                  title={showFilters ? 'إخفاء شريط الفلترة' : 'إظهار شريط الفلترة'}
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">فلتر</span>
+                </Button>
+                {/* زر التحديث لإلغاء التحديد */}
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8"
+                  onClick={handleResetSelections}
+                  title='تحديث / إلغاء التحديد'
+                >
+                  <RefreshCwIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">تحديث</span>
+                </Button>
+              </div>
             </div>
-          </div>
-          {showFilters && (
-            <TeacherCircleFilterBar
-              useInlineSelects
-              useShadSelect
-              teachers={effectiveTeachers}
-              circles={filteredCircles.map(c => ({ id: c.id, name: c.name }))}
-              selectedTeacherId={teacherId}
-              selectedCircleId={circleId}
-              searchQuery={search}
-              onSearchChange={setSearch}
-              onTeacherChange={(id) => { setTeacherId(id); setCircleId(null); }}
-              onCircleChange={(id) => setCircleId(id)}
-              onClearTeacher={() => { setTeacherId(null); setCircleId(null); }}
-              onClearCircle={() => setCircleId(null)}
-              showAddButton={canEditSchedules}
-              onAddClick={handleAddSchedule}
-              addButtonLabel={scsLabels.scheduleAdd}
-              addButtonTooltip={"إضافة موعد جديد"}
-              showExportButton={userRole === 'superadmin'}
-              onExportClick={() => {/* TODO: export logic */}}
-              exportButtonLabel="تصدير"
-              requireCircleBeforeAdd
-            />
-          )}
+            {showFilters && (
+              <TeacherCircleFilterBar
+                useInlineSelects
+                useShadSelect
+                teachers={effectiveTeachers}
+                circles={filteredCircles.map(c => ({ id: c.id, name: c.name }))}
+                selectedTeacherId={teacherId}
+                selectedCircleId={circleId}
+                searchQuery={search}
+                onSearchChange={setSearch}
+                onTeacherChange={(id) => { setTeacherId(id); setCircleId(null); }}
+                onCircleChange={(id) => setCircleId(id)}
+                onClearTeacher={() => { setTeacherId(null); setCircleId(null); }}
+                onClearCircle={() => setCircleId(null)}
+                showAddButton={canEditSchedules}
+                onAddClick={handleAddSchedule}
+                addButtonLabel={scsLabels.scheduleAdd}
+                addButtonTooltip={"إضافة موعد جديد"}
+                showExportButton={userRole === 'superadmin'}
+                onExportClick={() => {/* TODO: export logic */}}
+                exportButtonLabel="تصدير"
+                requireCircleBeforeAdd
+              />
+            )}
 
-          <div>
-          </div>
-        </CardContent>
+            <div>
+            </div>
+          </CardContent>
+        )}
       </Card>
 
 

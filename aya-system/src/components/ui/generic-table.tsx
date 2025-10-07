@@ -152,45 +152,51 @@ export function GenericTable<T extends { id: string }>(props: {
     const [internalPage, setInternalPage] = useState<number>(1);
     const currentPage = props.currentPageExternal ?? internalPage;
 
-    // فرض نمط البطاقات على الموبايل
+    // مرجع لمعرفة إذا كنا انتقلنا للتو بين حالتي الموبايل وسطح المكتب
+    const prevIsMobileRef = useRef<boolean>(isMobile);
+
+    // 1) فرض نمط البطاقات على الموبايل ونمط الجدول على سطح المكتب (سلوك سابق محفوظ)
     useEffect(() => {
         if (isMobile) {
-            setViewMode(prev => prev === 'card' ? prev : 'card');
+            setViewMode('card');
         } else {
-            setViewMode(prev => prev === 'table' ? prev : 'table');
+            setViewMode('table');
         }
     }, [isMobile]);
 
-    // سابقاً كنا نجبر الحجم على 1 دائماً في الموبايل وضع البطاقات.
-    // الآن: نجبره فقط إذا تم تمرير cardPageSize صراحة. إذا لم يُحدَّد يمكن للمستخدم تغييره من القائمة.
+    // 2) عند الانتقال لأول مرة إلى الموبايل: إن لم يُمرَّر cardPageSize نضع 1 كإعداد ابتدائي فقط (ولا نُعيد فرضه بعد تغيير المستخدم).
+    //    عند الخروج من الموبايل نعيد قيمة سطح المكتب السابقة (المحفوظة في prevPageSizeRef) إذا كنا في نمط الجدول.
     useEffect(() => {
-        // دخول إلى وضع الموبايل
-        if (isMobile) {
-            // حفظ آخر قيمة قبل الموبايل (قيمة سطح المكتب) إذا كنا ننتقل الآن من غير موبايل
-            // (ملاحظة: نعتمد على prevPageSizeRef السابق فقط إن كانت الصفحة الحالية ليست 1 مفروضة)
-            // إذا تم تمرير cardPageSize: نفرضها
-            if (viewMode === 'card' && cardPageSize && cardPageSize > 0) {
-                if (pageSize !== cardPageSize) setPageSize(cardPageSize);
-            } else {
-                // لم يتم تمرير cardPageSize -> نجعل القيمة 1 دائماً كافتراضي للموبايل
-                if (pageSize !== 1) setPageSize(1);
+        const wasMobile = prevIsMobileRef.current;
+        if (isMobile && !wasMobile) {
+            // انتقال إلى الموبايل الآن
+            if (!cardPageSize) {
+                // ضبط مبدئي فقط
+                setPageSize(1);
             }
-            return; // لا نكمل منطق سطح المكتب
-        }
-
-        // الخروج إلى سطح المكتب: لو كنا في جدول نعيد آخر قيمة محفوظة إذا كنا على قيمة موبايل (1) أو قيمة cardPageSize المفروضة
-        if (!isMobile && viewMode === 'table') {
-            const desired = prevPageSizeRef.current || defaultPageSize;
-            // إذا كانت القيمة الحالية 1 (افتراضي موبايل) أو مساوية لقيمة cardPageSize فنستعيد
-            if ((pageSize === 1 || (cardPageSize && pageSize === cardPageSize)) && pageSize !== desired) {
+        } else if (!isMobile && wasMobile) {
+            // خروج من الموبايل الآن
+            if (viewMode === 'table') {
+                const desired = prevPageSizeRef.current || defaultPageSize;
                 setPageSize(desired);
             }
         }
-        // تحديث المرجع دائماً في سطح المكتب عند أي تغيير يدوي (يتم خارج هذا التأثير نفسه)
-        if (!isMobile && pageSize !== 1 && (!cardPageSize || pageSize !== cardPageSize)) {
+        prevIsMobileRef.current = isMobile;
+    }, [isMobile, cardPageSize, viewMode, defaultPageSize]);
+
+    // 3) إذا تم تمرير cardPageSize نفرضه في الموبايل (ويمكن أن نسمح بسلوكه أيضاً في غير الموبايل إذا رغبت لاحقاً)
+    useEffect(() => {
+        if (isMobile && cardPageSize && cardPageSize > 0 && pageSize !== cardPageSize) {
+            setPageSize(cardPageSize);
+        }
+    }, [isMobile, cardPageSize, pageSize]);
+
+    // 4) تحديث مرجع آخر حجم صفحة لسطح المكتب عند أي تغيير يدوي في وضع سطح المكتب فقط
+    useEffect(() => {
+        if (!isMobile && pageSize > 0 && (!cardPageSize || pageSize !== cardPageSize)) {
             prevPageSizeRef.current = pageSize;
         }
-    }, [isMobile, viewMode, cardPageSize, pageSize, defaultPageSize]);
+    }, [isMobile, pageSize, cardPageSize]);
 
     // إعادة ضبط الصفحة عند تغيير نمط العرض لتفادي بقاء مؤشر خارج النطاق خاصة في وضع بطاقة واحدة
     useEffect(() => {
@@ -393,151 +399,151 @@ export function GenericTable<T extends { id: string }>(props: {
         <div className={cn('w-full overflow-hidden', className)}>
             {/* الهيدر (موبايل مبسط + سطح مكتب كامل) */}
             {isMobile ? (
-<div className="flex flex-col gap-1 mb-0 p-2.5
+                <div className="flex flex-col gap-1 mb-0 p-2.5
     bg-gradient-to-br from-green-100 via-green-200 to-emerald-100 
     dark:from-green-950 dark:via-emerald-950 dark:to-green-900 
     border border-green-300/40 dark:border-green-800/60 
     rounded-xl shadow-sm">
 
-  {/* الصف الأول: العنوان + زر الطي */}
-  {(title || collapsible || onToggleCollapse) && (
-    <div className="flex items-center justify-between w-full">
-      <div className="flex-1 text-center text-xs font-semibold 
+                    {/* الصف الأول: العنوان + زر الطي */}
+                    {(title || collapsible || onToggleCollapse) && (
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex-1 text-center text-xs font-semibold 
           text-green-900 dark:text-green-100 leading-tight tracking-wide">
-        {title}
-      </div>
-      {(collapsible || onToggleCollapse) && (
-        <button
-          type="button"
-          onClick={handleToggleInternal}
-          aria-label={effectiveCollapsed ? 'إظهار المحتوى' : 'إخفاء المحتوى'}
-          aria-expanded={!effectiveCollapsed}
-          className={cn(
-            'h-7 w-7 inline-flex items-center justify-center rounded-md border border-green-300 bg-green-100 text-green-700 hover:bg-green-200 transition-all shadow-sm',
-            !effectiveCollapsed && 'rotate-180'
-          )}
-        >
-          <ChevronDown className="h-4 w-4" />
-        </button>
-      )}
-    </div>
-  )}
+                                {title}
+                            </div>
+                            {(collapsible || onToggleCollapse) && (
+                                <button
+                                    type="button"
+                                    onClick={handleToggleInternal}
+                                    aria-label={effectiveCollapsed ? 'إظهار المحتوى' : 'إخفاء المحتوى'}
+                                    aria-expanded={!effectiveCollapsed}
+                                    className={cn(
+                                        'h-7 w-7 inline-flex items-center justify-center rounded-md border border-green-300 bg-green-100 text-green-700 hover:bg-green-200 transition-all shadow-sm',
+                                        !effectiveCollapsed && 'rotate-180'
+                                    )}
+                                >
+                                    <ChevronDown className="h-4 w-4" />
+                                </button>
+                            )}
+                        </div>
+                    )}
 
-  {/* الصف الثاني (مُوحّد): الترقيم + أزرار التنقل + حجم الصفحة + الترتيب */}
-  {!controlsHidden && (
-    <div
-      className={cn(
-        "bg-transparent border-2 border-green-500 rounded-lg px-2 py-2 flex items-center w-full gap-1",
-        "overflow-hidden flex-nowrap flex-shrink"
-      )}
-      style={{ flexWrap: "nowrap" }}
-    >
-      {enablePagination && (
-        <>
-          {/* رقم الصفحة */}
-          <div className="flex items-center justify-center flex-[0.8] min-w-0">
-            <span className="h-7 w-full flex items-center justify-center rounded bg-green-200/60 dark:bg-green-800/60 text-[11px] font-bold text-green-900 dark:text-green-100 truncate">
-              {currentPage}/{totalPages}
-            </span>
-          </div>
+                    {/* الصف الثاني (مُوحّد): الترقيم + أزرار التنقل + حجم الصفحة + الترتيب */}
+                    {!controlsHidden && (
+                        <div
+                            className={cn(
+                                "bg-transparent border-2 border-green-500 rounded-lg px-2 py-2 flex items-center w-full gap-1",
+                                "overflow-hidden flex-nowrap flex-shrink"
+                            )}
+                            style={{ flexWrap: "nowrap" }}
+                        >
+                            {enablePagination && (
+                                <>
+                                    {/* رقم الصفحة */}
+                                    <div className="flex items-center justify-center flex-[0.8] min-w-0">
+                                        <span className="h-7 w-full flex items-center justify-center rounded bg-green-200/60 dark:bg-green-800/60 text-[11px] font-bold text-green-900 dark:text-green-100 truncate">
+                                            {currentPage}/{totalPages}
+                                        </span>
+                                    </div>
 
-          {/* أزرار التنقل */}
-          <div className="flex items-center justify-center flex-[3] min-w-0 gap-1">
-            <button
-              onClick={() => {
-                if (props.currentPageExternal === undefined) setInternalPage(1);
-                else props.onPageChange && props.onPageChange(1);
-              }}
-              disabled={currentPage === 1}
-              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
-            >
-              <ChevronsRight className="h-3.5 w-3.5" />
-            </button>
+                                    {/* أزرار التنقل */}
+                                    <div className="flex items-center justify-center flex-[3] min-w-0 gap-1">
+                                        <button
+                                            onClick={() => {
+                                                if (props.currentPageExternal === undefined) setInternalPage(1);
+                                                else props.onPageChange && props.onPageChange(1);
+                                            }}
+                                            disabled={currentPage === 1}
+                                            className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+                                        >
+                                            <ChevronsRight className="h-3.5 w-3.5" />
+                                        </button>
 
-            <button
-              onClick={() => {
-                const t = Math.max(1, currentPage - 1);
-                if (props.currentPageExternal === undefined) setInternalPage(t);
-                else props.onPageChange && props.onPageChange(t);
-              }}
-              disabled={currentPage === 1}
-              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
+                                        <button
+                                            onClick={() => {
+                                                const t = Math.max(1, currentPage - 1);
+                                                if (props.currentPageExternal === undefined) setInternalPage(t);
+                                                else props.onPageChange && props.onPageChange(t);
+                                            }}
+                                            disabled={currentPage === 1}
+                                            className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+                                        >
+                                            <ChevronRight className="h-3.5 w-3.5" />
+                                        </button>
 
-            <button
-              onClick={() => {
-                const t = Math.min(totalPages, currentPage + 1);
-                if (props.currentPageExternal === undefined) setInternalPage(t);
-                else props.onPageChange && props.onPageChange(t);
-              }}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
+                                        <button
+                                            onClick={() => {
+                                                const t = Math.min(totalPages, currentPage + 1);
+                                                if (props.currentPageExternal === undefined) setInternalPage(t);
+                                                else props.onPageChange && props.onPageChange(t);
+                                            }}
+                                            disabled={currentPage === totalPages || totalPages === 0}
+                                            className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+                                        >
+                                            <ChevronLeft className="h-3.5 w-3.5" />
+                                        </button>
 
-            <button
-              onClick={() => {
-                if (props.currentPageExternal === undefined)
-                  setInternalPage(totalPages);
-                else props.onPageChange && props.onPageChange(totalPages);
-              }}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
-            >
-              <ChevronsLeft className="h-3.5 w-3.5" />
-            </button>
-          </div>
+                                        <button
+                                            onClick={() => {
+                                                if (props.currentPageExternal === undefined)
+                                                    setInternalPage(totalPages);
+                                                else props.onPageChange && props.onPageChange(totalPages);
+                                            }}
+                                            disabled={currentPage === totalPages || totalPages === 0}
+                                            className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+                                        >
+                                            <ChevronsLeft className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
 
-          {/* اختيار حجم الصفحة */}
-          <div className="flex items-center justify-center flex-[1.2] min-w-0">
-            <select
-              value={pageSize.toString()}
-              onChange={(e) => setPageSize(parseInt(e.target.value))}
-              className="h-7 w-full text-[10px] rounded bg-green-100/60 dark:bg-green-800/40 text-green-900 dark:text-green-100 border border-green-400/30 focus:outline-none focus:ring-2 focus:ring-green-400/40 truncate"
-            >
-              {effectivePageSizeOptions.map((o) => (
-                <option className="text-green-900" key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
-      )}
+                                    {/* اختيار حجم الصفحة */}
+                                    <div className="flex items-center justify-center flex-[1.2] min-w-0">
+                                        <select
+                                            value={pageSize.toString()}
+                                            onChange={(e) => setPageSize(parseInt(e.target.value))}
+                                            className="h-7 w-full text-[10px] rounded bg-green-100/60 dark:bg-green-800/40 text-green-900 dark:text-green-100 border border-green-400/30 focus:outline-none focus:ring-2 focus:ring-green-400/40 truncate"
+                                        >
+                                            {effectivePageSizeOptions.map((o) => (
+                                                <option className="text-green-900" key={o} value={o}>
+                                                    {o}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </>
+                            )}
 
-      {/* زر الترتيب */}
-      <div className="flex items-center justify-center flex-[0.8] min-w-0 ml-auto">
-        {!hideSortToggle && enableSorting && columns.length > 0 && (
-          <button
-            aria-label={
-              sortDirection === null
-                ? 'تفعيل الترتيب التصاعدي'
-                : sortDirection === 'asc'
-                ? 'التبديل إلى ترتيب تنازلي'
-                : 'إلغاء الترتيب'
-            }
-            onClick={() => toggleSort()}
-            className={cn(
-              "h-7 w-full flex items-center justify-center rounded-md shadow border transition-colors duration-200",
-              sortDirection === null
-                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
-                : sortDirection === "asc"
-                ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
-                : "bg-green-700 text-white border-green-800 hover:bg-green-800"
-            )}
-          >
-            {sortDirection === null && <ArrowUpDown className="h-4 w-4" />}
-            {sortDirection === "asc" && <ChevronUp className="h-4 w-4" />}
-            {sortDirection === "desc" && <ChevronDown className="h-4 w-4" />}
-          </button>
-        )}
-      </div>
-    </div>
-  )}
-</div>
+                            {/* زر الترتيب */}
+                            <div className="flex items-center justify-center flex-[0.8] min-w-0 ml-auto">
+                                {!hideSortToggle && enableSorting && columns.length > 0 && (
+                                    <button
+                                        aria-label={
+                                            sortDirection === null
+                                                ? 'تفعيل الترتيب التصاعدي'
+                                                : sortDirection === 'asc'
+                                                    ? 'التبديل إلى ترتيب تنازلي'
+                                                    : 'إلغاء الترتيب'
+                                        }
+                                        onClick={() => toggleSort()}
+                                        className={cn(
+                                            "h-7 w-full flex items-center justify-center rounded-md shadow border transition-colors duration-200",
+                                            sortDirection === null
+                                                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                                                : sortDirection === "asc"
+                                                    ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
+                                                    : "bg-green-700 text-white border-green-800 hover:bg-green-800"
+                                        )}
+                                    >
+                                        {sortDirection === null && <ArrowUpDown className="h-4 w-4" />}
+                                        {sortDirection === "asc" && <ChevronUp className="h-4 w-4" />}
+                                        {sortDirection === "desc" && <ChevronDown className="h-4 w-4" />}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
 
             ) : (
                 <div className="flex flex-col gap-1 mb-0 p-2.5 bg-gradient-to-r from-green-100 via-emerald-100 
