@@ -578,7 +578,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
 
   // تعريف أعمدة جدول الجدولة
   const tableColumns: Column<StudyCircleSchedule>[] = [
-        {
+    {
       key: 'row_index',
       header: '🔢',
       align: 'center' as const,
@@ -729,7 +729,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 <Filter className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">فلتر</span>
               </Button>
-              {/* زر الترتيب */}
+              {/* زر الترتيب
               <Button
                 type="button"
                 variant={listSortDirection ? 'default' : 'outline'}
@@ -748,7 +748,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 <span className="hidden sm:inline">
                   {listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
                 </span>
-              </Button>
+              </Button>  */}
               {/* زر التحديث */}
               <Button
                 variant="outline"
@@ -894,7 +894,14 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           <GenericTable
             data={displayedCircles}
             columns={columns}
-            //title={studyCirclesLabels.title}
+            title={
+              <div className="flex items-center gap-2 w-full">
+                <BookOpen className="h-4 w-4 md:h-5 md:w-5 text-green-600 drop-shadow-sm" />
+                <span className="font-extrabold text-green-600 text-sm md:text-base tracking-wide truncate">
+                  {studyCirclesLabels.title}
+                </span>
+              </div>
+            }
             emptyMessage={searchTerm ? studyCirclesLabels.searchNoResults : (activeTab === 'my-records' ? 'لا توجد حلقات خاصة بك' : studyCirclesLabels.noCircles)}
             onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddCircle : undefined}
             onRefresh={loadCircles}
@@ -940,7 +947,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             /* تطبيق نفس فكرة جدول سجلات الحفظ: إخفاء أيقونة الترتيب الافتراضي، تلوين الصفوف، تنسيق الإطار */
             className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
             getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
-            hideSortToggle={true}
+            hideSortToggle={false}
           />
         );
       })()}
@@ -997,7 +1004,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                       value={teacher.id}
                       className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 rounded-md"
                     >
-                      {teacher.full_name || `معلم ${teacher.id.slice(0,4)}`}
+                      {teacher.full_name || `معلم ${teacher.id.slice(0, 4)}`}
                     </SelectItem>
                   ))
                 ) : (
@@ -1118,7 +1125,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
                 hideSortToggle={false}
                 enablePagination={true}
                 defaultPageSize={3}
-                pageSizeOptions={[3,6,12,24,50]}
+                pageSizeOptions={[3, 6, 12, 24, 50]}
                 getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
               />
             )}

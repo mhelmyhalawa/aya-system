@@ -1,19 +1,22 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { cn } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input"; // ما زال مستخدماً داخل حوارات إضافة/تعديل الجدولة
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FormDialog, FormRow } from "@/components/ui/form-dialog";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge"; // يستخدم داخل جداول الحوارات
 import { StudyCircle } from "@/types/study-circle";
 import { StudyCircleSchedule, StudyCircleScheduleCreate, StudyCircleScheduleUpdate, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
 import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
-import { Calendar, Clock, Search, Plus, Pencil, Trash2, Info, MapPin, BookOpen, ChevronLeft, AlertCircle, AlertTriangle, X, ChevronRight } from "lucide-react";
+import { Calendar, Clock, Plus, Pencil, Trash2, Info, MapPin, X, BookOpen, Filter, RefreshCwIcon } from "lucide-react";
+import { checkAuthStatus } from '@/lib/auth-service';
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { getLabels } from '@/lib/labels';
 import { GenericTable } from '@/components/ui/generic-table';
+import TeacherCircleFilterBar from '@/components/filters/TeacherCircleFilterBar';
 
 const { studyCircleSchedulesLabels: scsLabels } = getLabels('ar');
 
@@ -27,8 +30,12 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
   const { toast } = useToast();
   const [allCircles, setAllCircles] = useState<StudyCircle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
+  // حالات الفلترة الجديدة
+  const [search, setSearch] = useState("");
+  const [teacherId, setTeacherId] = useState<string | null>(null);
+  const [circleId, setCircleId] = useState<string | null>(null);
   const [selectedCircle, setSelectedCircle] = useState<StudyCircle | null>(null);
+  // لم نعد نستخدم حوارات اختيار المعلم/الحلقة بعد التحويل إلى قوائم مباشرة
 
   // State for circle schedules
   const [circleSchedules, setCircleSchedules] = useState<StudyCircleSchedule[]>([]);
@@ -122,72 +129,56 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     }
   };
 
-  // Handle circle selection
-  const handleSelectCircle = async (circle: StudyCircle) => {
-    setSelectedCircle(circle);
-    await loadCircleSchedules(circle.id);
-  };
+  // قائمة المعلمين مع عدد الحلقات
+  const teachers = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; circles_count: number }>();
+    allCircles.forEach(c => {
+      const t = c.teacher;
+      if (t?.id) {
+        if (!map.has(t.id)) map.set(t.id, { id: t.id, name: t.full_name, circles_count: 0 });
+        map.get(t.id)!.circles_count += 1;
+      }
+    });
+    return Array.from(map.values());
+  }, [allCircles]);
 
-  // Filter circles based on search term
-  const filteredCircles = allCircles.filter(
-    circle =>
-      circle.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (circle.teacher?.full_name && circle.teacher.full_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  // فلترة الحلقات حسب المعلم والبحث
+  const filteredCircles = useMemo(() => {
+    const q = search.toLowerCase();
+    return allCircles.filter(c => {
+      if (teacherId && c.teacher?.id !== teacherId) return false;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        (c.teacher?.full_name?.toLowerCase().includes(q))
+      );
+    });
+  }, [allCircles, teacherId, search]);
 
-  // === Mobile circles pagination (show only 3 at a time) ===
-  const MOBILE_CIRCLES_PAGE_SIZE = 2 // كان 3 - طلب التعديل ليصبح 2
-  const [mobileCirclesPage, setMobileCirclesPage] = useState(0);
-  const totalMobileCirclePages = Math.ceil(filteredCircles.length / MOBILE_CIRCLES_PAGE_SIZE) || 1;
-  const pagedMobileCircles = filteredCircles.slice(
-    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE,
-    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE + MOBILE_CIRCLES_PAGE_SIZE
-  );
-
-  const canPrevMobileCircles = mobileCirclesPage > 0;
-  const canNextMobileCircles = mobileCirclesPage < totalMobileCirclePages - 1;
-
-  const goPrevMobileCircles = () => {
-    setMobileCirclesPage(p => (p > 0 ? p - 1 : p));
-  };
-  const goNextMobileCircles = () => {
-    setMobileCirclesPage(p => (p < totalMobileCirclePages - 1 ? p + 1 : p));
-  };
-
-  // Reset page to 0 when filters (search) change or count shrinks
+  // تحديث الحلقة المختارة عند تغير circleId
   useEffect(() => {
-    setMobileCirclesPage(0);
-  }, [searchTerm, allCircles.length]);
+    if (circleId) {
+      const c = allCircles.find(cc => cc.id === circleId) || null;
+      setSelectedCircle(c);
+      if (c) loadCircleSchedules(c.id);
+    } else {
+      setSelectedCircle(null);
+      setCircleSchedules([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circleId, allCircles]);
 
-  // === Schedules pagination (separate mobile vs desktop) ===
-  const MOBILE_SCHEDULES_PAGE_SIZE = 2; // المطلوب للموبايل
-  const DESKTOP_SCHEDULES_PAGE_SIZE = 4; // يمكن تغييره بسهولة لاحقاً دون التأثير على الموبايل
+  // عند تغيير المعلم نصفر اختيار الحلقة
+  useEffect(() => { setCircleId(null); }, [teacherId]);
+
+  // اختيار الحلقة
+  const handleSelectCircle = async (circle: StudyCircle) => {
+    setCircleId(circle.id);
+  };
+
+  // === Schedules sorting ===
   const sortedSchedules = [...circleSchedules].sort(
     (a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time)
   );
-
-  // Mobile schedule pagination state
-  const [mobileSchedulePage, setMobileSchedulePage] = useState(0);
-  const totalMobileSchedulePages = Math.ceil(sortedSchedules.length / MOBILE_SCHEDULES_PAGE_SIZE) || 1;
-  const pagedMobileSchedules = sortedSchedules.slice(
-    mobileSchedulePage * MOBILE_SCHEDULES_PAGE_SIZE,
-    mobileSchedulePage * MOBILE_SCHEDULES_PAGE_SIZE + MOBILE_SCHEDULES_PAGE_SIZE
-  );
-  const prevMobileSchedulePage = () => setMobileSchedulePage(p => (p > 0 ? p - 1 : p));
-  const nextMobileSchedulePage = () => setMobileSchedulePage(p => (p < totalMobileSchedulePages - 1 ? p + 1 : p));
-
-  // Desktop schedule pagination state
-  const [desktopSchedulePage, setDesktopSchedulePage] = useState(0);
-  const totalDesktopSchedulePages = Math.ceil(sortedSchedules.length / DESKTOP_SCHEDULES_PAGE_SIZE) || 1;
-  const pagedDesktopSchedules = sortedSchedules.slice(
-    desktopSchedulePage * DESKTOP_SCHEDULES_PAGE_SIZE,
-    desktopSchedulePage * DESKTOP_SCHEDULES_PAGE_SIZE + DESKTOP_SCHEDULES_PAGE_SIZE
-  );
-  const prevDesktopSchedulePage = () => setDesktopSchedulePage(p => (p > 0 ? p - 1 : p));
-  const nextDesktopSchedulePage = () => setDesktopSchedulePage(p => (p < totalDesktopSchedulePages - 1 ? p + 1 : p));
-
-  // Reset both when circle or schedules change
-  useEffect(() => { setMobileSchedulePage(0); setDesktopSchedulePage(0); }, [selectedCircle?.id, sortedSchedules.length]);
 
   // Add schedule
   const handleAddSchedule = () => {
@@ -416,8 +407,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
   // Clear selection
   const handleClearSelection = () => {
-    setSelectedCircle(null);
-    setCircleSchedules([]);
+    setCircleId(null);
   };
 
   // === Helpers for grouping & conflict detection ===
@@ -463,6 +453,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       key: 'weekday',
       header: '📅 ' + scsLabels.fieldDayHeader,
       align: 'right' as const,
+      important: true,
       render: (s: StudyCircleSchedule) => (
         <div className="flex flex-col text-right leading-snug">
           <span className="text-xs font-semibold text-green-800">{getWeekdayName(s.weekday)}</span>
@@ -526,22 +517,94 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     } : null
   ].filter(Boolean);
 
-  const tableSchedules = sortedSchedules.map((s, idx) => ({ ...s, row_index: idx + 1, id: s.id ?? `sch-${idx}` }));
+  const tableSchedules = sortedSchedules.map((s, idx) => ({ ...s, row_index: idx + 1, id: s.id ?? `sch-${idx}`, __conflict: conflictIds.has(s.id) }));
+
+  // تبويبات (جميع السجلات / سجلاتي)
+  const [showFilters, setShowFilters] = useState(false);
+
+  // حالة المصادقة الفعلية
+  const [currentUserProfile, setCurrentUserProfile] = useState<any>(null);
+  const [currentUserRoles, setCurrentUserRoles] = useState<string[]>([]);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const status = await checkAuthStatus();
+        if (mounted && status.success && status.isAuthenticated && status.user) {
+          setCurrentUserProfile(status.user);
+          // نفترض أن الدور مفرد (role) داخل user.role، يمكن لاحقاً دعمه كمصفوفة
+          setCurrentUserRoles(status.user.role ? [status.user.role] : []);
+        }
+      } finally {
+        mounted = false;
+        setAuthLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+  const isTeacher = currentUserRoles.includes('teacher');
+  const isAdmin = currentUserRoles.includes('admin') || currentUserRoles.includes('superadmin');
+  const effectiveTeachers = useMemo(() => {
+    if ((isTeacher || isAdmin) && currentUserProfile) {
+      // إذا كان أدمن نعرض الجميع، إذا معلم نعرض نفسه فقط
+      if (isTeacher && !isAdmin) {
+        return teachers.filter(t => t.id === currentUserProfile.id);
+      }
+    }
+    return teachers;
+  }, [isTeacher, isAdmin, currentUserProfile, teachers]);
+
+  // عند التحول إلى تبويب سجلاتي نضمن اختيار المعلم الحالي (إن وجد)
+  // عند تحميل الصفحة: لو المستخدم معلم نحدد معلمه وحلقته الوحيدة (إن وُجدت)
+  useEffect(() => {
+    if (authLoading) return; // انتظار حتى تنتهي المصادقة
+    if (!(isTeacher || isAdmin) || !currentUserProfile) return;
+
+    // تأكد أن المستخدم موجود ضمن قائمة المعلمين (قد يتأخر تحميلها)
+    const userAsTeacher = teachers.find(t => t.id === currentUserProfile.id);
+    if (userAsTeacher && !teacherId) {
+      setTeacherId(currentUserProfile.id);
+    }
+
+    // اختيار حلقة واحدة تلقائياً إذا هو معلم وله حلقة وحيدة
+    if (isTeacher) {
+      const myCircles = filteredCircles.filter(c => c.teacher?.id === currentUserProfile.id);
+      if (myCircles.length === 1 && !circleId) {
+        setCircleId(myCircles[0].id);
+      }
+    }
+
+    // في حالة الأدمن: إن كان الأدمن نفسه معرفاً كمعلم وله حلقة واحدة أيضاً (سيناريو مزدوج)
+    if (isAdmin && !isTeacher && userAsTeacher) {
+      const adminCircles = filteredCircles.filter(c => c.teacher?.id === currentUserProfile.id);
+      if (adminCircles.length === 1 && !circleId) {
+        setCircleId(adminCircles[0].id);
+      }
+    }
+  }, [authLoading, isTeacher, isAdmin, currentUserProfile, teachers, filteredCircles, teacherId, circleId]);
+
+  // إعادة ضبط عند زر تحديث (إلغاء التحديد)
+  const handleResetSelections = () => {
+    setTeacherId(null);
+    setCircleId(null);
+    setSearch('');
+  };
 
   return (
     <div className="w-full max-w-[1600px] mx-auto">
-      <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
+      <Card className="pt-1 pb-0 px-0 sm:px-0 shadow-md border-0">
         {/* الهيدر */}
-        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
-                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+        <CardHeader className="pb-1 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
             {/* العنوان والوصف */}
             <div className="flex flex-col">
-              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
+              <CardTitle className="text-base md:text-lg font-extrabold text-green-50 flex items-center gap-1.5">
                 <Calendar className="h-4 w-4 sm:h-6 sm:w-6 text-yellow-300 animate-pulse" />
                 <span className="line-clamp-1">{scsLabels.pageTitle} </span>
               </CardTitle>
-              <CardDescription className="text-[11px] sm:text-sm text-green-100/90 mt-0.5">
+              <CardDescription className="text-[10px] sm:text-xs text-green-100/90 mt-0.5">
                 {scsLabels.pageDescription}
               </CardDescription>
             </div>
@@ -549,355 +612,129 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3 sm:space-y-6 px-2 sm:px-4 pt-3 pb-4">
-          <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
-            {/* قائمة الجوال */}
-            <div className="md:hidden">
-              <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
-                {/* الهيدر */}
-                <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
-                  <div className="flex items-center gap-1">
-                    <BookOpen className="h-3.5 w-3.5 text-white" />
-                    <h2 className="text-[12px] font-semibold text-white">{scsLabels.circlesListTitle}</h2>
-                  </div>
-                  {selectedCircle && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-white/80">{scsLabels.teacherShort}</span>
-                      <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-4 rounded-full text-[10px]">
-                        {selectedCircle.teacher?.full_name?.split(" ")[0] || scsLabels.teacherUnknown}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
-
-                {/* البحث */}
-                {userRole !== 'teacher' && (
-                  <div className="px-2 pt-2">
-                    <div className="relative">
-                      <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
-                      <Input
-                        placeholder={scsLabels.searchPlaceholder}
-                        className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* العناصر */}
-                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar">
-                  {loading ? (
-                    <div className="w-full py-6 text-center flex flex-col items-center">
-                      <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                      <span className="text-green-700 text-[12px] font-medium">{scsLabels.loading}</span>
-                    </div>
-                  ) : filteredCircles.length === 0 ? (
-                    <div className="w-full py-6 text-center text-green-600 text-[12px]">{scsLabels.noResults}</div>
-                  ) : (
-                    <div className="flex flex-col gap-1">
-                      {pagedMobileCircles.map(circle => {
-                        const active = selectedCircle?.id === circle.id;
-                        return (
-                          <button
-                            key={circle.id}
-                            onClick={() => handleSelectCircle(circle)}
-                            className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200
-                        ${active
-                                ? 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300 text-white shadow-md'
-                                : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}
-                      `}
-                          >
-                            <span className="font-medium truncate">{circle.name}</span>
-                            <div className="flex items-center gap-1.5">
-                              {circle.teacher && (
-                                <span className={`text-[10px] ${active ? 'text-green-100' : 'text-green-500'}`}>
-                                  {circle.teacher.full_name.split(" ")[0]}
-                                </span>
-                              )}
-                              {active && (
-                                <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">
-                                  ✓
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                      {/* Pagination controls */}
-                      {totalMobileCirclePages > 1 && (
-                        <div className="mt-2 flex flex-col items-center gap-1 py-1">
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={goPrevMobileCircles}
-                              disabled={!canPrevMobileCircles}
-                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
-                                ${canPrevMobileCircles ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label={scsLabels.prevLabel}
-                            >
-                              ‹
-                            </button>
-                            <div className="flex items-center gap-1" aria-label={scsLabels.pagesIndicatorAria}>
-                              {Array.from({ length: totalMobileCirclePages }).map((_, i) => (
-                                <span
-                                  key={i}
-                                  className={`w-2 h-2 rounded-full transition-all ${i === mobileCirclesPage ? 'bg-green-600 scale-110' : 'bg-green-300'
-                                    }`}
-                                  aria-label={`صفحة ${i + 1}`}
-                                />
-                              ))}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={goNextMobileCircles}
-                              disabled={!canNextMobileCircles}
-                              className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border shadow-sm transition-all
-                                ${canNextMobileCircles ? 'bg-white border-green-300 text-green-700 hover:bg-green-50 active:scale-95' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'}`}
-                              aria-label={scsLabels.nextLabel}
-                            >
-                              ›
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+        <CardContent className="space-y-0 sm:space-y-0 px-2 sm:px-3 pt-2 pb-3">
+          <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-1 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
+            <div className="flex gap-2 items-center ">
+              {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
+              <Button
+                variant={showFilters ? 'default' : 'outline'}
+                className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
+                onClick={() => setShowFilters(p => !p)}
+                title={showFilters ? 'إخفاء شريط الفلترة' : 'إظهار شريط الفلترة'}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">فلتر</span>
+              </Button>
+              {/* زر التحديث لإلغاء التحديد */}
+              <Button
+                variant="outline"
+                className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8"
+                onClick={handleResetSelections}
+                title='تحديث / إلغاء التحديد'
+              >
+                <RefreshCwIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">تحديث</span>
+              </Button>
             </div>
+          </div>
+          {showFilters && (
+            <TeacherCircleFilterBar
+              useInlineSelects
+              useShadSelect
+              teachers={effectiveTeachers}
+              circles={filteredCircles.map(c => ({ id: c.id, name: c.name }))}
+              selectedTeacherId={teacherId}
+              selectedCircleId={circleId}
+              searchQuery={search}
+              onSearchChange={setSearch}
+              onTeacherChange={(id) => { setTeacherId(id); setCircleId(null); }}
+              onCircleChange={(id) => setCircleId(id)}
+              onClearTeacher={() => { setTeacherId(null); setCircleId(null); }}
+              onClearCircle={() => setCircleId(null)}
+              showAddButton={canEditSchedules}
+              onAddClick={handleAddSchedule}
+              addButtonLabel={scsLabels.scheduleAdd}
+              addButtonTooltip={"إضافة موعد جديد"}
+              showExportButton={userRole === 'superadmin'}
+              onExportClick={() => {/* TODO: export logic */}}
+              exportButtonLabel="تصدير"
+              requireCircleBeforeAdd
+            />
+          )}
 
-            {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
-            <div className="md:col-span-1 hidden md:block">
-              <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3">
-                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" />
-                    {scsLabels.circlesHeading}
-                  </h2>
-                </div>
-
-                {/* Body */}
-                <div className="p-4 space-y-4 md:space-y-5">
-                  {/* مربع البحث */}
-                  <div className="relative">
-                    {userRole !== 'teacher' && (
-                      <div className="relative mt-1">
-                        <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
-                        <Input
-                          placeholder={scsLabels.searchPlaceholder}
-                          className="pr-10 pl-3 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm text-sm"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {loading ? (
-                    <div className="flex flex-col items-center justify-center p-8 gap-2">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-                      <span className="text-sm text-green-600">{scsLabels.loadingCircles}</span>
-                    </div>
-                  ) : filteredCircles.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-8 text-center gap-2">
-                      <BookOpen className="h-12 w-12 text-green-200" />
-                      <h3 className="text-lg font-semibold text-green-800">{scsLabels.noCircles}</h3>
-                      <p className="text-sm text-green-600">
-                        {scsLabels.noCirclesSearch}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-green-100">
-                      {filteredCircles.map((circle) => (
-                        <div
-                          key={circle.id}
-                          className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2.5 shadow-sm text-sm ${selectedCircle?.id === circle.id
-                            ? 'bg-green-700 text-white ring-1 ring-green-400'
-                            : 'bg-green-50 hover:bg-green-100 text-green-800'
-                            }`}
-                          onClick={() => handleSelectCircle(circle)}
-                        >
-                          <div className="flex items-center justify-between font-medium gap-1">
-                            {/* اسم الحلقة مع أيقونة كتاب صغيرة */}
-                            <div className="flex items-center gap-1 truncate">
-                              <span className="text-green-500">📖</span>
-                              <span className="truncate">{circle.name}</span>
-                              {circle.teacher && (
-                                <span className={`flex items-center gap-1 text-[11px] truncate ${selectedCircle?.id === circle.id ? 'text-white' : 'text-green-700'
-                                  }`}>
-                                  👨‍🏫 {circle.teacher.full_name}
-                                </span>
-                              )}
-                            </div>
-
-                            {selectedCircle?.id === circle.id && (
-                              <Badge
-                                variant="outline"
-                                className={`${selectedCircle?.id === circle.id ? 'text-white border-white' : 'text-green-800 border-green-400'
-                                  } text-xs`}
-                              >
-                                {scsLabels.selectedBadge}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* جانب الجدولة - ثلثين الصفحة */}
-            <div className="md:col-span-3">
-              <div className="bg-green-50 border border-green-200 rounded-none md:rounded-xl shadow-sm overflow-hidden">
-
-                {/* هيدر ديناميكي حسب الشاشة */}
-                {/** هيدر الموبايل **/}
-                <div className="flex items-center justify-between md:hidden px-2 py-1 bg-gradient-to-r from-green-600 via-green-500 to-green-600 rounded-t-lg">
-                  <div className="flex items-center gap-1 truncate">
-                    {selectedCircle?.teacher && (
-                      <>
-                        <BookOpen className="h-3 w-3 text-white" />
-                        <span className="text-[9px] text-white truncate">
-                          <span className="truncate">{selectedCircle.name}</span> 👨‍🏫 {selectedCircle.teacher.full_name.split(" ")[0]}
-                        </span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1">
-                    {canEditSchedules && selectedCircle && (
-                      <Button
-                        onClick={handleAddSchedule}
-                        size="sm"
-                        className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none"
-                        title={scsLabels.addScheduleTooltip}
-                      >
-                        <Plus className="h-2.5 w-2.5" />
-                      </Button>
-                    )}
-
-                    {selectedCircle && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleClearSelection}
-                        className="flex items-center gap-1 rounded-md bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-[8px] px-1 py-0.5 h-5 shadow-none border border-green-200"
-                        title={scsLabels.clearSelection}
-                      >
-                        <X className="h-2.5 w-2.5" />
-                      </Button>
-
-                    )}
-                  </div>
-                </div>
-
-
-                {/** هيدر الديسكتوب **/}
-                <div className="hidden md:flex justify-between items-center bg-gradient-to-r from-green-100 via-green-200 to-green-700 px-4 py-4 rounded-t-xl">
-                  <CardTitle className="text-lg font-bold text-white flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-green-700" />
-                      {selectedCircle ? `${scsLabels.pageTitle.replace('الحلقات الدراسية', 'حلقة')}: ${selectedCircle.name}` : scsLabels.pageTitle} | 👨‍🏫
-                    </div>
-
-                    {selectedCircle?.teacher && (
-                      <CardDescription className="text-gray-700 text-xs sm:text-[10px]">
-                        {scsLabels.teacherShort.replace(':', '')}: {selectedCircle.teacher.full_name}
-                      </CardDescription>
-                    )}
-                  </CardTitle>
-
-                  {selectedCircle && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-3 rounded-3xl border-2 border-green-600 text-green-900 
-                                  hover:bg-green-100 hover:text-green-800 hover:scale-105 
-                                  dark:border-green-500 dark:text-green-300 dark:hover:bg-green-800 dark:hover:text-green-200 
-                                  shadow-lg transition-all duration-200 px-5 py-2 font-semibold"
-                        onClick={handleClearSelection}
-                      >
-                        {scsLabels.clearSelection}
-                      </Button>
-
-                      {canEditSchedules && (
-                        <Button
-                          onClick={handleAddSchedule}
-                          size="sm"
-                          className="flex items-center gap-3 rounded-3xl bg-green-600 hover:bg-green-700 
-                                     dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-lg hover:scale-105 transition-transform duration-200 px-5 py-2 font-semibold"
-                        >
-                          <Plus className="h-4 w-4" />
-                          {scsLabels.scheduleAdd}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-
-                {/* محتوى الجدولة */}
-                <CardContent className="px-3 sm:px-4 pt-4 pb-5">
-                  {!selectedCircle ? (
-                    <div className="flex flex-col items-center justify-center p-10 sm:p-12 text-center gap-3 text-sm sm:text-base">
-                      <Calendar className="h-16 w-16 text-green-200" />
-                      <h3 className="text-xl font-semibold text-green-800">{scsLabels.chooseCircleTitle}</h3>
-                      <p className="text-green-600 max-w-md">
-                        {scsLabels.chooseCircleHelp}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <GenericTable
-                        data={tableSchedules}
-                        columns={scheduleColumns as any}
-                        emptyMessage={circleSchedules.length === 0 ? scsLabels.noSchedules : ''}
-                        onAddNew={canEditSchedules ? handleAddSchedule : undefined}
-                        onRefresh={selectedCircle ? () => loadCircleSchedules(selectedCircle.id) : undefined}
-                        enablePagination
-                        defaultPageSize={5}
-                        pageSizeOptions={[5, 10, 20, 50]}
-                        cardGridColumns={{ sm: 1, md: 2, lg: 3, xl: 3 }}
-                        cardWidth="100%"
-                        cardMaxFieldsCollapsed={4}
-                        /* تطبيق نفس فكرة جدول سجلات الحفظ: إخفاء أيقونة الترتيب الافتراضي، تلوين الصفوف، تنسيق الإطار */
-                        className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-                        getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
-                        hideSortToggle={false}
-                        cardPrimaryActions={canEditSchedules ? (s: any) => (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEditSchedule(s)}
-                              className="border-green-600 text-green-700 hover:bg-green-50"
-                            >
-                              <Pencil className="h-3 w-3 ml-1" />
-                              <span className="hidden sm:inline">{scsLabels.editDialogTitle}</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteSchedule(s)}
-                              className="border-red-500 text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3 w-3 ml-1" />
-                              <span className="hidden sm:inline">{scsLabels.deleteDialogTitle}</span>
-                            </Button>
-                          </>
-                        ) : undefined}
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </div>
-            </div>
+          <div>
           </div>
         </CardContent>
       </Card>
+
+
+      <div>
+        {!selectedCircle ? (
+          <div className="flex flex-col items-center justify-center p-8 sm:p-10 text-center gap-2.5 text-sm sm:text-base">
+            <Calendar className="h-16 w-16 text-green-200" />
+            <h3 className="text-lg font-semibold text-green-800">{scsLabels.chooseCircleTitle}</h3>
+            <p className="text-green-600 max-w-md">
+              {scsLabels.chooseCircleHelp}
+            </p>
+          </div>
+        ) : (
+          <div className="pt-2">
+            <GenericTable
+              title={
+                <div className="flex items-center gap-2 w-full">
+                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-green-600 drop-shadow-sm" />
+                  <span className="font-extrabold text-green-600 text-sm md:text-base tracking-wide truncate">
+                    {selectedCircle
+                      ? `${scsLabels.pageTitle.replace('الحلقات الدراسية', 'حلقة')} : ${selectedCircle.name}`
+                      : scsLabels.pageTitle}
+                  </span>
+                </div>
+              }
+              data={tableSchedules}
+              columns={scheduleColumns as any}
+              emptyMessage={circleSchedules.length === 0 ? scsLabels.noSchedules : ''}
+              onAddNew={canEditSchedules ? handleAddSchedule : undefined}
+              onRefresh={selectedCircle ? () => loadCircleSchedules(selectedCircle.id) : undefined}
+              enablePagination
+              defaultPageSize={5}
+              pageSizeOptions={[5, 10, 20, 50]}
+              cardGridColumns={{ sm: 1, md: 2, lg: 3, xl: 3 }}
+              cardWidth="100%"
+              cardMaxFieldsCollapsed={4}
+              className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+              getRowClassName={(row: any, index) => {
+                const base = index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50';
+                return cn(base, row.__conflict && 'outline outline-2 outline-red-400/70');
+              }}
+              hideSortToggle={false}
+              cardPrimaryActions={canEditSchedules ? (s: any) => (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEditSchedule(s)}
+                    className="border-green-600 text-green-700 hover:bg-green-50"
+                  >
+                    <Pencil className="h-3 w-3 ml-1" />
+                    <span className="hidden sm:inline">{scsLabels.editDialogTitle}</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDeleteSchedule(s)}
+                    className="border-red-500 text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-3 w-3 ml-1" />
+                    <span className="hidden sm:inline">{scsLabels.deleteDialogTitle}</span>
+                  </Button>
+                </>
+              ) : undefined}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* تمت إزالة حوارات اختيار المعلم والحلقة بعد اعتماد القوائم المباشرة */}
       {/* Add Schedule Dialog */}
       <FormDialog
         title={scsLabels.addDialogTitle}

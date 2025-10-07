@@ -51,14 +51,14 @@ export function GenericTable<T extends { id: string }>(props: {
     cardPageSize?: number;
     /** إظهار أزرار التالي/السابق في الهيدر حتى في الشاشات الكبيرة عند نمط البطاقات */
     showCardNavInHeader?: boolean;
-    /** حد خاص لعدد البطاقات في الموبايل (يفوق أي قيمة افتراضية)، إذا لم يحدد يستخدم 1 عند استخدام cardPageSize */
-    cardMobilePageSize?: number;
     /** تفعيل الترقيم العام */
     enablePagination?: boolean;
     /** خيارات حجم الصفحة */
     pageSizeOptions?: number[];
     /** حجم الصفحة الافتراضي */
     defaultPageSize?: number;
+    /** تحديد نوع تنسيق أزرار التحكم على الموبايل 'wrap' (متعدد الصفوف) أو 'single-row' (صف واحد) أو 'equal' (توزيع متساوي) */
+    mobileControlsLayout?: 'wrap' | 'single-row' | 'equal';
     /**
      * إخفاء زر الترتيب وتعطيل الترتيب (يُرتب الجدول فقط عند إظهار الزر).
      * ملاحظة: الترتيب يتم حالياً على أساس العمود الأول فقط لأغراض تبسيطية.
@@ -108,7 +108,6 @@ export function GenericTable<T extends { id: string }>(props: {
         cardWidth,
         cardPageSize,
         showCardNavInHeader = false,
-        cardMobilePageSize,
         enablePagination = false,
         pageSizeOptions = [5, 10, 20, 50],
         defaultPageSize = 5,
@@ -121,16 +120,35 @@ export function GenericTable<T extends { id: string }>(props: {
         defaultCollapsed = false,
         onCollapseChange,
         hideControlsWhenCollapsed = true,
+        mobileControlsLayout = 'wrap',
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
     const isMobile = useIsMobile();
     // إضافة حالة للترتيب
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc' | null>(null);
+    const sortGradientClass = React.useMemo(() => {
+        switch (sortDirection) {
+            case 'asc':
+                return 'bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400 dark:from-emerald-700 dark:via-green-700 dark:to-lime-600';
+            case 'desc':
+                return 'bg-gradient-to-r from-green-700 via-green-600 to-emerald-500 dark:from-green-800 dark:via-green-700 dark:to-emerald-600';
+            default:
+                return 'bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 dark:from-green-800 dark:via-green-700 dark:to-green-600';
+        }
+    }, [sortDirection]);
     // فهرس البطاقة الحالية على الموبايل (نعرض بطاقة واحدة مع تنقل)
     const [mobileCardIndex, setMobileCardIndex] = useState(0);
     // الترقيم
-    const [pageSize, setPageSize] = useState<number>(defaultPageSize);
+    // حجم الصفحة: في الموبايل يكون الافتراضي 1 (حسب الطلب)، وفي غير ذلك نستخدم القيمة الافتراضية الممررة
+    const [pageSize, setPageSize] = useState<number>(isMobile ? 1 : defaultPageSize);
+    // حفظ آخر حجم صفحة "سطح مكتب" أو قيمة مخصصة قبل الدخول إلى وضع الموبايل
+    const prevPageSizeRef = useRef<number>(defaultPageSize);
+    // خيارات حجم الصفحة: في الموبايل نعرض القائمة الكاملة ابتداءً من 1 ثم 2 3 4 5 10 20 50
+    const effectivePageSizeOptions = React.useMemo(() => {
+        if (isMobile) return [1, 2, 3, 4, 5, 10, 20, 50];
+        return pageSizeOptions;
+    }, [isMobile, pageSizeOptions]);
     const [internalPage, setInternalPage] = useState<number>(1);
     const currentPage = props.currentPageExternal ?? internalPage;
 
@@ -143,6 +161,37 @@ export function GenericTable<T extends { id: string }>(props: {
         }
     }, [isMobile]);
 
+    // سابقاً كنا نجبر الحجم على 1 دائماً في الموبايل وضع البطاقات.
+    // الآن: نجبره فقط إذا تم تمرير cardPageSize صراحة. إذا لم يُحدَّد يمكن للمستخدم تغييره من القائمة.
+    useEffect(() => {
+        // دخول إلى وضع الموبايل
+        if (isMobile) {
+            // حفظ آخر قيمة قبل الموبايل (قيمة سطح المكتب) إذا كنا ننتقل الآن من غير موبايل
+            // (ملاحظة: نعتمد على prevPageSizeRef السابق فقط إن كانت الصفحة الحالية ليست 1 مفروضة)
+            // إذا تم تمرير cardPageSize: نفرضها
+            if (viewMode === 'card' && cardPageSize && cardPageSize > 0) {
+                if (pageSize !== cardPageSize) setPageSize(cardPageSize);
+            } else {
+                // لم يتم تمرير cardPageSize -> نجعل القيمة 1 دائماً كافتراضي للموبايل
+                if (pageSize !== 1) setPageSize(1);
+            }
+            return; // لا نكمل منطق سطح المكتب
+        }
+
+        // الخروج إلى سطح المكتب: لو كنا في جدول نعيد آخر قيمة محفوظة إذا كنا على قيمة موبايل (1) أو قيمة cardPageSize المفروضة
+        if (!isMobile && viewMode === 'table') {
+            const desired = prevPageSizeRef.current || defaultPageSize;
+            // إذا كانت القيمة الحالية 1 (افتراضي موبايل) أو مساوية لقيمة cardPageSize فنستعيد
+            if ((pageSize === 1 || (cardPageSize && pageSize === cardPageSize)) && pageSize !== desired) {
+                setPageSize(desired);
+            }
+        }
+        // تحديث المرجع دائماً في سطح المكتب عند أي تغيير يدوي (يتم خارج هذا التأثير نفسه)
+        if (!isMobile && pageSize !== 1 && (!cardPageSize || pageSize !== cardPageSize)) {
+            prevPageSizeRef.current = pageSize;
+        }
+    }, [isMobile, viewMode, cardPageSize, pageSize, defaultPageSize]);
+
     // إعادة ضبط الصفحة عند تغيير نمط العرض لتفادي بقاء مؤشر خارج النطاق خاصة في وضع بطاقة واحدة
     useEffect(() => {
         // لا نعيد التعيين إذا كان التحكم خارجي لتجنب القفز
@@ -150,9 +199,9 @@ export function GenericTable<T extends { id: string }>(props: {
     }, [viewMode, props.currentPageExternal]);
 
     const goNext = () => {
-        // حساب حجم الصفحة الحالي اعتماداً على السياق (موبايل أو سطح مكتب)
+        // حجم البطاقة في التنقل يعتمد على cardPageSize (أو 1 للموبايل إن لم يحدد)
         const currentPageSize = isMobile
-            ? (cardMobilePageSize ?? 1)
+            ? (cardPageSize ?? 1)
             : (cardPageSize ?? sortedData.length);
         setMobileCardIndex(i => {
             const maxStart = Math.max(sortedData.length - currentPageSize, 0);
@@ -162,7 +211,7 @@ export function GenericTable<T extends { id: string }>(props: {
     };
     const goPrev = () => {
         const currentPageSize = isMobile
-            ? (cardMobilePageSize ?? 1)
+            ? (cardPageSize ?? 1)
             : (cardPageSize ?? sortedData.length);
         setMobileCardIndex(i => {
             const prev = i - currentPageSize;
@@ -216,12 +265,13 @@ export function GenericTable<T extends { id: string }>(props: {
     }, [sortedData.length, mobileCardIndex]);
 
     // الترتيب النهائي للبيانات
-    // حساب عدد الصفحات مع مراعاة وضع بطاقة واحدة في الموبايل
-    const effectivePageSize = (isMobile && viewMode === 'card') ? 1 : pageSize;
+    // حساب عدد الصفحات، في الموبايل وبوضع البطاقات نسمح بعدة بطاقات حسب cardMobilePageSize (افتراضياً 1 إن لم يحدد وتوجد قيمة cardPageSize)
+    const effectivePageSize = pageSize; // توحيد الحجم عبر الأنماط، التحكم عبر pageSize فقط
     const totalPages = React.useMemo(() => {
         if (!enablePagination) return 1;
         return Math.max(1, Math.ceil(sortedData.length / effectivePageSize));
     }, [enablePagination, sortedData.length, effectivePageSize]);
+
 
     useEffect(() => {
         if (currentPage > totalPages) {
@@ -233,7 +283,7 @@ export function GenericTable<T extends { id: string }>(props: {
     useEffect(() => {
         // لا نعيد الصفحة للأولى إلا إذا أصبح نطاق الصفحة الحالية خارج البيانات بعد تغيير الحجم أو التصفية
         if (!enablePagination) return;
-        const effectiveSize = (isMobile && viewMode === 'card') ? 1 : pageSize;
+        const effectiveSize = pageSize;
         const startIndex = (currentPage - 1) * effectiveSize; // صفرية
         if (startIndex >= sortedData.length && sortedData.length > 0) {
             const newLastPage = Math.max(1, Math.ceil(sortedData.length / effectiveSize));
@@ -255,12 +305,8 @@ export function GenericTable<T extends { id: string }>(props: {
             try { console.debug('[GenericTable] paginate', { currentPage, pageSize, total: sortedData.length }); } catch { }
         }
         if (!enablePagination) return sortedData;
-        // في حالة الموبايل + عرض البطاقات نعرض بطاقة واحدة فقط لكل صفحة
-        if (isMobile && viewMode === 'card') {
-            const start = (currentPage - 1) * 1;
-            const end = start + 1;
-            return sortedData.slice(start, end);
-        }
+        // في حالة الموبايل + عرض البطاقات نعرض عدداً من البطاقات بحسب cardMobilePageSize (أو pageSize)
+        // في الموبايل أيضاً نستخدم pageSize الآن
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize;
         return sortedData.slice(start, end);
@@ -345,239 +391,225 @@ export function GenericTable<T extends { id: string }>(props: {
 
     return (
         <div className={cn('w-full overflow-hidden', className)}>
-            {/* العنوان وأدوات التحكم */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-0 p-2.5
-                                bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600
-                                dark:from-green-800 dark:via-emerald-800 dark:to-teal-800
-                                border border-green-400/40 dark:border-green-700/60 rounded-xl shadow-sm">
+            {/* الهيدر (موبايل مبسط + سطح مكتب كامل) */}
+            {isMobile ? (
+<div className="flex flex-col gap-1 mb-0 p-2.5
+    bg-gradient-to-br from-green-100 via-green-200 to-emerald-100 
+    dark:from-green-950 dark:via-emerald-950 dark:to-green-900 
+    border border-green-300/40 dark:border-green-800/60 
+    rounded-xl shadow-sm">
 
-                {/* العنوان (الآن يظهر في الموبايل أيضاً) */}
-                {(title || collapsible || onToggleCollapse) && (
-                    <div className="flex items-center gap-2 min-w-0 w-full md:w-auto">
-                        {/* تمت إزالة زر الطي من هنا ونقله إلى شريط الأزرار */}
+  {/* الصف الأول: العنوان + زر الطي */}
+  {(title || collapsible || onToggleCollapse) && (
+    <div className="flex items-center justify-between w-full">
+      <div className="flex-1 text-center text-xs font-semibold 
+          text-green-900 dark:text-green-100 leading-tight tracking-wide">
+        {title}
+      </div>
+      {(collapsible || onToggleCollapse) && (
+        <button
+          type="button"
+          onClick={handleToggleInternal}
+          aria-label={effectiveCollapsed ? 'إظهار المحتوى' : 'إخفاء المحتوى'}
+          aria-expanded={!effectiveCollapsed}
+          className={cn(
+            'h-7 w-7 inline-flex items-center justify-center rounded-md border border-green-300 bg-green-100 text-green-700 hover:bg-green-200 transition-all shadow-sm',
+            !effectiveCollapsed && 'rotate-180'
+          )}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      )}
+    </div>
+  )}
 
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                            {title && (
-                                <div className="flex flex-col min-w-0">
-                                    {title}
+  {/* الصف الثاني (مُوحّد): الترقيم + أزرار التنقل + حجم الصفحة + الترتيب */}
+  {!controlsHidden && (
+    <div
+      className={cn(
+        "bg-transparent border-2 border-green-500 rounded-lg px-2 py-2 flex items-center w-full gap-1",
+        "overflow-hidden flex-nowrap flex-shrink"
+      )}
+      style={{ flexWrap: "nowrap" }}
+    >
+      {enablePagination && (
+        <>
+          {/* رقم الصفحة */}
+          <div className="flex items-center justify-center flex-[0.8] min-w-0">
+            <span className="h-7 w-full flex items-center justify-center rounded bg-green-200/60 dark:bg-green-800/60 text-[11px] font-bold text-green-900 dark:text-green-100 truncate">
+              {currentPage}/{totalPages}
+            </span>
+          </div>
+
+          {/* أزرار التنقل */}
+          <div className="flex items-center justify-center flex-[3] min-w-0 gap-1">
+            <button
+              onClick={() => {
+                if (props.currentPageExternal === undefined) setInternalPage(1);
+                else props.onPageChange && props.onPageChange(1);
+              }}
+              disabled={currentPage === 1}
+              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+            >
+              <ChevronsRight className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              onClick={() => {
+                const t = Math.max(1, currentPage - 1);
+                if (props.currentPageExternal === undefined) setInternalPage(t);
+                else props.onPageChange && props.onPageChange(t);
+              }}
+              disabled={currentPage === 1}
+              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              onClick={() => {
+                const t = Math.min(totalPages, currentPage + 1);
+                if (props.currentPageExternal === undefined) setInternalPage(t);
+                else props.onPageChange && props.onPageChange(t);
+              }}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+
+            <button
+              onClick={() => {
+                if (props.currentPageExternal === undefined)
+                  setInternalPage(totalPages);
+                else props.onPageChange && props.onPageChange(totalPages);
+              }}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="h-7 flex-1 flex items-center justify-center rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 disabled:opacity-40 text-xs hover:bg-green-200 dark:hover:bg-green-700"
+            >
+              <ChevronsLeft className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* اختيار حجم الصفحة */}
+          <div className="flex items-center justify-center flex-[1.2] min-w-0">
+            <select
+              value={pageSize.toString()}
+              onChange={(e) => setPageSize(parseInt(e.target.value))}
+              className="h-7 w-full text-[10px] rounded bg-green-100/60 dark:bg-green-800/40 text-green-900 dark:text-green-100 border border-green-400/30 focus:outline-none focus:ring-2 focus:ring-green-400/40 truncate"
+            >
+              {effectivePageSizeOptions.map((o) => (
+                <option className="text-green-900" key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {/* زر الترتيب */}
+      <div className="flex items-center justify-center flex-[0.8] min-w-0 ml-auto">
+        {!hideSortToggle && enableSorting && columns.length > 0 && (
+          <button
+            aria-label={
+              sortDirection === null
+                ? 'تفعيل الترتيب التصاعدي'
+                : sortDirection === 'asc'
+                ? 'التبديل إلى ترتيب تنازلي'
+                : 'إلغاء الترتيب'
+            }
+            onClick={() => toggleSort()}
+            className={cn(
+              "h-7 w-full flex items-center justify-center rounded-md shadow border transition-colors duration-200",
+              sortDirection === null
+                ? "bg-green-100 text-green-700 border-green-200 hover:bg-green-200"
+                : sortDirection === "asc"
+                ? "bg-green-500 text-white border-green-600 hover:bg-green-600"
+                : "bg-green-700 text-white border-green-800 hover:bg-green-800"
+            )}
+          >
+            {sortDirection === null && <ArrowUpDown className="h-4 w-4" />}
+            {sortDirection === "asc" && <ChevronUp className="h-4 w-4" />}
+            {sortDirection === "desc" && <ChevronDown className="h-4 w-4" />}
+          </button>
+        )}
+      </div>
+    </div>
+  )}
+</div>
+
+            ) : (
+                <div className="flex flex-col gap-1 mb-0 p-2.5 bg-gradient-to-r from-green-100 via-emerald-100 
+                to-teal-100 dark:from-green-200 dark:via-emerald-200 dark:to-teal-200 border border-green-300/50 
+                dark:border-green-400/40 rounded-xl shadow-sm">
+                    {/* الصف الأول: العنوان + زر الطي */}
+                    {(title || collapsible || onToggleCollapse) && (
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex-1 text-center text-xs font-semibold text-green-800 leading-tight">
+                                {title}
+                            </div>
+                            {/* الصف الثاني (موحّد): الترقيم + أزرار التنقل + حجم الصفحة + زر الترتيب + تبديل العرض */}
+                            {!controlsHidden && (
+                                <div className="flex items-center justify-between gap-2 bg-transparent border-2 border-green-300 rounded-lg px-1 py-1">
+                                    {enablePagination && (
+                                        <div className="flex items-center gap-1">
+                                            <span className="px-1.5 py-0.5 rounded bg-green-100 text-[11px] font-bold text-green-800 min-w-[46px] text-center">{currentPage}/{totalPages}</span>
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={() => { if (props.currentPageExternal === undefined) setInternalPage(1); else props.onPageChange && props.onPageChange(1); }} disabled={currentPage === 1} className="h-7 w-7 flex items-center justify-center rounded bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-40 text-xs"><ChevronsRight className="h-3.5 w-3.5" /></button>
+                                                <button onClick={() => { const t = Math.max(1, currentPage - 1); if (props.currentPageExternal === undefined) setInternalPage(t); else props.onPageChange && props.onPageChange(t); }} disabled={currentPage === 1} className="h-7 w-7 flex items-center justify-center rounded bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-40 text-xs"><ChevronRight className="h-3.5 w-3.5" /></button>
+                                                <button onClick={() => { const t = Math.min(totalPages, currentPage + 1); if (props.currentPageExternal === undefined) setInternalPage(t); else props.onPageChange && props.onPageChange(t); }} disabled={currentPage === totalPages || totalPages === 0} className="h-7 w-7 flex items-center justify-center rounded bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-40 text-xs"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                                                <button onClick={() => { if (props.currentPageExternal === undefined) setInternalPage(totalPages); else props.onPageChange && props.onPageChange(totalPages); }} disabled={currentPage === totalPages || totalPages === 0} className="h-7 w-7 flex items-center justify-center rounded bg-green-100 text-green-800 hover:bg-green-200 disabled:opacity-40 text-xs"><ChevronsLeft className="h-3.5 w-3.5" /></button>
+                                            </div>
+                                            <select value={pageSize.toString()} onChange={(e) => setPageSize(parseInt(e.target.value))} className="h-7 px-1 text-[10px] rounded bg-green-100 text-green-800 border border-green-300 focus:outline-none focus:ring-2 focus:ring-green-300/50">
+                                                {effectivePageSizeOptions.map(o => <option className='text-green-900' key={o} value={o}>{o}</option>)}
+                                            </select>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-1 ml-auto">
+                                        {!hideSortToggle && enableSorting && columns.length > 0 && (
+                                            <button
+                                                aria-label={sortDirection === null ? 'تفعيل الترتيب التصاعدي' : sortDirection === 'asc' ? 'التبديل إلى ترتيب تنازلي' : 'إلغاء الترتيب'}
+                                                onClick={() => toggleSort()}
+                                                className={cn(
+                                                    'h-7 w-7 flex items-center justify-center rounded-md shadow border transition-colors duration-200',
+                                                    sortDirection === null
+                                                        ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
+                                                        : sortDirection === 'asc'
+                                                            ? 'bg-green-500 text-white border-green-600 hover:bg-green-600'
+                                                            : 'bg-green-700 text-white border-green-800 hover:bg-green-800'
+                                                )}
+                                            >
+                                                {sortDirection === null && <ArrowUpDown className="h-4 w-4" />}
+                                                {sortDirection === 'asc' && <ChevronUp className="h-4 w-4" />}
+                                                {sortDirection === 'desc' && <ChevronDown className="h-4 w-4" />}
+                                            </button>
+                                        )}
+                                        <button type="button" onClick={() => setViewMode('table')} className={cn('h-7 w-7 flex items-center justify-center rounded-md shadow text-xs border', viewMode === 'table' ? 'bg-white text-green-700 border-green-400' : 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200')} title="عرض الجدول"><List className="h-4 w-4" /></button>
+                                        <button type="button" onClick={() => setViewMode('card')} className={cn('h-7 w-7 flex items-center justify-center rounded-md shadow text-xs border', viewMode === 'card' ? 'bg-white text-green-700 border-green-400' : 'bg-green-100 text-green-700 border-green-300 hover:bg-green-200')} title="عرض البطاقات"><LayoutGrid className="h-4 w-4" /></button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {(collapsible || onToggleCollapse) && (
+                                <div className="flex items-center justify-between gap-2 bg-transparent border-2 border-green-300 rounded-lg px-1 py-1">
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleInternal}
+                                        aria-label={effectiveCollapsed ? 'إظهار المحتوى' : 'إخفاء المحتوى'}
+                                        aria-expanded={!effectiveCollapsed}
+                                        className={cn('h-7 w-7 inline-flex items-center justify-center rounded-md border border-green-300 bg-green-100 text-green-700 hover:bg-green-200 transition-all shadow-sm', !effectiveCollapsed && 'rotate-180')}
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </button>
                                 </div>
                             )}
                         </div>
-                    </div>
-                )}
-
-                {/* أزرار التحكم */}
-                <div className="flex items-center gap-2 sm:gap-3 flex-nowrap sm:flex-wrap justify-center 
-                md:justify-end w-full md:w-auto scrollbar-none">
-
-                    {/* عداد السجلات */}
-                    {!controlsHidden && !isMobile && !((isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1) && !enablePagination && (
-                        <div
-                            aria-label="عدد السجلات"
-                            className="flex items-center gap-1 h-7 sm:h-9 px-2 sm:px-3 rounded-lg 
-                           border border-green-300 dark:border-green-700 
-                           bg-white/90 dark:bg-green-800/40 
-                           text-green-800 dark:text-green-100 
-                           text-[11px] sm:text-xs font-semibold shadow-sm select-none"
-                        >
-                            <Hash className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-300" />
-                            <span className="leading-none">{sortedData.length}</span>
-                        </div>
                     )}
 
-                    {/* أزرار التنقل مع حركة Hover */}
-                    {!controlsHidden && (isMobile || showCardNavInHeader) && viewMode === 'card' && sortedData.length > 1 && !enablePagination && (
-                        <div className="flex items-center gap-2" aria-label="التنقل بين البطاقات">
-
-                            {/* زر السابق */}
-                            <button
-                                type="button"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); goPrev(); }}
-                                disabled={mobileCardIndex === 0}
-                                className={cn(
-                                    "px-3 py-1 text-sm font-semibold rounded-lg flex items-center gap-1 h-8 transition-all transform hover:-translate-y-1 hover:scale-105 shadow-md",
-                                    mobileCardIndex === 0
-                                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                        : "bg-white text-green-700 border border-green-300 hover:bg-green-100"
-                                )}
-                            >
-                                <ArrowLeft className="h-5 w-5 text-green-700" />
-                                السابق
-                            </button>
-
-                            {/* النص الوسيط */}
-                            <span className="text-[12px] font-semibold text-white dark:text-white select-none min-w-[50px] text-center px-1 drop-shadow-sm">
-                                {mobileCardIndex + 1} / {sortedData.length}
-                            </span>
-
-                            {/* زر التالي */}
-                            <button
-                                type="button"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); goNext(); }}
-                                disabled={mobileCardIndex === sortedData.length - 1}
-                                className={cn(
-                                    "px-3 py-1 text-sm font-semibold rounded-lg flex items-center gap-1 h-8 transition-all transform hover:-translate-y-1 hover:scale-105 shadow-md",
-                                    mobileCardIndex === sortedData.length - 1
-                                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                                        : "bg-white text-green-700 border border-green-300 hover:bg-green-100"
-                                )}
-                            >
-                                التالي
-                                <ArrowRight className="h-5 w-5 text-green-700" />
-                            </button>
-                        </div>
-                    )}
-
-                    {/* الترقيم داخل الهيدر */}
-                    {!controlsHidden && enablePagination && (
-                        <div className="flex items-center gap-1 sm:gap-2 bg-white/20 backdrop-blur-sm
-                            px-2 py-1.5 rounded-xl border border-white/30 shadow-inner shrink-0">
-                            <div className="flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-white">
-                                <span className="px-1.5 py-0.5 rounded-md bg-white/25 text-white font-bold tracking-wide">
-                                    {currentPage}/{totalPages}
-                                </span>
-                                <span className="hidden lg:inline text-white/80 font-normal">
-                                    {rangeInfo.total > 0 ? `من ${rangeInfo.start} إلى ${rangeInfo.end}` : 'لا بيانات'}
-                                </span>
-                            </div>
-
-                            {!(isMobile && viewMode === 'card') && (
-                                <select
-                                    value={pageSize.toString()}
-                                    onChange={(e) => setPageSize(parseInt(e.target.value))}
-                                    className="h-7 sm:h-8 text-[10px] sm:text-[11px] px-1.5 rounded-lg bg-white/25 text-white 
-                                    border border-white/30 focus:outline-none focus:ring-2 focus:ring-yellow-300/60"
-                                >
-                                    {pageSizeOptions.map(o => <option className='text-green-900' key={o} value={o}>{o}</option>)}
-                                </select>
-                            )}
-
-                            <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => {
-                                        if (props.currentPageExternal === undefined) setInternalPage(1); else props.onPageChange && props.onPageChange(1);
-                                    }}
-                                    disabled={currentPage === 1}
-                                    aria-label='الأولى'
-                                    className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-green-700 hover:bg-green-100 transform hover:scale-110"
-                                >
-                                    <ChevronsRight className='h-4 w-4' />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const target = Math.max(1, currentPage - 1);
-                                        if (props.currentPageExternal === undefined) setInternalPage(target); else props.onPageChange && props.onPageChange(target);
-                                    }}
-                                    disabled={currentPage === 1}
-                                    aria-label='السابق'
-                                    className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-green-700 hover:bg-green-100 transform hover:scale-110"
-                                >
-                                    <ChevronRight className='h-4 w-4' />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        const target = Math.min(totalPages, currentPage + 1);
-                                        if (props.currentPageExternal === undefined) setInternalPage(target); else props.onPageChange && props.onPageChange(target);
-                                    }}
-                                    disabled={currentPage === totalPages || totalPages === 0}
-                                    aria-label='التالي'
-                                    className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-green-700 hover:bg-green-100 transform hover:scale-110"
-                                >
-                                    <ChevronLeft className='h-4 w-4' />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (props.currentPageExternal === undefined) setInternalPage(totalPages); else props.onPageChange && props.onPageChange(totalPages);
-                                    }}
-                                    disabled={currentPage === totalPages || totalPages === 0}
-                                    aria-label='الأخيرة'
-                                    className="h-7 w-7 flex items-center justify-center rounded-md transition-all bg-white/90 text-green-700 hover:bg-green-100 transform hover:scale-110"
-                                >
-                                    <ChevronsLeft className='h-4 w-4' />
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* زر الترتيب (حسب العمود الأول) */}
-                    {!controlsHidden && !hideSortToggle && enableSorting && columns.length > 0 && (
-                        <Button
-                            onClick={() => toggleSort()}
-                            size="icon"
-                            className={cn(
-                                'h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg shadow transition-transform',
-                                sortDirection
-                                    ? 'bg-white text-green-700 border border-green-600'
-                                    : 'bg-green-600 text-white border border-green-700 hover:bg-green-700'
-                            )}
-                            title={
-                                sortDirection === null
-                                    ? 'ترتيب تصاعدي'
-                                    : sortDirection === 'asc'
-                                        ? 'ترتيب تنازلي'
-                                        : 'إلغاء الترتيب'
-                            }
-                        >
-                            {sortDirection === null && <ArrowUpDown className="h-4 w-4" />}
-                            {sortDirection === 'asc' && <ChevronUp className="h-4 w-4" />}
-                            {sortDirection === 'desc' && <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                    )}
-
-                    {/* أزرار العرض */}
-                    {!controlsHidden && (
-                    <div className="hidden sm:flex items-center gap-1 overflow-hidden">
-                        <Button
-                            onClick={() => setViewMode("table")}
-                            size="icon"
-                            className={cn(
-                                "h-7 w-7 sm:h-8 sm:w-auto sm:px-2 sm:py-1 flex items-center justify-center gap-1 rounded-lg shadow transition-transform",
-                                viewMode === "card"
-                                    ? "bg-white text-green-700 border border-green-600"
-                                    : "bg-green-600 text-white border border-green-700 hover:bg-green-700"
-                            )}
-                        >
-                            <List className="h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="hidden sm:inline text-sm font-medium">جدول</span>
-                        </Button>
-
-                        <Button
-                            onClick={() => setViewMode("card")}
-                            size="icon"
-                            className={cn(
-                                "h-7 w-7 sm:h-8 sm:w-auto sm:px-2 sm:py-1 flex items-center justify-center gap-1 rounded-lg shadow transition-transform",
-                                viewMode === "card"
-                                    ? "bg-white text-green-700 border border-green-600"
-                                    : "bg-green-600 text-white border border-green-700 hover:bg-green-700"
-                            )}
-                            title="عرض البطاقات"
-                        >
-                            <LayoutGrid className="h-4 w-4 sm:h-5 sm:w-5" />
-                            <span className="hidden sm:inline text-sm font-medium">بطاقات</span>
-                        </Button>
-                    </div>
-                    )}
-
-                    {/* زر الطي بعد أزرار العرض */}
-                    {(collapsible || onToggleCollapse) && (
-                        <button
-                            type="button"
-                            onClick={handleToggleInternal}
-                            aria-label={effectiveCollapsed ? 'إظهار المحتوى' : 'إخفاء المحتوى'}
-                            aria-expanded={!effectiveCollapsed}
-                            aria-controls={typeof title === 'string' ? `${title}-content` : undefined}
-                            className={cn(
-                                'h-7 w-7 sm:h-8 sm:w-8 inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/10 text-white hover:bg-white/20 transition-all shadow-sm transform',
-                                !effectiveCollapsed && 'rotate-180'
-                            )}
-                            title={effectiveCollapsed ? 'إظهار المحتوى' : 'إخفاء المحتوى'}
-                        >
-                            <ChevronDown className="h-4 w-4 transition-transform" />
-                        </button>
-                    )}
 
                 </div>
-            </div>
+            )}
 
 
             {/* حاوية متحركة للمحتوى القابل للطي */}
@@ -637,8 +669,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 !effectiveCollapsed && 'overflow-x-auto overflow-auto'
                             )}>
                                 <Table className="direction-rtl w-full border-collapse text-[11px] sm:text-[12px]">
-                                    <TableHeader className="bg-gradient-to-b from-green-700 via-green-600 to-green-500 
-                            dark:from-green-900 dark:via-green-800 dark:to-green-700 sticky top-0 z-10 shadow-inner">
+                                    <TableHeader className={cn('sticky top-0 z-10 shadow-inner', sortGradientClass)}>
                                         <TableRow>
                                             {columns.map((column, colIdx) => {
                                                 const alignClass =
@@ -734,12 +765,9 @@ export function GenericTable<T extends { id: string }>(props: {
                     const effective = enablePagination ? displayData : sortedData;
                     const smallSet = effective.length <= (cardPageSize ?? 2);
                     // حجم الصفحة حسب نوع الجهاز
-                    const pageSize = isMobile
-                        ? (cardMobilePageSize ?? 1)
-                        : (cardPageSize ?? sortedData.length);
-                    // في حالة وجود حد للبطاقات أو كنا على الموبايل نستخدم mobileCardIndex كبداية
+                    // الحجم المنطقي لعدد البطاقات في العرض (إن تم تحديد cardPageSize نستخدمه، وإلا نعرض الكل في سطح المكتب وواحدة في الموبايل)
                     const cardLogicalPageSize = isMobile
-                        ? (cardMobilePageSize ?? 1)
+                        ? (cardPageSize ?? 1)
                         : (cardPageSize ?? effective.length);
                     const startIndex = (cardLogicalPageSize < effective.length) ? mobileCardIndex : 0;
                     const endIndexExclusive = Math.min(startIndex + cardLogicalPageSize, effective.length);
@@ -844,10 +872,8 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 )}
                                                 style={cardWidth ? { width: cardWidth } : undefined}
                                             >
-                                                {/* الرأس */}
-                                                <div className="px-2 sm:px-3 py-1.5 sm:py-2.5 bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 
-                                                    dark:from-green-800 dark:via-green-700 dark:to-green-600 
-                                                    text-white rounded-t-lg shadow-md flex items-center justify-between">
+                                                {/* الرأس (لون ديناميكي حسب حالة الترتيب) */}
+                                                <div className={cn('px-2 sm:px-3 py-1.5 sm:py-2.5 text-white rounded-t-lg shadow-md flex items-center justify-between', sortGradientClass)}>
                                                     <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1 flex items-center gap-2">
                                                         {indexColumn && (
                                                             <span className="inline-flex items-center justify-center min-w-[26px] h-[26px] rounded-full bg-white/15 border border-white/30 text-xs font-semibold shadow-inner backdrop-blur-sm">

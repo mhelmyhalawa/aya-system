@@ -94,12 +94,12 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
       isSubmenu: true,
       key: "circleManagement",
       subItems: [
-        (userRole === 'superadmin' || userRole === 'admin') && {
+        {
           icon: <BookOpen className="h-5 w-5" />,
           label: "بيانات الحلقات",
           path: "/study-circles"
         },
-        (userRole === 'superadmin' || userRole === 'admin') && {
+        {
           icon: <Calendar className="h-5 w-5" />,
           label: "جدولة الحلقات",
           path: "/study-circle-schedules"
