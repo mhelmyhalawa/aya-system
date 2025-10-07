@@ -75,6 +75,27 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     loadCircles();
   }, [userRole, userId]);
 
+  // اختيار تلقائي للمعلم (teacher/admin/superadmin) وتحديد الحلقة فقط إذا كان لديه حلقة واحدة
+  useEffect(() => {
+    if ((userRole === 'teacher' || userRole === 'admin' || userRole === 'superadmin') && userId) {
+      const userCircles = allCircles.filter(c => c.teacher?.id === userId);
+      if (userCircles.length > 0 && !teacherId) {
+        setTeacherId(userId);
+      }
+      if (userCircles.length === 1 && !circleId) {
+        setCircleId(userCircles[0].id);
+      }
+      // إذا أكثر من حلقة نترك للمستخدم الاختيار
+    }
+  }, [userRole, userId, allCircles, teacherId, circleId]);
+
+  // في حال النظام كله يحتوي حلقة واحدة فقط ولم يتم اختيار circleId بعد، اخترها مباشرة
+  useEffect(() => {
+    if (!circleId && allCircles.length === 1) {
+      setCircleId(allCircles[0].id);
+    }
+  }, [allCircles, circleId]);
+
   // Load circles based on user role
   const loadCircles = async () => {
     setLoading(true);
@@ -93,11 +114,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
 
       setAllCircles(circles);
 
-      // إذا كان معلم ولديه حلقة واحدة فقط، نختارها تلقائيًا
-      if (userRole === 'teacher' && circles.length === 1) {
-        setSelectedCircle(circles[0]);
-        await loadCircleSchedules(circles[0].id);
-      }
+      // اختيار الحلقة سيتم الآن عبر تأثير موحد لاحق (circleId) عندما يكون هناك حلقة واحدة فقط
     } catch (error) {
       console.error("Error loading circles:", error);
       toast({
@@ -139,8 +156,39 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
         map.get(t.id)!.circles_count += 1;
       }
     });
-    return Array.from(map.values());
+    // نعيد فقط المعلمين الذين لديهم حلقات (الخريطة منشأة أساساً من الحلقات، فالقائمة بالفعل مصفاة).
+    return Array.from(map.values()).filter(t => t.circles_count > 0);
   }, [allCircles]);
+
+  // في حال المعلم أو الحلقة المحددة لم يعودا صالحين بعد تحديث الحلقات، نقوم بإعادة التعيين
+  useEffect(() => {
+    if (teacherId && !teachers.some(t => t.id === teacherId)) {
+      setTeacherId(null);
+    }
+    if (circleId) {
+      const stillExists = allCircles.some(c => c.id === circleId);
+      if (!stillExists) {
+        setCircleId(null);
+        setSelectedCircle(null);
+      }
+    }
+  }, [teachers, teacherId, circleId, allCircles]);
+
+  // عند تغيير المعلم: إذا كان لديه حلقة واحدة فقط ولم يتم اختيار circleId نختارها
+  useEffect(() => {
+    if (teacherId) {
+      const teacherCircles = allCircles.filter(c => c.teacher?.id === teacherId);
+      if (teacherCircles.length === 1 && !circleId) {
+        setCircleId(teacherCircles[0].id);
+      }
+      if (teacherCircles.length > 1 && circleId) {
+        const stillValid = teacherCircles.some(c => c.id === circleId);
+        if (!stillValid) setCircleId(null);
+      }
+    } else {
+      if (allCircles.length !== 1) setCircleId(null);
+    }
+  }, [teacherId, allCircles, circleId]);
 
   // فلترة الحلقات حسب المعلم والبحث
   const filteredCircles = useMemo(() => {
@@ -673,12 +721,11 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
                 addButtonLabel={scsLabels.scheduleAdd}
                 addButtonTooltip={"إضافة موعد جديد"}
                 showExportButton={userRole === 'superadmin'}
-                onExportClick={() => {/* TODO: export logic */}}
+                onExportClick={() => {/* TODO: export logic */ }}
                 exportButtonLabel="تصدير"
                 requireCircleBeforeAdd
               />
             )}
-
             <div>
             </div>
           </CardContent>

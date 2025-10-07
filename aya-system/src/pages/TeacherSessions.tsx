@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormDialog, FormRow } from "@/components/ui/form-dialog";
@@ -23,35 +23,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// (تمت إزالة مكونات الجدول/السلكت غير المستخدمة بعد اعتماد GenericTable + شريط فلترة موحد)
 import {
   Calendar,
-  UserCheck,
   Clock,
   Edit,
   Trash2,
-  CalendarRange,
-  AlarmClock,
-  CalendarClock,
   BookOpen,
   Plus,
-  FileText,
-  Search,
-  Check
+  ChevronDown,
+  ChevronUp,
+  Filter,
+  RefreshCw as RefreshCwIcon
 } from "lucide-react";
 import { getStudyCirclesByTeacherId, getAllStudyCircles } from "@/lib/study-circle-service";
 import { getSessionsByCircleId, createSession, updateSession, deleteSession } from "@/lib/circle-session-service";
@@ -59,11 +42,12 @@ import { getteachers } from "@/lib/profile-service";
 import { Badge } from "@/components/ui/badge";
 import { format, isAfter, parseISO, startOfToday, addDays } from "date-fns";
 import { arSA } from "date-fns/locale";
-import { GenericTable, Column } from "@/components/ui/generic-table";
+import { GenericTable } from "@/components/ui/generic-table";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { CircleSession } from "@/types/circle-session";
 import { getLabels } from '@/lib/labels';
-import PaginatedCardList from '@/components/ui/paginated-card-list';
+// إزالة قائمة البطاقات القديمة (تم استبدالها بشريط TeacherCircleFilterBar)
+import { TeacherCircleFilterBar } from '@/components/filters/TeacherCircleFilterBar';
 
 type TeacherSessionsProps = {
   onNavigate: (page: string) => void;
@@ -106,6 +90,8 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
   const [selectedCircle, setSelectedCircle] = useState<string | null>(null);
   const [circleSessions, setCircleSessions] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  // فلترة جديدة مشابهة لصفحة الجداول
+  const [teacherId, setTeacherId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // بحث الحلقات
@@ -117,37 +103,80 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
   // دور المستخدم الحالي
   const userRole = currentUser?.role;
 
-  // تصفية الحلقات حسب البحث
-  const filteredCircles = circles.filter((circle) => {
+  // إعداد قائمة معلمين مع عدد الحلقات (فقط من لديهم حلقات فعلياً)
+  const aggregatedTeachers = teachers
+    .map(t => {
+      const count = circles.filter(c => c.teacher_id === t.id).length;
+      return { id: t.id, name: t.full_name, circles_count: count };
+    })
+    .filter(t => t.circles_count > 0);
+
+  // في حال تم تصفية المعلم الحالي (لم يعد لديه حلقات) قم بإلغاء التحديد
+  useEffect(() => {
+    if (teacherId && !aggregatedTeachers.some(t => t.id === teacherId)) {
+      setTeacherId(null);
+      // أيضاً إذا كانت الحلقة المختارة تخص معلم سابق لم يعد ضمن القائمة، نلغي الحلقة
+      if (selectedCircle) {
+        const circle = circles.find(c => c.id === selectedCircle);
+        if (circle && circle.teacher_id && !aggregatedTeachers.some(t => t.id === circle.teacher_id)) {
+          setSelectedCircle(null);
+        }
+      }
+    }
+  }, [teacherId, aggregatedTeachers, selectedCircle, circles]);
+
+  // اختيار تلقائي للمعلم (teacher/admin/superadmin) فقط وتحديد الحلقة تلقائياً إذا كان لديه حلقة واحدة فقط
+  useEffect(() => {
+    if ((userRole === 'teacher' || userRole === 'admin' || userRole === 'superadmin') && currentUser?.id) {
+      const userCircles = circles.filter(c => c.teacher_id === currentUser.id);
+      if (userCircles.length > 0 && !teacherId) {
+        setTeacherId(currentUser.id);
+      }
+      // إذا كان لديه حلقة واحدة فقط ولم يختر حلقة بعد نحددها
+      if (userCircles.length === 1 && !selectedCircle) {
+        setSelectedCircle(userCircles[0].id);
+      }
+      // إذا كان لديه أكثر من حلقة نترك للمستخدم الاختيار ولا نحدد تلقائياً
+    }
+  }, [userRole, currentUser?.id, circles, teacherId, selectedCircle]);
+
+  // عند تغيير المعلم: إذا كان لديه حلقة واحدة فقط ولم يتم اختيار حلقة، نختارها
+  useEffect(() => {
+    if (teacherId) {
+      const teacherCircles = circles.filter(c => c.teacher_id === teacherId);
+      if (teacherCircles.length === 1 && !selectedCircle) {
+        setSelectedCircle(teacherCircles[0].id);
+      }
+      if (teacherCircles.length > 1 && selectedCircle) {
+        // إذا كانت الحلقة المختارة لا تنتمي لهذا المعلم بعد التغيير، نفرغ الاختيار
+        const stillValid = teacherCircles.some(c => c.id === selectedCircle);
+        if (!stillValid) setSelectedCircle(null);
+      }
+    } else {
+      // إزالة اختيار الحلقة عند مسح المعلم (إلا إذا كان هناك حلقة واحدة فقط إجمالاً وسيتم التقاطها بتأثير آخر)
+      if (circles.length !== 1) setSelectedCircle(null);
+    }
+  }, [teacherId, circles, selectedCircle]);
+
+  // في حال النظام كله يحتوي حلقة واحدة فقط (حتى لو ليست للمعلم الحالي) ولم يتم اختيار حلقة بعد، اخترها مباشرة
+  useEffect(() => {
+    if (!selectedCircle && circles.length === 1) {
+      setSelectedCircle(circles[0].id);
+    }
+  }, [circles, selectedCircle]);
+
+  // تصفية الحلقات حسب المعلم والبحث
+  const filteredCircles = circles.filter(circle => {
+    if (teacherId && circle.teacher_id !== teacherId) return false;
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
-    const circleName = (circle?.name || "").toLowerCase();
-    const teacherName = (circle?.teacher?.full_name || "").toLowerCase();
-    return circleName.includes(term) || teacherName.includes(term);
+    return (
+      (circle.name || '').toLowerCase().includes(term) ||
+      (circle.teacher?.full_name || '').toLowerCase().includes(term)
+    );
   });
 
-  // Pagination for mobile circles similar to StudyCircleSchedules
-  const MOBILE_CIRCLES_PAGE_SIZE = 2; // match schedules page requirement
-  const [mobileCirclesPage, setMobileCirclesPage] = useState(0);
-  const totalMobileCirclePages = Math.ceil(filteredCircles.length / MOBILE_CIRCLES_PAGE_SIZE) || 1;
-  const pagedMobileCircles = filteredCircles.slice(
-    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE,
-    mobileCirclesPage * MOBILE_CIRCLES_PAGE_SIZE + MOBILE_CIRCLES_PAGE_SIZE
-  );
-  useEffect(() => { setMobileCirclesPage(0); }, [searchTerm, circles.length]);
-  useEffect(() => { setDesktopCirclesPage(0); }, [searchTerm, circles.length]);
-
-  const handleMobileCirclesPageChange = (p: number) => {
-    if (p >= 0 && p < totalMobileCirclePages) setMobileCirclesPage(p);
-  };
-
-  // Desktop pagination for circles list
-  const DESKTOP_CIRCLES_PAGE_SIZE = 8; // reasonable number for desktop list
-  const [desktopCirclesPage, setDesktopCirclesPage] = useState(0);
-  const totalDesktopCirclePages = Math.ceil(filteredCircles.length / DESKTOP_CIRCLES_PAGE_SIZE) || 1;
-  const handleDesktopCirclesPageChange = (p: number) => {
-    if (p >= 0 && p < totalDesktopCirclePages) setDesktopCirclesPage(p);
-  };
+  // تمت إزالة ترقيم صفحات الحلقات بعد اعتماد شريط الفلترة الموحد (TeacherCircleFilterBar)
 
   // حالة نموذج إضافة/تعديل الجلسة
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -167,6 +196,18 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
   // حالة نافذة التأكيد للحذف
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<CircleSession | null>(null);
+
+  // حالة طي/توسيع الكارد الرئيسي (مشابهة لصفحة الجداول StudyCircleSchedules)
+  const [cardCollapsed, setCardCollapsed] = useState(false);
+  // إظهار/إخفاء شريط الفلترة
+  const [showFilters, setShowFilters] = useState(true);
+
+  // إعادة التحديد (إلغاء اختيار المعلم والحلقة والبحث)
+  const handleResetSelections = () => {
+    setTeacherId(null);
+    setSelectedCircle(null);
+    setSearchTerm("");
+  };
 
   // Temporary cast to allow controlled usage until DeleteConfirmationDialogProps includes open/onOpenChange
   const DeleteConfirmationDialogAny = DeleteConfirmationDialog as any;
@@ -192,10 +233,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         const teachersData = await getteachers();
         setTeachers(teachersData);
 
-        // إذا كان المستخدم معلم، يتم اختيار أول حلقة تلقائيًا
-        if (currentUser && currentUser.role === "teacher" && circlesData.length > 0) {
-          setSelectedCircle(circlesData[0].id);
-        }
+        // (إلغاء التحديد التلقائي للحلقة هنا - سيتم لاحقاً عبر تأثير موحد إذا كانت حلقة واحدة فقط)
       } catch (error) {
         console.error("Error loading initial data:", error);
         toast({
@@ -478,366 +516,210 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
   return (
     <div className="w-full max-w-[1600px] mx-auto">
-      <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
+      <Card className="pt-1 pb-0 px-0 sm:px-0 shadow-md border-0">
         {/* الهيدر */}
-        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 
-                               border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-            {/* العنوان والوصف */}
-            <div className="flex flex-col">
-              <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
-                <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
-                <span className="truncate">جلسات المعلمين</span>
-              </CardTitle>
-              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5">
+        <CardHeader className="pb-2 bg-gradient-to-r from-green-800 via-green-700 to-green-600 border-b border-green-300 duration-300 rounded-t-2xl shadow-md">
+          <div className="flex flex-col gap-1">
+            <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-green-100" />
+              <span className="truncate flex-1">جلسات المعلمين</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCardCollapsed(p => !p)}
+                className="bg-green-700/30 hover:bg-green-600/50 text-white rounded-full h-8 w-8 p-0 flex items-center justify-center shadow-sm transition-colors"
+                title={cardCollapsed ? 'عرض المحتوى' : 'طي المحتوى'}
+                aria-label={cardCollapsed ? 'Expand content' : 'Collapse content'}
+              >
+                {cardCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
+            </CardTitle>
+            {!cardCollapsed && (
+              <CardDescription className="text-xs md:text-sm text-green-100 mt-0.5 pr-10">
                 إدارة جلسات المعلمين والحلقات المستقبلية
               </CardDescription>
-            </div>
-
+            )}
           </div>
         </CardHeader>
 
-        <CardContent className="space-y-3 sm:space-y-6 px-2 sm:px-4 pt-3 pb-4">
-          <div className="grid md:grid-cols-4 gap-2 sm:gap-6">
-            {/* قائمة الجوال */}
-            <div className="md:hidden">
-              <div className="bg-white/70 backdrop-blur border border-green-200 rounded-lg shadow-sm overflow-hidden mb-3">
-                {/* الهيدر */}
-                <div className="sticky top-0 z-10 flex items-center justify-between gap-2 px-2 py-2 bg-gradient-to-r from-green-600 via-green-500 to-green-600">
-                  <div className="flex items-center gap-1">
-                    <BookOpen className="h-3.5 w-3.5 text-white" />
-                    <h2 className="text-[12px] font-semibold text-white">{tsLabels.circlesListTitle}</h2>
-                  </div>
-                  {selectedCircle && (
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-white/80">{tsLabels.teacherShort}</span>
-                      <Badge className="bg-white/20 text-white font-normal px-2 py-0 h-1 rounded-full text-[10px]">
-                        {getCircleTeacher(selectedCircle)?.split(" ")[0] || tsLabels.teacherUnknown}
-                      </Badge>
-                    </div>
-                  )}
-                </div>
+        {!cardCollapsed && (
+          <CardContent className="space-y-0 sm:space-y-0 px-2 sm:px-3 pt-2 pb-3 transition-all duration-300">
 
-                {/* البحث */}
-                {userRole !== 'teacher' && (
-                  <div className="px-2 pt-2">
-                    <div className="relative">
-                      <Search className="absolute right-2 top-2 h-3.5 w-3.5 text-green-400" />
-                      <Input
-                        placeholder={tsLabels.searchPlaceholder}
-                        className="pr-7 h-8 text-[11px] rounded-lg border-green-300 focus:ring-green-300"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* العناصر */}
-                <div className="px-2 pt-2 pb-1 overflow-y-auto max-h-44 custom-scrollbar scroll-fade">
-                  {loading ? (
-                    <div className="w-full py-6 text-center flex flex-col items-center">
-                      <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                      <span className="text-green-700 text-[12px] font-medium">{tsLabels.loading}</span>
-                    </div>
-                  ) : filteredCircles.length === 0 ? (
-                    <div className="w-full py-6 text-center text-green-600 text-[12px]">{tsLabels.noResults}</div>
-                  ) : (
-                    <PaginatedCardList
-                      items={filteredCircles}
-                      pageSize={MOBILE_CIRCLES_PAGE_SIZE}
-                      page={mobileCirclesPage}
-                      onPageChange={handleMobileCirclesPageChange}
-                      ariaLabels={{
-                        prev: scsLabels.prevLabel,
-                        next: scsLabels.nextLabel,
-                        pagesIndicator: scsLabels.pagesIndicatorAria,
-                        pagination: scsLabels.paginationAria,
-                        page: scsLabels.pageAria
-                      }}
-                      className="flex flex-col gap-1"
-                      navigationPosition="bottom"
-                      renderItem={(circle) => {
-                        const active = selectedCircle === circle.id;
-                        return (
-                          <button
-                            key={circle.id}
-                            onClick={() => handleCircleChange(circle.id)}
-                            className={`group flex items-center justify-between w-full px-2 py-1.5 rounded-md border text-[11px] transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-white ${active ? 'bg-gradient-to-r from-blue-600 to-blue-700 border-blue-300 text-white shadow-md' : 'bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-400 hover:shadow-sm'}`}
-                          >
-                            <span className="font-medium truncate">{circle.name}</span>
-                            <div className="flex items-center gap-1.5">
-                              {circle.teacher && (
-                                <span className={`text-[10px] ${active ? 'text-blue-100' : 'text-blue-500'}`}>{circle.teacher.full_name.split(' ')[0]}</span>
-                              )}
-                              {active && (
-                                <span className="inline-flex items-center bg-white/30 text-[9px] px-1 py-0.5 rounded-full font-medium">✓</span>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      }}
-                    />
-                  )}
-                </div>
+            <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-1 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
+              <div className="flex gap-2 items-center ">
+                {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
+                <Button
+                  variant={showFilters ? 'default' : 'outline'}
+                  className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
+                  onClick={() => setShowFilters(p => !p)}
+                  title={showFilters ? 'إخفاء شريط الفلترة' : 'إظهار شريط الفلترة'}
+                >
+                  <Filter className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">فلتر</span>
+                </Button>
+                {/* زر التحديث لإلغاء التحديد */}
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8"
+                  onClick={handleResetSelections}
+                  title='تحديث / إلغاء التحديد'
+                >
+                  <RefreshCwIcon className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">تحديث</span>
+                </Button>
               </div>
             </div>
 
-            {/* جانب الحلقات - ثلث الصفحة (ديسكتوب) */}
-            <div className="md:col-span-1 hidden md:block">
-              <div className="bg-green-50 border border-green-300 rounded-2xl shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-green-600 via-green-500 to-green-700 p-3">
-                  <h2 className="text-lg font-semibold text-white mb-0 flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" />
-                    {scsLabels.circlesHeading}
-                  </h2>
-                </div>
-                {/* Body */}
-                <div className="p-4 space-y-4 md:space-y-5">
-                  {/* مربع البحث */}
-                  <div className="relative">
-                    {userRole !== 'teacher' && (
-                      <div className="relative mt-1">
-                        <Search className="absolute right-3 top-2.5 h-4 w-4 text-green-400" />
-                        <Input
-                          placeholder={scsLabels.searchPlaceholder}
-                          className="pr-10 pl-3 py-2 border-2 border-green-300 rounded-xl focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 shadow-sm text-sm"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {loading ? (
-                    <div className="flex flex-col items-center justify-center p-8 gap-2">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
-                      <span className="text-sm text-green-600">{scsLabels.loadingCircles}</span>
-                    </div>
-                  ) : filteredCircles.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-8 text-center gap-2">
-                      <BookOpen className="h-12 w-12 text-green-200" />
-                      <h3 className="text-lg font-semibold text-green-800">{scsLabels.noCircles}</h3>
-                      <p className="text-sm text-green-600">
-                        {scsLabels.noCirclesSearch}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-green-100">
-                      {filteredCircles.map((circle) => (
-                        <div
-                          key={circle.id}
-                          className={`cursor-pointer transition-all duration-200 rounded-2xl flex flex-col gap-1 p-2.5 shadow-sm text-sm ${selectedCircle === circle.id
-                            ? 'bg-green-700 text-white ring-1 ring-green-400'
-                            : 'bg-green-50 hover:bg-green-100 text-green-800'
-                            }`}
-                          onClick={() => handleCircleChange(circle.id)}
-                        >
-                          <div className="flex items-center justify-between font-medium gap-1">
-                            {/* اسم الحلقة مع أيقونة كتاب صغيرة */}
-                            <div className="flex items-center gap-1 truncate">
-                              <span className="text-green-500">📖</span>
-                              <span className="truncate">{circle.name}</span>
-                              {circle.teacher && (
-                                <span className={`flex items-center gap-1 text-[11px] truncate ${selectedCircle === circle.id ? 'text-white' : 'text-green-700'
-                                  }`}>
-                                  👨‍🏫 {circle.teacher.full_name}
-                                </span>
-                              )}
-                            </div>
-
-                            {selectedCircle === circle.id && (
-                              <Badge
-                                variant="outline"
-                                className={`${selectedCircle === circle.id ? 'text-white border-white' : 'text-green-800 border-green-400'
-                                  } text-xs`}
-                              >
-                                {scsLabels.selectedBadge}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* عرض الجلسات - ثلثي الصفحة */}
-            <div className="md:col-span-3">
-              <div className="bg-white border border-green-200 rounded-xl shadow-md overflow-hidden">
-                {/* هيدر الجلسات */}
-                <div className="bg-gradient-to-r from-green-100 via-green-200 to-green-300 px-3 py-2 sm:px-4 sm:py-3 border-b border-green-300">
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-                    <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-center sm:justify-start">
-                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" />
-                      <h3 className="text-sm sm:text-base md:text-lg font-bold text-green-800 text-center sm:text-right">
-                        {selectedCircle ? (
-                          <span>{tsLabels.futureSessionsForCircle(getCircleName(selectedCircle))}</span>
-                        ) : (
-                          <span>{tsLabels.futureSessionsGeneric}</span>
-                        )}
-                      </h3>
-                    </div>
-                    {selectedCircle && (
-                      <Button
-                        onClick={handleAddSession}
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm rounded-lg shadow-sm flex items-center gap-1 mx-auto sm:mx-0"
-                        title="تسجيل جلسة جديدة"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span className="inline">{tsLabels.addSessionButton}</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* عداد الجلسات والبيانات */}
-                <div className="p-3 sm:p-4">
-                  {/* جدول الجلسات */}
-                  {loading ? (
-                    <div className="text-center py-12 flex flex-col items-center justify-center">
-                      <div className="animate-spin h-8 w-8 border-3 border-green-500 border-t-transparent rounded-full mb-2"></div>
-                      <span className="text-green-700 font-medium">جاري التحميل...</span>
-                    </div>
-                  ) : selectedCircle ? (
-                    circleSessions.length > 0 ? (
-                      <div className="overflow-hidden">
-                        <GenericTable
-                          data={circleSessions.map((session, index) => ({
-                            ...session,
-                            id: `${session.study_circle_id}-${session.session_date}-${index}`
-                          }))}
-                          cardGridColumns={{ sm: 1, md: 1, lg: 3, xl: 3 }}
-                          cardWidth="100%"
-                          /* تم تكييف إعدادات الجدول لتطابق إعدادات الجداول العامة في بقية النظام */
-                          enablePagination
-                          defaultPageSize={5}
-                          pageSizeOptions={[5, 10, 20, 50]}
-                          columns={[
-                            {
-                              key: 'session_date',
-                              header: '📅 التاريخ',
-                              align: 'right',
-                              render: (session) => (
-                                <div className="flex flex-col text-right">
-                                  <span className="text-xs text-white-600">{formatDateDisplay(session.session_date)}</span>
-                                </div>
-                              ),
-                            },
-                            {
-                              key: 'time',
-                              header: '⏰ الوقت',
-                              align: 'right',
-                              render: (session) => (
-                                <div className="flex flex-wrap items-center gap-1 max-w-full">
-                                  <div className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-lg text-xs whitespace-nowrap">
-                                    <Clock className="h-3 w-3" />
-                                    <span className="font-medium">{formatTimeDisplay(session.start_time)}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-xs whitespace-nowrap">
-                                    <Clock className="h-3 w-3" />
-                                    <span className="font-medium">{formatTimeDisplay(session.end_time)}</span>
-                                  </div>
-                                </div>
-                              ),
-                            },
-                            {
-                              key: 'notes',
-                              header: '📝' + tsLabels.fieldNotes,
-                              align: 'right',
-                              render: (session) => (
-                                <span className="text-green-800 text-xs max-w-[200px] block">{session.notes || '—'}</span>
-                              ),
-                            },
-                            {
-                              key: 'actions',
-                              header: '⚙️ ' + 'إجراءات',
-                              align: 'center',
-                              render: (session) => (
-                                <div className="flex justify-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEditSession({
-                                      study_circle_id: session.study_circle_id,
-                                      session_date: session.session_date,
-                                      start_time: session.start_time,
-                                      end_time: session.end_time,
-                                      notes: session.notes,
-                                      teacher_id: session.teacher_id
-                                    })}
-                                    className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 transition-colors"
-                                    title={tsLabels.editSession}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteSession({
-                                      study_circle_id: session.study_circle_id,
-                                      session_date: session.session_date,
-                                      start_time: session.start_time,
-                                      end_time: session.end_time,
-                                      notes: session.notes,
-                                      teacher_id: session.teacher_id
-                                    })}
-                                    className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 transition-colors"
-                                    title={tsLabels.deleteSession}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ),
-                            },
-                          ]}
-                          emptyMessage="لا توجد جلسات مستقبلية"
-                          className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-                          getRowClassName={(_, index) =>
-                            `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
-                          }
-                          cardMaxFieldsCollapsed={4}
-                          hideSortToggle={false}
-                        /* يمكن إضافة زر للتحديث لاحقاً إذا لزم الأمر: onRefresh={...} */
-                        />
-                      </div>
-                    ) : (
-                      <div className="py-16 text-center">
-                        <div className="bg-green-50 rounded-2xl p-6 max-w-md mx-auto border border-green-200 shadow-inner">
-                          <Calendar className="w-12 h-12 text-green-300 mx-auto mb-3" />
-                          <h3 className="text-lg font-bold text-green-800 mb-2">{tsLabels.noFutureSessions}</h3>
-                          <p className="text-green-600 text-sm mb-4">
-                            {tsLabels.noFutureSessions}
-                          </p>
-                          <Button
-                            onClick={handleAddSession}
-                            className="bg-green-600 hover:bg-green-700 text-white rounded-xl"
-                          >
-                            <Plus className="h-4 w-4 mr-1" />
-                            {tsLabels.addSessionButton}
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  ) : (
-                    <div className="py-16 text-center">
-                      <div className="bg-green-50 rounded-2xl p-6 max-w-md mx-auto border border-green-200 shadow-inner">
-                        <BookOpen className="w-12 h-12 text-green-300 mx-auto mb-3" />
-                        <h3 className="text-lg font-bold text-green-800 mb-2">{tsLabels.chooseCircleTitle}</h3>
-                        <p className="text-green-600 text-sm">
-                          {tsLabels.chooseCircleHelp}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
+            {showFilters && (
+              <TeacherCircleFilterBar
+                useInlineSelects
+                useShadSelect
+                teachers={aggregatedTeachers.map(t => ({ id: t.id, name: t.name, circles_count: t.circles_count }))}
+                circles={filteredCircles.map(c => ({ id: c.id, name: c.name }))}
+                selectedTeacherId={teacherId}
+                selectedCircleId={selectedCircle}
+                searchQuery={searchTerm}
+                onSearchChange={setSearchTerm}
+                onTeacherChange={(id) => { setTeacherId(id); setSelectedCircle(null); }}
+                onCircleChange={(id) => setSelectedCircle(id)}
+                onClearTeacher={() => { setTeacherId(null); setSelectedCircle(null); }}
+                onClearCircle={() => setSelectedCircle(null)}
+                showAddButton={!!selectedCircle}
+                requireCircleBeforeAdd
+                onAddClick={handleAddSession}
+                addButtonLabel={tsLabels.addSessionButton}
+                addButtonTooltip={tsLabels.addSessionButton}
+              />
+            )}
+          </CardContent>
+        )}
       </Card>
+
+      <div>
+        {!selectedCircle  ? (
+          <div className="flex flex-col items-center justify-center p-8 sm:p-10 text-center gap-2.5 text-sm sm:text-base">
+            <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-green-700" />
+            <h3 className="text-sm sm:text-base md:text-lg font-bold text-green-800 text-center sm:text-right">
+              {selectedCircle && showFilters ? (
+                <span>{tsLabels.futureSessionsForCircle(getCircleName(selectedCircle))}</span>
+              ) : (
+                <span>{tsLabels.futureSessionsGeneric}</span>
+              )}
+            </h3>
+          </div>
+        ) : (
+          <div className="pt-2">
+            <GenericTable
+              title={
+                <div className="flex items-center gap-2 w-full">
+                  <Calendar className="h-4 w-4 md:h-5 md:w-5 text-green-600 drop-shadow-sm" />
+                  <span className="font-extrabold text-green-600 text-sm md:text-base tracking-wide truncate">
+                    {selectedCircle
+                      ? `${tsLabels.futureSessionsForCircle(getCircleName(selectedCircle))}`
+                      : tsLabels.futureSessionsGeneric}
+                  </span>
+                </div>
+              }
+              data={circleSessions.map((session, index) => ({
+                ...session,
+                id: `${session.study_circle_id}-${session.session_date}-${index}`
+              }))}
+              cardGridColumns={{ sm: 1, md: 1, lg: 3, xl: 3 }}
+              cardWidth="100%"
+              /* تم تكييف إعدادات الجدول لتطابق إعدادات الجداول العامة في بقية النظام */
+              enablePagination
+              defaultPageSize={5}
+              pageSizeOptions={[5, 10, 20, 50]}
+              columns={[
+                {
+                  key: 'session_date',
+                  header: '📅 التاريخ',
+                  align: 'right',
+                  render: (session) => (
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs text-white-600">{formatDateDisplay(session.session_date)}</span>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'time',
+                  header: '⏰ الوقت',
+                  align: 'right',
+                  render: (session) => (
+                    <div className="flex flex-wrap items-center gap-1 max-w-full">
+                      <div className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-lg text-xs whitespace-nowrap">
+                        <Clock className="h-3 w-3" />
+                        <span className="font-medium">{formatTimeDisplay(session.start_time)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-purple-100 text-purple-800 px-2 py-1 rounded-lg text-xs whitespace-nowrap">
+                        <Clock className="h-3 w-3" />
+                        <span className="font-medium">{formatTimeDisplay(session.end_time)}</span>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'notes',
+                  header: '📝' + tsLabels.fieldNotes,
+                  align: 'right',
+                  render: (session) => (
+                    <span className="text-green-800 text-xs max-w-[200px] block">{session.notes || '—'}</span>
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: '⚙️ ' + 'إجراءات',
+                  align: 'center',
+                  render: (session) => (
+                    <div className="flex justify-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditSession({
+                          study_circle_id: session.study_circle_id,
+                          session_date: session.session_date,
+                          start_time: session.start_time,
+                          end_time: session.end_time,
+                          notes: session.notes,
+                          teacher_id: session.teacher_id
+                        })}
+                        className="bg-green-200 hover:bg-green-300 text-green-900 rounded-md p-2 transition-colors"
+                        title={tsLabels.editSession}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSession({
+                          study_circle_id: session.study_circle_id,
+                          session_date: session.session_date,
+                          start_time: session.start_time,
+                          end_time: session.end_time,
+                          notes: session.notes,
+                          teacher_id: session.teacher_id
+                        })}
+                        className="bg-red-100 hover:bg-red-200 text-red-700 rounded-md p-2 transition-colors"
+                        title={tsLabels.deleteSession}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ),
+                },
+              ]}
+              emptyMessage="لا توجد جلسات مستقبلية"
+              className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+              getRowClassName={(_, index) =>
+                `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
+              }
+              cardMaxFieldsCollapsed={4}
+              hideSortToggle={false}
+            /* يمكن إضافة زر للتحديث لاحقاً إذا لزم الأمر: onRefresh={...} */
+            />
+          </div>
+        )}
+      </div>
 
       {/* نافذة إضافة جلسة جديدة */}
       {/* نافذة إضافة جلسة جديدة */}
