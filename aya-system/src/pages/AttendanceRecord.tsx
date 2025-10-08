@@ -100,8 +100,9 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   const [loading, setLoading] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [savingAttendance, setSavingAttendance] = useState(false);
-  const [showFutureConfirm, setShowFutureConfirm] = useState(false);
-  const [pendingFutureSave, setPendingFutureSave] = useState(false);
+  // حوار تأكيد الحفظ (أصبح دائماً قبل الحفظ)
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [pendingSave, setPendingSave] = useState(false);
 
   // فلترة المعلمين (للأدمن/المشرف) - إذا كان المستخدم معلماً نلصق معرفه مباشرة
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(() => {
@@ -189,9 +190,9 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           new Date(a.session_date).getTime() - new Date(b.session_date).getTime()
         );
 
-  setCircleSessions(sortedSessions);
-  // تعيين أول جلسة (اليوم أو القادمة) تلقائياً لعرض الطلاب مباشرة
-  setSelectedSession(sortedSessions[0] || null);
+        setCircleSessions(sortedSessions);
+        // تعيين أول جلسة (اليوم أو القادمة) تلقائياً لعرض الطلاب مباشرة
+        setSelectedSession(sortedSessions[0] || null);
       } catch (error) {
         console.error("خطأ في جلب جلسات الحلقة:", error);
         toast({
@@ -361,29 +362,19 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     }
   };
 
-  // غلاف يتحقق من تاريخ الجلسة قبل الاستدعاء الحقيقي
+  // عرض حوار تأكيد دائماً قبل الحفظ
   const attemptSaveAttendance = () => {
     if (!selectedSession) return;
-    const sessionDate = new Date(selectedSession.session_date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    sessionDate.setHours(0, 0, 0, 0);
-    if (sessionDate.getTime() > today.getTime()) {
-      // جلسة مستقبلية
-      setShowFutureConfirm(true);
-      return;
-    }
-    // جلسة اليوم أو أقدم (حسب الفلترة المتبقية هي اليوم/المستقبل) فنحفظ مباشرة
-    handleSaveAllAttendance();
+    setShowSaveConfirm(true);
   };
 
-  const confirmFutureAttendanceSave = async () => {
-    setPendingFutureSave(true);
+  const confirmAttendanceSave = async () => {
+    setPendingSave(true);
     try {
       await handleSaveAllAttendance();
     } finally {
-      setPendingFutureSave(false);
-      setShowFutureConfirm(false);
+      setPendingSave(false);
+      setShowSaveConfirm(false);
     }
   };
 
@@ -650,8 +641,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
 
           {/* شريط التحكم بالفلاتر (الأزرار) */}
-          <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-2 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
-            <div className="flex gap-2 items-center ">
+          <div className={`flex flex-col md:flex-row justify-end items-center gap-2 mb-2 rounded-md p-1.5 shadow-sm border transition-colors duration-200 ${hasChanges ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-600' : 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-700'}`}> 
+            <div className="flex flex-wrap gap-2 items-center ">
               {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
               <Button
                 variant={showFilters ? 'default' : 'outline'}
@@ -672,6 +663,46 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                 <RefreshCwIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
+              {/* زر تعيين الجميع حاضر */}
+              <Button
+                size="sm"
+                onClick={() => setAllStudentsStatus("present")}
+                className="flex items-center gap-1.5 rounded-xl bg-green-100 hover:bg-green-200 text-green-800 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-green-300"
+                title="تعيين كل الطلاب حاضر"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">الكل حاضر</span>
+              </Button>
+              {/* زر تعيين الجميع غائب */}
+              <Button
+                size="sm"
+                onClick={() => setAllStudentsStatus("absent")}
+                className="flex items-center gap-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-red-300"
+                title="تعيين كل الطلاب غائب"
+              >
+                <X className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">الكل غائب</span>
+              </Button>
+              {/* زر حفظ الحضور (منقول من الفوتر) */}
+              <Button
+                onClick={attemptSaveAttendance}
+                disabled={!hasChanges || savingAttendance || studentsWithAttendance.length === 0}
+                className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors px-3 py-1 text-[11px] font-medium h-8"
+                title="حفظ الحضور"
+              >
+                {savingAttendance ? (
+                  <>
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span className="hidden sm:inline">جارٍ الحفظ...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">حفظ الحضور</span>
+                  </>
+                )}
+              </Button>
+              {/* تمت إزالة شارة (تغييرات غير محفوظة) والاكتفاء بتلوين الشريط */}
             </div>
           </div>
 
@@ -746,25 +777,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                     </CardDescription>
                   </div>
 
-                  {/* أزرار سريعة */}
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      onClick={() => setAllStudentsStatus("present")}
-                      className="flex items-center h-6 px-2 rounded bg-green-100 hover:bg-green-200 text-green-800 text-[10px] border border-green-300"
-                    >
-                      <Check className="h-3 w-3 mr-0.5" />
-                      حاضر
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setAllStudentsStatus("absent")}
-                      className="flex items-center h-6 px-2 rounded bg-red-100 hover:bg-red-200 text-red-800 text-[10px] border border-red-300"
-                    >
-                      <X className="h-3 w-3 mr-0.5" />
-                      غائب
-                    </Button>
-                  </div>
+                  {/* أزرار سريعة نُقلت إلى الشريط العلوي */}
                 </div>
 
                 {/* ملخص الحضور (سطر صغير تحت لو ضروري) */}
@@ -959,38 +972,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                 )}
               </CardContent>
 
-              {/* الفوتر */}
-              <CardFooter className="bg-green-50 px-3 py-2 border-t border-green-200">
-                <div className="w-full space-y-1">
-                  <Button
-                    onClick={attemptSaveAttendance}
-                    disabled={
-                      !hasChanges ||
-                      savingAttendance ||
-                      studentsWithAttendance.length === 0
-                    }
-                    className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2 rounded-lg"
-                  >
-                    {savingAttendance ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        جارٍ الحفظ...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        حفظ الحضور
-                      </>
-                    )}
-                  </Button>
-                  {hasChanges && (
-                    <p className="text-amber-600 text-[11px] flex items-center gap-1 font-medium">
-                      <AlertCircle className="h-3 w-3" />
-                      تغييرات غير محفوظة
-                    </p>
-                  )}
-                </div>
-              </CardFooter>
+              {/* الفوتر أزيل زر الحفظ منه بعد نقله للأعلى */}
             </Card>
           )}
         </div>
@@ -1031,24 +1013,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
             </div>
           </CardHeader>
 
-          <div className="flex items-center justify-center gap-2 p-2 bg-green-50 border-b border-green-200">
-            <Button
-              size="sm"
-              onClick={() => setAllStudentsStatus("present")}
-              className="flex items-center h-7 px-2 rounded-md bg-green-100 hover:bg-green-200 text-green-800 text-[11px] border border-green-300"
-            >
-              <Check className="h-3 w-3 mr-1" />
-              الكل حاضر
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setAllStudentsStatus("absent")}
-              className="flex items-center h-7 px-2 rounded-md bg-red-100 hover:bg-red-200 text-red-800 text-[11px] border border-red-300"
-            >
-              <X className="h-3 w-3 mr-1" />
-              الكل غائب
-            </Button>
-          </div>
+          {/* أزرار الكل حاضر/غائب أزيلت من هنا وتم نقلها للأعلى */}
           {/* المحتوى */}
           <CardContent className="p-3">
             {loadingStudents ? (
@@ -1162,41 +1127,11 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
             )}
           </CardContent>
 
-          {/* الفوتر */}
-          <CardFooter className="bg-green-50 px-3 py-2 border-t border-green-200">
-            <div className="w-full space-y-1">
-              <Button
-                onClick={attemptSaveAttendance}
-                disabled={
-                  !hasChanges ||
-                  savingAttendance ||
-                  studentsWithAttendance.length === 0
-                }
-                className="w-full bg-green-600 hover:bg-green-700 text-white text-sm py-2 rounded-lg"
-              >
-                {savingAttendance ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    جارٍ الحفظ...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    حفظ الحضور
-                  </>
-                )}
-              </Button>
-
-              {hasChanges && (
-                <p className="text-amber-600 text-[11px] flex items-center gap-1 font-medium">
-                  <AlertCircle className="h-3 w-3" />
-                  تغييرات غير محفوظة
-                </p>
-              )}
-            </div>
-          </CardFooter>
+          {/* الفوتر أزيل زر الحفظ منه بعد نقله للأعلى */}
         </Card>
       )}
+
+
       {/* نافذة تحرير معلومات حضور طالب */}
       <FormDialog
         title="تفاصيل الحضور"
@@ -1283,14 +1218,18 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
         </div>
       </FormDialog>
       <DeleteConfirmationDialog
-        isOpen={showFutureConfirm}
-        onOpenChange={setShowFutureConfirm}
-        title="تأكيد تسجيل حضور مبكر"
-        description={
-          <div className="space-y-2 text-right">
-            <p>أنت على وشك تسجيل حضور لجلسة بتاريخ مستقبلي.</p>
-            <p className="font-medium text-red-700">هل أنت متأكد أنك تريد المتابعة؟</p>
-            {selectedSession && (
+        isOpen={showSaveConfirm}
+        onOpenChange={setShowSaveConfirm}
+        title="تأكيد حفظ الحضور"
+        description={(() => {
+          if (!selectedSession) return null;
+          const sessionDate = new Date(selectedSession.session_date);
+          const today = new Date(); today.setHours(0,0,0,0); sessionDate.setHours(0,0,0,0);
+          const isFuture = sessionDate.getTime() > today.getTime();
+          return (
+            <div className="space-y-2 text-right">
+              <p>{isFuture ? 'تنبيه: هذه جلسة بتاريخ مستقبلي وسيتم تسجيل الحضور مسبقاً.' : 'سيتم حفظ حالات الحضور الحالية.'}</p>
+              <p className="font-medium text-emerald-700">هل أنت متأكد من المتابعة؟</p>
               <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2 text-[13px]">
                 <div className="flex items-center gap-2 font-semibold text-blue-800">
                   <CalendarCheck className="h-4 w-4" />
@@ -1303,13 +1242,13 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                   <span>{selectedSession.start_time && selectedSession.end_time ? `${formatTimeDisplay(selectedSession.start_time)} - ${formatTimeDisplay(selectedSession.end_time)}` : '-'}</span>
                 </div>
               </div>
-            )}
-          </div>
-        }
-        deleteButtonText={pendingFutureSave ? 'جارٍ الحفظ...' : 'نعم، متابعة الحفظ'}
+            </div>
+          );
+        })()}
+        deleteButtonText={pendingSave ? 'جارٍ الحفظ...' : 'نعم، حفظ'}
         cancelButtonText="إلغاء"
-        onConfirm={confirmFutureAttendanceSave}
-        isLoading={pendingFutureSave}
+        onConfirm={confirmAttendanceSave}
+        isLoading={pendingSave}
       />
     </div>
   );

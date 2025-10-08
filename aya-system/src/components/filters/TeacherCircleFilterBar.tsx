@@ -208,17 +208,17 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
         <div
             dir="rtl"
             className={cn(
-                // جعل العناصر دائماً في صف واحد بدون التفاف مع تمرير أفقي عند ضيق المساحة
-                'flex flex-row flex-nowrap overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-emerald-300/60 hover:scrollbar-thumb-emerald-400/70 gap-1.5 md:gap-2 w-full p-1.5',
+                // موبايل: ترتيب عمودي، شاشات متوسطة فأعلى: صف أفقي
+                'flex flex-col md:flex-row md:flex-nowrap md:overflow-x-auto md:scrollbar-thin md:scrollbar-track-transparent md:scrollbar-thumb-emerald-300/60 md:hover:scrollbar-thumb-emerald-400/70 gap-2 md:gap-2 w-full p-1.5',
                 'bg-transparent',
-                // منع التفاف العناصر
-                'whitespace-nowrap',
+                // منع التفاف فقط على الشاشات الكبيرة
+                'md:whitespace-nowrap',
                 className,
                 disabled && 'opacity-60 pointer-events-none'
             )}
         >
             {/* اختيار المعلم */}
-            <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+            <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative w-full">
                                 {useInlineSelects ? (
                     <div className="grid gap-1.5 w-full">
                         <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">المعلم</label>
@@ -319,7 +319,7 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
             </div>
 
             {/* اختيار الحلقة + زر الإضافة (موبايل) */}
-            <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+            <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative w-full">
                 {useInlineSelects ? (
                     <div className="w-full">
                         <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1 block mb-1">الحلقة</label>
