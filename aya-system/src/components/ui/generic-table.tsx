@@ -86,6 +86,12 @@ export function GenericTable<T extends { id: string }>(props: {
     onCollapseChange?: (collapsed: boolean) => void;
     /** عند الطي يتم إخفاء جميع أزرار التحكم (الترقيم/التنقل/العرض/الترتيب/العداد) والإبقاء على زر الطي فقط */
     hideControlsWhenCollapsed?: boolean;
+    /** تفعيل نمط بطاقات مدمج (تصغير الهوامش والخطوط) */
+    compactCards?: boolean;
+    /** تفعيل شبكة مرنة auto-fill بدلاً من حساب أعمدة ثابتة */
+    cardAutoLayout?: boolean;
+    /** أقل عرض للبطاقة عند استخدام auto layout */
+    cardMinWidth?: number; // px
 }) {
     const {
         data,
@@ -121,6 +127,9 @@ export function GenericTable<T extends { id: string }>(props: {
         onCollapseChange,
         hideControlsWhenCollapsed = true,
         mobileControlsLayout = 'wrap',
+        compactCards = false,
+        cardAutoLayout = false,
+        cardMinWidth = 220,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -821,20 +830,35 @@ export function GenericTable<T extends { id: string }>(props: {
                         );
                     };
 
+                    const gridColsSm = Math.min(cardLogicalPageSize, cardGridColumns.sm || cardLogicalPageSize);
+                    const gridColsMd = Math.min(cardLogicalPageSize, cardGridColumns.md || cardLogicalPageSize);
+                    const gridColsLg = Math.min(cardLogicalPageSize, cardGridColumns.lg || cardLogicalPageSize);
+                    const gridColsXl = Math.min(cardLogicalPageSize, cardGridColumns.xl || cardLogicalPageSize);
+
+                    const autoLayoutStyle = cardAutoLayout && !isMobile && !smallSet ? {
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(auto-fill, minmax(${cardMinWidth}px, 1fr))`
+                    } : undefined;
+
+                    // تعديل: زيادة مسافة بسيطة حتى لا تلتصق البطاقات تماماً (بدلاً من gap-1 فقط)
+                    // على الشاشات الصغيرة جداً تبقى ضيقة، ثم تزيد قليلاً ابتداءً من md
+                    const gapResponsive = compactCards ? 'gap-1.5 md:gap-2 lg:gap-2 xl:gap-2 p-1.5 md:p-2' : 'gap-4 md:gap-5 p-3 md:p-4';
                     const containerClass = isMobile
-                        ? 'w-full p-2 custom-scrollbar scrollbar-thin scrollbar-green scroll-fade-overlay'
+                        ? cn('w-full custom-scrollbar scrollbar-thin scrollbar-green scroll-fade-overlay', compactCards ? 'p-1.5' : 'p-2')
                         : smallSet
-                            ? cn('flex flex-col md:flex-row gap-4 w-full p-2 overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay justify-center items-stretch', !noMaxHeight && 'max-h-[calc(100vh-200px)]')
-                            : cn(`grid gap-4 w-full p-2 overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay
-                            grid-cols-${Math.min(cardLogicalPageSize, 2)} md:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.md || cardLogicalPageSize)} lg:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.lg || cardLogicalPageSize)} xl:grid-cols-${Math.min(cardLogicalPageSize, cardGridColumns.xl || cardLogicalPageSize)}`,
-                                !noMaxHeight && 'max-h-[calc(100vh-200px)]');
+                            ? cn('flex flex-col md:flex-row w-full overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay justify-center items-stretch', gapResponsive, !noMaxHeight && 'max-h-[calc(100vh-200px)]')
+                            : cardAutoLayout
+                                ? cn('w-full overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay', gapResponsive, !noMaxHeight && 'max-h-[calc(100vh-200px)]')
+                                : cn(`grid w-full overflow-auto custom-scrollbar scrollbar-green scroll-fade-overlay ${gapResponsive}
+                                grid-cols-${Math.min(gridColsSm, 2)} md:grid-cols-${gridColsMd} lg:grid-cols-${gridColsLg} xl:grid-cols-${gridColsXl}`,
+                                    !noMaxHeight && 'max-h-[calc(100vh-200px)]');
 
                     return (
                         <div className="w-full flex flex-col items-stretch h-full">
                             {/* الترقيم مدمج في الهيدر؛ لا حاجة لعنصر علوي هنا */}
                             {/* النقاط (متمركزة) فوق الشبكة عند عدم تفعيل الترقيم */}
                             {!enablePagination && totalItems > 1 && <Dots />}
-                            <div className={containerClass}>
+                            <div className={containerClass} style={autoLayoutStyle}>
                                 {(() => {
                                     const CardItem = ({ item, globalIndex }: { item: T; globalIndex: number }) => {
                                         const [expanded, setExpanded] = useState(false);
@@ -871,18 +895,20 @@ export function GenericTable<T extends { id: string }>(props: {
                                                     }
                                                 }}
                                                 className={cn(
-                                                    'group relative rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/90 dark:bg-green-900/30 shadow-sm overflow-hidden flex flex-col focus:outline-none focus:ring-2 focus:ring-green-500 md:h-full',
+                                                    // السماح بتلوين الخلفية حسب الحالة (حاضر / غائب ...) عبر getRowClassName
+                                                    'group relative border border-green-200/70 dark:border-green-800/50 overflow-hidden flex flex-col focus:outline-none md:h-full rounded-xl transition-all duration-150 bg-white/95 dark:bg-green-900/30',
                                                     cardWidth ? '' : 'w-full',
-                                                    smallSet && 'md:max-w-[520px] mx-auto'
-                                                    // تمت إزالة تأثير hover (الظل وتغيير الحد) لمنع الوميض
+                                                    smallSet && 'md:max-w-[520px] mx-auto',
+                                                    compactCards ? 'rounded-lg shadow-sm hover:shadow-md hover:border-emerald-300/80 hover:ring-1 hover:ring-emerald-300/60' : 'shadow-sm hover:shadow-md',
+                                                    getRowClassName ? getRowClassName(item as any, globalIndex) : ''
                                                 )}
                                                 style={cardWidth ? { width: cardWidth } : undefined}
                                             >
                                                 {/* الرأس (لون ديناميكي حسب حالة الترتيب) */}
-                                                <div className={cn('px-2 sm:px-3 py-1.5 sm:py-2.5 text-white rounded-t-lg shadow-md flex items-center justify-between', sortGradientClass)}>
-                                                    <h3 className="font-bold text-sm sm:text-base tracking-wide text-white drop-shadow-sm truncate flex-1 flex items-center gap-2">
+                                                <div className={cn('flex items-center justify-between', compactCards ? 'bg-emerald-600/85 text-white px-2 py-1.5 border-b border-emerald-500/60' : cn('text-white', sortGradientClass, 'px-2 sm:px-3 py-1.5 sm:py-2.5 rounded-t-lg shadow-md'))}> 
+                                                    <h3 className={cn('font-bold truncate flex-1 flex items-center gap-2', compactCards ? 'text-[11px] tracking-tight' : 'text-sm sm:text-base tracking-wide')}> 
                                                         {indexColumn && (
-                                                            <span className="inline-flex items-center justify-center min-w-[26px] h-[26px] rounded-full bg-white/15 border border-white/30 text-xs font-semibold shadow-inner backdrop-blur-sm">
+                                                            <span className={cn('inline-flex items-center justify-center border border-white/30 text-xs font-semibold shadow-inner backdrop-blur-sm', compactCards ? 'min-w-[20px] h-[20px] rounded-md bg-white/20' : 'min-w-[26px] h-[26px] rounded-full bg-white/15')}> 
                                                                 {indexColumn.render ? indexColumn.render(item, globalIndex) : (item as any)[indexColumn.key] ?? (globalIndex + 1)}
                                                             </span>
                                                         )}
@@ -893,26 +919,26 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 </div>
 
                                                 {/* المحتوى */}
-                                                <div className="w-full">
+                                                <div className={cn('w-full', compactCards && 'text-[11px]')}> 
                                                     {/* نسخة الجدول - تظهر من sm وفوق */}
-                                                    <table className="hidden sm:table w-full border border-green-300 dark:border-green-700 text-[11px] sm:text-xs table-fixed">
+                                                    <table className={cn('hidden sm:table w-full border border-green-300 dark:border-green-700 table-fixed', compactCards ? 'text-[10px]' : 'text-[11px] sm:text-xs')}> 
                                                         <tbody>
                                                             {visibleColumns.map((column) => {
                                                                 const value = column.render
                                                                     ? column.render(item)
                                                                     : (item as any)[column.key];
                                                                 return (
-                                                                    <tr key={`${item.id}-${column.key}-row`}>
-                                                                        <td className="w-[30%] border border-green-300 dark:border-green-700 px-2 py-1 font-medium text-green-700 dark:text-green-300 text-right">
+                                                                    <tr key={`${item.id}-${column.key}-row`} className={compactCards ? 'hover:bg-green-50/60' : ''}> 
+                                                                        <td className={cn('w-[30%] border border-green-300 dark:border-green-700 text-right', compactCards ? 'px-1.5 py-1 font-semibold text-[10px] text-green-700/90' : 'px-2 py-1 font-medium text-green-700 dark:text-green-300')}> 
                                                                             {column.header}
                                                                         </td>
-                                                                        <td className="w-[70%] border border-green-300 dark:border-green-700 px-2 py-1 text-green-800 dark:text-green-100 text-right bg-green-50 dark:bg-green-900/50">
-                                                                            <div className="w-full sm:max-w-xs text-[11px] sm:text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30 border border-green-200 dark:border-green-700 rounded-md px-2 py-1 min-h-[24px] sm:min-h-[26px] flex items-center justify-center">
+                                                                        <td className={cn('w-[70%] border border-green-300 dark:border-green-700 text-right bg-green-50 dark:bg-green-900/50', compactCards ? 'px-1.5 py-1' : 'px-2 py-1 text-green-800 dark:text-green-100')}> 
+                                                                            <div className={cn('w-full sm:max-w-xs border border-green-200 dark:border-green-700 rounded-md flex items-center justify-center', compactCards ? 'px-1.5 py-0.5 min-h-[20px] text-[10px] bg-white/70' : 'px-2 py-1 min-h-[24px] sm:min-h-[26px] text-[11px] sm:text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30')}> 
                                                                                 {value !== null && value !== undefined ? (
                                                                                     typeof value === "object" && React.isValidElement(value) ? (
                                                                                         value
                                                                                     ) : (
-                                                                                        <span className="text-center">{getDisplayValue(value)}</span>
+                                                                                        <span className="text-center font-medium">{getDisplayValue(value)}</span>
                                                                                     )
                                                                                 ) : (
                                                                                     <span className="text-green-400/60 italic text-center">-</span>
@@ -964,7 +990,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 </div>
                                                 {/* زر إظهار المزيد إذا كان هناك المزيد من الحقول */}
 
-                                                {!isMobile && hasMore && (
+                                                {!isMobile && hasMore && !compactCards && (
                                                     <button
                                                         type="button"
                                                         onClick={(e) => {

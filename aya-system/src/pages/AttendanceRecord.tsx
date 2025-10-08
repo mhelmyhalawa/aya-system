@@ -34,8 +34,9 @@ import {
   CheckCircle2,
   Filter,
   RefreshCw as RefreshCwIcon,
+  Users,
 } from "lucide-react";
-
+//
 import { Profile } from "@/types/profile";
 import { StudyCircle } from "@/types/study-circle";
 import { CircleSession, formatDateDisplay, formatTimeDisplay } from "@/types/circle-session";
@@ -58,6 +59,8 @@ import {
 import { getStudentsCountInCircles } from "@/lib/student-count-service";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { TeacherCircleFilterBar } from '@/components/filters/TeacherCircleFilterBar';
+import { GenericTable, Column } from '@/components/ui/generic-table';
+import { cn } from '@/lib/utils';
 // ================== تعريف الأنواع الداخلية ==================
 interface StudentWithAttendance {
   student: Student;
@@ -553,24 +556,198 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     });
 
     return (
-      <div className="flex flex-wrap justify-center gap-2 text-sm mb-3">
-        <span className="h-6 px-2 rounded-md bg-red-100 hover:bg-red-200 text-red-800 text-[10px] border border-red-300">
-          حاضر: {summary.present}
+      <div className="flex flex-wrap justify-center gap-1.5 text-sm mb-3">
+        <span className="h-6 px-2 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] border border-emerald-200 inline-flex items-center gap-1">
+          <Users className="h-3 w-3 text-emerald-600" /> مجموع: {summary.total}
         </span>
-        <span className="h-6 px-2 rounded-md bg-red-100 hover:bg-red-200 text-red-800 text-[10px] border border-red-300">
-          غائب: {summary.absent}
+        <span className="h-6 px-2 rounded-md bg-blue-50 hover:bg-blue-100 text-blue-700 text-[10px] border border-blue-200 inline-flex items-center gap-1">
+          <CheckCircle2 className="h-3 w-3 text-blue-600" /> حاضر: {summary.present}
         </span>
-        <span className="h-6 px-2 rounded-md bg-amber-100 hover:bg-amber-200 text-amber-700 text-[10px] border border-amber-300">
-          متأخر: {summary.late}
+        <span className="h-6 px-2 rounded-md bg-red-50 hover:bg-red-100 text-red-700 text-[10px] border border-red-200 inline-flex items-center gap-1">
+          <X className="h-3 w-3 text-red-600" /> غائب: {summary.absent}
         </span>
-        <span className="h-6 px-2 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] border border-blue-300">
-          معذور: {summary.excused}
+        <span className="h-6 px-2 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-700 text-[10px] border border-amber-200 inline-flex items-center gap-1">
+          <Clock className="h-3 w-3 text-amber-600" /> متأخر: {summary.late}
         </span>
-        <span className="h-6 px-2 rounded-md bg-blue-100 hover:bg-blue-200 text-blue-700 text-[10px] border border-blue-300">
-          المجموع: {summary.total}
+        <span className="h-6 px-2 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-700 text-[10px] border border-sky-200 inline-flex items-center gap-1">
+          <Calendar className="h-3 w-3 text-sky-600" /> معذور: {summary.excused}
         </span>
       </div>
     );
+  };
+
+  // ===== بيانات الجدول (سطح المكتب) باستخدام GenericTable =====
+  interface AttendanceTableRow {
+    id: string; // معرف الطالب
+    studentName: string;
+    guardianName: string;
+    note?: string;
+  }
+
+  const attendanceTableData: AttendanceTableRow[] = useMemo(() => {
+    return studentsWithAttendance.map(({ student }) => ({
+      id: student.id,
+      studentName: student.full_name,
+      guardianName: student.guardian?.full_name || '',
+      note: attendanceFormData[student.id]?.note || ''
+    }));
+  }, [studentsWithAttendance, attendanceFormData]);
+
+  const attendanceColumns: Column<AttendanceTableRow>[] = useMemo(() => ([
+    {
+      key: '__index',
+      header: '#',
+      width: '48px',
+      align: 'center',
+      render: (_row, globalIndex) => (
+        <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-800 text-[11px] font-bold border border-emerald-300 shadow-sm">
+          {(globalIndex ?? 0) + 1}
+        </span>
+      )
+    },
+    {
+      key: 'studentName',
+      header: 'الطالب / ولي الأمر',
+      render: (row) => (
+        <div className="flex items-start gap-2 max-w-[280px]">
+          <div className="flex flex-col min-w-0 leading-tight">
+            <span className="text-[11.5px] font-semibold text-emerald-800 truncate" title={row.studentName}>{row.studentName}</span>
+            {row.guardianName && <span className="text-[10px] text-gray-500 truncate" title={row.guardianName}>{row.guardianName}</span>}
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      header: 'الحالة',
+      render: (row) => {
+        const st = attendanceFormData[row.id]?.status || 'present';
+        const colorMap: Record<string, string> = {
+          present: 'border-emerald-300 bg-emerald-50 text-emerald-700',
+          absent: 'border-red-300 bg-red-50 text-red-700',
+          late: 'border-amber-300 bg-amber-50 text-amber-700',
+          excused: 'border-blue-300 bg-blue-50 text-blue-700'
+        };
+        return (
+          <div className="min-w-[130px]">
+            <Select
+              value={st}
+              onValueChange={(value) => handleStatusChange(row.id, value as AttendanceStatus)}
+            >
+              <SelectTrigger
+                id={`attendance-status-${row.id}`}
+                dir="rtl"
+                className={cn('h-8 text-[11px] leading-none rounded-full border px-3 py-0 flex items-center justify-between gap-1 shadow-sm transition-colors', colorMap[st] || 'border-gray-300 text-gray-600')}
+              >
+                <SelectValue placeholder="الحالة">
+                  {getAttendanceStatusName(st)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent position="popper" dir="rtl" className="text-right text-[11px] rounded-md border border-emerald-200 shadow-md bg-white">
+                {attendanceStatusOptions.map((option) => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className="cursor-pointer data-[highlighted]:bg-emerald-100 data-[state=checked]:font-semibold rounded-sm text-[11px]"
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'late',
+      header: 'دقائق تأخير',
+      render: (row) => {
+        const st = attendanceFormData[row.id]?.status;
+        if (st !== 'late') return <span className="text-gray-300 text-[11px]">—</span>;
+        return (
+          <div className="flex items-center gap-1">
+            <Input
+              title="أدخل دقائق التأخير"
+              type="number"
+              min={0}
+              value={attendanceFormData[row.id]?.late_minutes || 0}
+              onChange={(e) => {
+                const value = parseInt(e.target.value) || 0;
+                setAttendanceFormData((prev) => ({
+                  ...prev,
+                  [row.id]: { ...prev[row.id], late_minutes: value < 0 ? 0 : value },
+                }));
+                setHasChanges(true);
+              }}
+              className="h-8 w-16 text-center text-[11px] bg-amber-50 border-amber-300 focus:ring-amber-400/40"
+              placeholder="0"
+            />
+          </div>
+        );
+      }
+    },
+    {
+      key: 'note',
+      header: 'ملاحظة',
+      render: (row) => (
+        attendanceFormData[row.id]?.note ? (
+          <button
+            type="button"
+            onClick={() => handleEditAttendance(row.id)}
+            className="group inline-flex items-center gap-1 max-w-[220px] text-[11px] text-gray-600 hover:text-emerald-700 transition-colors"
+            title={attendanceFormData[row.id]?.note}
+          >
+            <FileText className="h-3.5 w-3.5 text-emerald-500 group-hover:text-emerald-600" />
+            <span className="truncate font-medium">{attendanceFormData[row.id]?.note}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => handleEditAttendance(row.id)}
+            className="text-[10px] text-gray-400 hover:text-emerald-600 italic underline-offset-2 hover:underline"
+            title="إضافة ملاحظة"
+          >
+            لا يوجد
+          </button>
+        )
+      )
+    },
+    {
+      key: 'actions',
+      header: 'تحرير',
+      render: (row) => (
+        <div className="flex items-center justify-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEditAttendance(row.id)}
+            className="h-7 w-7 p-0 rounded-full hover:bg-emerald-100"
+            title="تحرير السجل"
+          >
+            <Edit className="h-4 w-4 text-emerald-700" />
+          </Button>
+        </div>
+      )
+    }
+  ]), [attendanceFormData]);
+
+  // تلوين الصف حسب الحالة
+  const getAttendanceRowClass = (row: AttendanceTableRow) => {
+    const st = attendanceFormData[row.id]?.status;
+    // نعتمد نفس الألوان لكل من الصفوف والبطاقات (تم تطبيقها الآن أيضاً على البطاقات عبر generic-table)
+    switch (st) {
+      case 'present':
+        return 'bg-emerald-50/60 hover:bg-emerald-50';
+      case 'absent':
+        return 'bg-red-50/60 hover:bg-red-50';
+      case 'late':
+        return 'bg-amber-50/70 hover:bg-amber-50';
+      case 'excused':
+        return 'bg-blue-50/60 hover:bg-blue-50';
+      default:
+        return '';
+    }
   };
 
   // دالة إعادة ضبط الفلاتر والاختيارات (أُعيدت بعد حذف الكاروسيل)
@@ -751,232 +928,81 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-1 gap-2 p-2">
-        <div className="md:col-span-1">
-          {/* تمت إزالة الفراغ السفلي الزائد */}
-          {selectedCircle && selectedSession && (
-            <Card className="hidden md:block border border-green-300 rounded-xl shadow-md overflow-hidden">
-              {/* الهيدر */}
-              <CardHeader className="bg-gradient-to-r from-green-700 to-green-600 text-white px-3 py-2 border-b border-green-400">
-                <div className="flex items-center justify-between w-full">
-                  {/* العنوان + التاريخ */}
-                  <div className="flex flex-col">
-                    <CardTitle className="text-[13px] font-bold flex items-center gap-1">
-                      <CalendarCheck className="h-3.5 w-3.5 text-yellow-300" />
-                      <span className="line-clamp-1">{getCircleName(selectedCircle)}</span>
-                    </CardTitle>
-                    <CardDescription className="text-[10px] text-green-50 flex items-center gap-1">
-                      <Calendar className="h-3 w-3 text-green-200" />
-                      {formatDateDisplay(selectedSession.session_date)}
-                      {selectedSession.start_time && selectedSession.end_time && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-green-200" />
-                          {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
-                        </span>
-                      )}
-                    </CardDescription>
-                  </div>
-
-                  {/* أزرار سريعة نُقلت إلى الشريط العلوي */}
-                </div>
-
-                {/* ملخص الحضور (سطر صغير تحت لو ضروري) */}
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  {renderAttendanceSummary()}
-                </div>
-              </CardHeader>
-
-              {/* المحتوى */}
-              <CardContent className="p-3">
-                {loadingStudents ? (
-                  <div className="text-center py-6">
-                    <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-green-600" />
-                    <p className="text-gray-500 text-xs">جارٍ تحميل بيانات الطلاب...</p>
-                  </div>
-                ) : studentsWithAttendance.length === 0 ? (
-                  <div className="text-center py-6 bg-green-50 rounded-lg">
-                    <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500" />
-                    <p className="text-sm font-medium text-green-800">لا يوجد طلاب</p>
-                    <p className="text-[11px] text-gray-600">
-                      يرجى إضافة طلاب لهذه الحلقة.
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="w-full flex justify-center pt-2 pb-3">
-                      <div className="flex items-center gap-2">
-
-                        {/* زر السابق */}
-                        {studentsWithAttendance.length > studentsGroupSize && (
-                          <button
-                            onClick={goPrevStudentCarousel}
-                            disabled={studentCarouselIndex === 0}
-                            className="h-8 w-8 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                            aria-label="السابق"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
+      {/* جدول الحضور لسطح المكتب */}
+      {selectedCircle && selectedSession && (
+        <div className="hidden md:block p-2">
+          {loadingStudents ? (
+            <div className="text-center py-10 bg-white border rounded-xl shadow-sm">
+              <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-3 text-green-600" />
+              <p className="text-gray-600 text-sm">جارٍ تحميل بيانات الطلاب...</p>
+            </div>
+          ) : attendanceTableData.length === 0 ? (
+            <div className="text-center py-10 bg-green-50 rounded-xl border border-green-200">
+              <AlertCircle className="h-8 w-8 mx-auto mb-3 text-amber-500" />
+              <p className="text-sm font-medium text-green-800">لا يوجد طلاب</p>
+              <p className="text-[12px] text-gray-600">يرجى إضافة طلاب لهذه الحلقة.</p>
+            </div>
+          ) : (
+            <>
+            <GenericTable<AttendanceTableRow>
+              data={attendanceTableData}
+              columns={attendanceColumns}
+              defaultView="table"
+              enablePagination={true}
+              defaultPageSize={5}
+              pageSizeOptions={[5, 10, 15, 25, 50]}
+              hideSortToggle={false}
+              enableSorting
+              cardGridColumns={{ sm:1, md:2, lg:4, xl:6 }}
+              cardWidth="230px"
+              compactCards
+              cardAutoLayout
+              cardMinWidth={217.5}
+              getRowClassName={(row) => getAttendanceRowClass(row)}
+              title={(
+                <div className="w-full flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                        <CalendarCheck className="h-4 w-4 text-yellow-500" />
+                        {getCircleName(selectedCircle)}
+                      </span>
+                      <span className="hidden md:inline-flex items-center text-[10px] text-emerald-700 bg-white/60 px-2 py-0.5 rounded border border-emerald-200 gap-1">
+                        <Calendar className="h-3 w-3 text-emerald-500" />
+                        {formatDateDisplay(selectedSession.session_date)}
+                        {selectedSession.start_time && selectedSession.end_time && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-emerald-500" />
+                            {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
+                          </span>
                         )}
-
-                        {/* شبكة الطلاب */}
-                        <div className="grid grid-cols-4 gap-3 w-full max-w-2xl mx-auto">
-                          {visibleStudentsGroup.map((item, idx) => {
-                            const absoluteIndex = studentCarouselIndex * studentsGroupSize + idx;
-                            return (
-                              <div
-                                key={item.student.id}
-                                className="group relative border rounded-lg cursor-pointer overflow-hidden transition-all duration-300 bg-white flex flex-col shadow-sm hover:shadow-md hover:scale-[1.005] border-emerald-200 hover:border-emerald-400"
-                              >
-                                <div className="h-0.5 w-full bg-gradient-to-r from-emerald-200 to-emerald-300 group-hover:from-emerald-300 group-hover:to-emerald-400 transition-all" />
-                                <div className="p-2 flex flex-col gap-1.5 text-[10px] grow">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <div className="h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                                        {absoluteIndex + 1}
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-[11px] font-medium truncate text-emerald-800 leading-tight">{item.student.full_name}</p>
-                                        <p className="text-[10px] text-gray-500 truncate leading-tight">{item.student.guardian?.full_name}</p>
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEditAttendance(item.student.id)}
-                                      className="h-7 w-7 p-0 flex-shrink-0"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-1.5 mt-0.5">
-                                    {/* حالة الحضور */}
-                                    <Select
-                                      value={attendanceFormData[item.student.id]?.status || 'present'}
-                                      onValueChange={(value) => handleStatusChange(item.student.id, value as AttendanceStatus)}
-                                    >
-                                      <SelectTrigger
-                                        id={`attendance-status-${item.student.id}`}
-                                        dir="rtl"
-                                        className={`h-7 text-right truncate max-w-full min-w-0 text-[10px] leading-none rounded-md border px-2 pr-2 transition-all
-                                              focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 bg-white dark:bg-gray-800
-                                              ${(() => {
-                                            const st = attendanceFormData[item.student.id]?.status || 'present';
-                                            if (st === 'present') return 'border-emerald-300 bg-emerald-50 text-emerald-700 font-semibold';
-                                            if (st === 'absent') return 'border-red-300 bg-red-50 text-red-700 font-semibold';
-                                            if (st === 'late') return 'border-amber-300 bg-amber-50 text-amber-700 font-semibold';
-                                            if (st === 'excused') return 'border-blue-300 bg-blue-50 text-blue-700 font-semibold';
-                                            return 'border-gray-300 text-gray-600';
-                                          })()}`}
-                                      >
-                                        <SelectValue placeholder="اختر الحالة">
-                                          {getAttendanceStatusName(attendanceFormData[item.student.id]?.status || 'present')}
-                                        </SelectValue>
-                                      </SelectTrigger>
-                                      <SelectContent
-                                        position="popper"
-                                        dir="rtl"
-                                        className="text-right text-[10px] sm:text-[11px] rounded-md border border-emerald-200 dark:border-emerald-700 shadow-md bg-white dark:bg-gray-900"
-                                      >
-                                        {attendanceStatusOptions.map((option) => (
-                                          <SelectItem
-                                            key={option.value}
-                                            value={option.value}
-                                            className={`cursor-pointer data-[highlighted]:bg-emerald-900/80 data-[state=checked]:font-semibold rounded-sm text-[11px]
-                                                  ${option.value === 'present' ? 'text-emerald-700' :
-                                                option.value === 'absent' ? 'text-red-700' :
-                                                  option.value === 'late' ? 'text-amber-700' :
-                                                    option.value === 'excused' ? 'text-blue-700' : 'text-gray-700'}`}
-                                          >
-                                            {option.label}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-
-                                    {attendanceFormData[item.student.id]?.status === 'late' && (
-                                      <Input
-                                        title="أدخل دقائق التأخير"
-                                        type="number"
-                                        min={0}
-                                        value={attendanceFormData[item.student.id]?.late_minutes || 0}
-                                        onChange={(e) => {
-                                          const value = parseInt(e.target.value) || 0;
-                                          setAttendanceFormData((prev) => ({
-                                            ...prev,
-                                            [item.student.id]: {
-                                              ...prev[item.student.id],
-                                              late_minutes: value < 0 ? 0 : value,
-                                            },
-                                          }));
-                                          setHasChanges(true);
-                                        }}
-                                        className="h-7 text-center text-[10px] bg-amber-50 border-amber-300 px-1"
-                                        placeholder="دقائق التأخير"
-                                      />
-                                    )}
-                                  </div>
-
-                                  {attendanceFormData[item.student.id]?.note && (
-                                    <div className="mt-0.5 flex items-center gap-1 text-[11px] text-gray-600">
-                                      <FileText className="h-3 w-3 flex-shrink-0" />
-                                      <span className="truncate">{attendanceFormData[item.student.id]?.note}</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {/* زر التالي */}
-                        {studentsWithAttendance.length > studentsGroupSize && (
-                          <button
-                            onClick={goNextStudentCarousel}
-                            disabled={studentCarouselIndex >= totalStudentCarouselGroups - 1}
-                            className="h-8 w-8 flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow hover:from-emerald-600 hover:to-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-emerald-300"
-                            aria-label="التالي"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </button>
-                        )}
-
-                      </div>
+                      </span>
                     </div>
-
-                    {/* مؤشرات + عداد */}
-                    <div className="flex flex-col items-center mt-2 gap-3">
-                      {studentsWithAttendance.length > studentsGroupSize && (
-                        <div className="flex items-center gap-2 bg-white/60 backdrop-blur px-2 py-1.5 rounded-xl border border-emerald-200 shadow-sm">
-                          {Array.from({ length: totalStudentCarouselGroups }).map((_, i) => (
-                            <button
-                              key={i}
-                              id={`student-indicator-${i}`}
-                              onClick={() => setStudentCarouselIndex(i)}
-                              className="w-2.5 h-2.5 rounded-full bg-emerald-300 transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-emerald-400/50"
-                              aria-label={`مجموعة الطلاب ${i + 1}`}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-[10px] flex items-center gap-2 text-emerald-700 font-medium bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shadow-sm">
-                        <span>مجموعة {studentCarouselIndex + 1} / {totalStudentCarouselGroups}</span>
-                        <span className="w-px h-3 bg-emerald-300" />
-                        <span>
-                          الطلاب: {visibleStudentsGroup.length === 0 ? 0 : (studentCarouselIndex * studentsGroupSize + 1)} - {Math.min((studentCarouselIndex * studentsGroupSize) + visibleStudentsGroup.length, studentsWithAttendance.length)} من {studentsWithAttendance.length}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1"><Users className="h-3 w-3 text-emerald-600" /> مجموع: {attendanceTableData.length}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-600" /> حاضر: {Object.values(attendanceFormData).filter(v=>v.status==='present').length}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-red-50 border border-red-200 inline-flex items-center gap-1"><X className="h-3 w-3 text-red-600" /> غائب: {Object.values(attendanceFormData).filter(v=>v.status==='absent').length}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 inline-flex items-center gap-1"><Clock className="h-3 w-3 text-amber-600" /> متأخر: {Object.values(attendanceFormData).filter(v=>v.status==='late').length}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 inline-flex items-center gap-1"><Calendar className="h-3 w-3 text-sky-600" /> معذور: {Object.values(attendanceFormData).filter(v=>v.status==='excused').length}</span>
                     </div>
                   </div>
-
-                )}
-              </CardContent>
-
-              {/* الفوتر أزيل زر الحفظ منه بعد نقله للأعلى */}
-            </Card>
+                  <div className="md:hidden flex items-center justify-start text-[10px] text-emerald-700 bg-white/60 px-2 py-0.5 rounded border border-emerald-200 gap-1">
+                    <Calendar className="h-3 w-3 text-emerald-500" />
+                    {formatDateDisplay(selectedSession.session_date)}
+                    {selectedSession.start_time && selectedSession.end_time && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-emerald-500" />
+                        {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+            />
+            </>
           )}
         </div>
-      </div>
+      )}
 
       <div className="mb-4"></div>
       {selectedCircle && selectedSession && (
@@ -1031,13 +1057,16 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
               </div>
             ) : (
               <div className="space-y-2">
-                {studentsWithAttendance.map((item) => (
+                {studentsWithAttendance.map((item, idx) => (
                   <div
                     key={item.student.id}
                     className="border rounded-lg p-2 bg-white shadow-sm"
                   >
                     <div className="flex justify-between items-start mb-1">
                       <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-300">
+                          {idx + 1}
+                        </span>
                         <UserRound className="h-5 w-5 text-gray-400" />
                         <div>
                           <p className="text-sm font-medium">
