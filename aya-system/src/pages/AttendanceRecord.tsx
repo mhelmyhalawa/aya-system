@@ -103,12 +103,13 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   const [showFutureConfirm, setShowFutureConfirm] = useState(false);
   const [pendingFutureSave, setPendingFutureSave] = useState(false);
 
-  // فلترة المعلمين (للأدمن/المشرف) - مدمجة لاحقاً مع TeacherCircleFilterBar
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  // فلترة المعلمين (للأدمن/المشرف) - إذا كان المستخدم معلماً نلصق معرفه مباشرة
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(() => {
+    if (currentUser?.role === 'teacher') return currentUser.id;
+    return null;
+  });
 
-  // تصفح الجلسات
-  const [sessionsPage, setSessionsPage] = useState(0);
-  const sessionsPerPage = 8;
+  // (أزيلت آليات تصفح/كاروسيل الجلسات بعد دمج اختيار الجلسة في شريط الفلترة)
 
   // التحرير
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
@@ -188,10 +189,9 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           new Date(a.session_date).getTime() - new Date(b.session_date).getTime()
         );
 
-        setCircleSessions(sortedSessions);
-        // تعيين أول جلسة (اليوم أو القادمة) تلقائياً لعرض الطلاب مباشرة
-        setSelectedSession(sortedSessions[0] || null);
-        setSessionsPage(0); // إعادة تعيين صفحة الجلسات عند تحميل جلسات جديدة
+  setCircleSessions(sortedSessions);
+  // تعيين أول جلسة (اليوم أو القادمة) تلقائياً لعرض الطلاب مباشرة
+  setSelectedSession(sortedSessions[0] || null);
       } catch (error) {
         console.error("خطأ في جلب جلسات الحلقة:", error);
         toast({
@@ -258,7 +258,6 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   // تغيير الحلقة المختارة
   const handleCircleChange = (circleId: string) => {
     setSelectedCircle(circleId);
-    setSessionsPage(0); // إعادة تعيين صفحة الجلسات عند تغيير الحلقة
   };
 
   // تغيير الجلسة المختارة
@@ -444,12 +443,22 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }, [baseCircles, isAdminOrSuperadmin, currentUser, teacherCircles.length]);
 
-  // تعيين المعلم الحالي تلقائياً إذا كان المستخدم معلماً
+  // تأكيد تهيئة selectedTeacherId للمعلّم (مع عدم الكتابة فوق اختيار يدوي لاحق)
   useEffect(() => {
-    if (currentUser?.role === 'teacher') {
+    if (currentUser?.role === 'teacher' && !selectedTeacherId) {
       setSelectedTeacherId(currentUser.id);
     }
-  }, [currentUser]);
+  }, [currentUser, selectedTeacherId]);
+
+  // في حالة كان المستخدم Admin/Superadmin لكنه أيضاً معلّم (مربوط كـ teacher في بعض الحلقات) ولم يتم اختيار معلم بعد
+  useEffect(() => {
+    if ((currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && !selectedTeacherId) {
+      const teachesAny = baseCircles.some(c => c.teacher?.id === currentUser.id);
+      if (teachesAny) {
+        setSelectedTeacherId(currentUser.id);
+      }
+    }
+  }, [currentUser, selectedTeacherId, baseCircles]);
 
   // حلقات بعد تطبيق فلتر المعلم
   const circlesAfterTeacher = useMemo(() => {
@@ -476,33 +485,9 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     }
   }, [filteredCircles, selectedCircle]);
 
-  // تصفح الجلسات
-  const totalSessionPages = Math.max(1, Math.ceil(circleSessions.length / sessionsPerPage));
-  const pagedSessions = circleSessions.slice(
-    sessionsPage * sessionsPerPage,
-    (sessionsPage + 1) * sessionsPerPage
-  );
+  // أزيلت حسابات وترقيم كاروسيل الجلسات القديم
 
-  // ================== جلسات (سلايدر 3 بطاقات) ==================
-  const sessionsGroupSize = 4; // تحديث: عرض 4 بطاقات في كل مجموعة
-  const [sessionCarouselIndex, setSessionCarouselIndex] = useState(0); // المجموعة الحالية
-  const totalSessionCarouselGroups = Math.ceil(pagedSessions.length / sessionsGroupSize) || 1;
-  const visibleSessionGroup = pagedSessions.slice(
-    sessionCarouselIndex * sessionsGroupSize,
-    sessionCarouselIndex * sessionsGroupSize + sessionsGroupSize
-  );
-
-  const goPrevSessionCarousel = () => {
-    setSessionCarouselIndex((idx) => Math.max(0, idx - 1));
-  };
-  const goNextSessionCarousel = () => {
-    setSessionCarouselIndex((idx) => Math.min(totalSessionCarouselGroups - 1, idx + 1));
-  };
-
-  // إعادة الضبط عند تغيير الصفحة العامة للجلسات
-  useEffect(() => {
-    setSessionCarouselIndex(0);
-  }, [sessionsPage]);
+  // (أزيل تأثير إعادة ضبط sessionCarouselIndex بعد إزالة الكاروسيل)
 
   // ================== طلاب (سلايدر 3 بطاقات) ==================
   const studentsGroupSize = 4; // تحديث: عرض 4 طلاب في كل مجموعة
@@ -528,17 +513,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     }
   }, [studentsWithAttendance.length, totalStudentCarouselGroups, studentCarouselIndex]);
 
-  const prevSessionPage = () => {
-    if (sessionsPage > 0) {
-      setSessionsPage(sessionsPage - 1);
-    }
-  };
-
-  const nextSessionPage = () => {
-    if (sessionsPage < totalSessionPages - 1) {
-      setSessionsPage(sessionsPage + 1);
-    }
-  };
+  // (أزيلت دوال التنقل بين صفحات الجلسات القديمة)
 
   // ضبط selectedSession عند تغيير المؤشر
   useEffect(() => {
@@ -559,15 +534,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     }
   }, [circleSessions.length, mobileSessionIndex]);
 
-  // تأثير لتحديث مؤشرات السلايدر للجلسات
-  useEffect(() => {
-    for (let i = 0; i < totalSessionCarouselGroups; i++) {
-      const indicator = document.getElementById(`session-indicator-${i}`);
-      if (indicator) {
-        indicator.className = `w-2 h-2 rounded-full transition-all ${i === sessionCarouselIndex ? 'bg-blue-600 scale-125' : 'bg-blue-300 hover:bg-blue-400'}`;
-      }
-    }
-  }, [sessionCarouselIndex, totalSessionCarouselGroups]);
+  // (أزيل تأثير مؤشرات الكاروسيل للجلسات)
 
   // تأثير مؤشرات الطلاب
   useEffect(() => {
@@ -582,14 +549,13 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   // عرض ملخص الحضور
   const renderAttendanceSummary = () => {
     if (!attendanceFormData || Object.keys(attendanceFormData).length === 0) return null;
-
     const summary = {
       present: 0,
       absent: 0,
       late: 0,
       excused: 0,
       total: Object.keys(attendanceFormData).length
-    };
+    } as Record<string, number> & { total: number };
 
     Object.values(attendanceFormData).forEach(data => {
       summary[data.status]++;
@@ -616,42 +582,34 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     );
   };
 
-  // أزيلت قائمة الحلقات القديمة (تم استبدالها بشريط TeacherCircleFilterBar)
-  // حالة طي كارد الجلسات
-  const [sessionsCardCollapsed, setSessionsCardCollapsed] = useState(false);
-  // حالة طي الكارد الرئيسي (سجل حضور الطلاب)
-  const [mainCardCollapsed, setMainCardCollapsed] = useState(false);
-  // إظهار/إخفاء شريط الفلترة
-  const [showFilters, setShowFilters] = useState(true);
-
+  // دالة إعادة ضبط الفلاتر والاختيارات (أُعيدت بعد حذف الكاروسيل)
   const handleResetSelections = () => {
-    // إعادة تعيين الفلاتر واختيار المعلم تلقائياً
     setSearchTerm("");
 
     if (currentUser?.role === 'teacher') {
-      // المعلّم: إعادة ضبط لاختيار نفسه ثم أول حلقة تخصه
       setSelectedTeacherId(currentUser.id);
       const firstCircle = teacherCircles[0];
       setSelectedCircle(firstCircle?.id || '');
     } else if (isAdminOrSuperadmin) {
-      // أدمن / سوبر: اختيار أول معلم (إن وُجد) وأول حلقة مرتبطة به، وإلا أول حلقة عامة
       const firstTeacher = teachersForFilter[0];
       if (firstTeacher) {
-        setSelectedTeacherId(firstTeacher.id);
-        const circleForTeacher = allCircles.find(c => c.teacher?.id === firstTeacher.id);
+        const circleForTeacher = baseCircles.find(c => c.teacher?.id === firstTeacher.id);
         if (circleForTeacher) {
           setSelectedCircle(circleForTeacher.id);
           return;
         }
       }
-      // fallback
-      setSelectedCircle(allCircles[0]?.id || '');
+      setSelectedCircle(baseCircles[0]?.id || '');
     } else {
-      // أدوار أخرى (إن وُجدت لاحقاً) فقط نختار أول حلقة متاحة
-      const circlesPool = teacherCircles.length ? teacherCircles : allCircles;
+      const circlesPool = teacherCircles.length ? teacherCircles : baseCircles;
       setSelectedCircle(circlesPool[0]?.id || '');
     }
   };
+
+  // حالات الطي وإظهار شريط الفلترة (أُعيد تعريفها بعد التنظيف)
+  const [sessionsCardCollapsed, setSessionsCardCollapsed] = useState(false);
+  const [mainCardCollapsed, setMainCardCollapsed] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
 
   return (
     <div className="w-full max-w-[1600px] mx-auto">

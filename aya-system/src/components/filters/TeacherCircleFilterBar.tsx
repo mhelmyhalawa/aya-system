@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils'; // إن وُجد util للدمج، وإلا استبدلها بخيار آخر
-import { ChevronDown, GraduationCap, BookOpen, X, Plus } from 'lucide-react';
+import { ChevronDown, GraduationCap, BookOpen, X, Plus, CalendarDays } from 'lucide-react';
 // استيراد عناصر Select من مكتبة المشروع (يفترض وجودها بنفس المسارات، عدّل إذا اختلفت)
 import {
     Select,
@@ -64,6 +64,7 @@ export interface TeacherCircleFilterBarProps {
     onSessionChange?: (id: string | null) => void;                       // تغيير الجلسة
     showSessionSelect?: boolean;                                         // تفعيل إظهار حقل اختيار الجلسة
     sessionLabel?: string;                                               // نص حقل الجلسة
+    sessionCollapsible?: boolean;                                        // تمكين الطي لحقل الجلسة
 }
 
 export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
@@ -100,17 +101,118 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
     selectedSessionId,
     onSessionChange,
     showSessionSelect = false,
-    sessionLabel = 'الجلسة'
+    sessionLabel = 'الجلسة',
+    sessionCollapsible = false
 }) => {
     const selectedTeacher = selectedTeacherId ? teachers.find(t => t.id === selectedTeacherId) : undefined;
     const selectedCircle = selectedCircleId ? circles.find(c => c.id === selectedCircleId) : undefined;
+    const [sessionCollapsed, setSessionCollapsed] = React.useState(false);
+
+    const SessionSelectBlock: React.FC = () => (
+        <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
+            {useInlineSelects ? (
+                <div className="w-full">
+                    <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">{sessionLabel || 'الجلسة'}</label>
+                        {sessionCollapsible && (
+                            <button
+                                type="button"
+                                onClick={() => setSessionCollapsed(c => !c)}
+                                aria-expanded={!sessionCollapsed}
+                                aria-label={sessionCollapsed ? 'فتح حقل الجلسة' : 'طي حقل الجلسة'}
+                                className={`h-6 w-6 inline-flex items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition ${sessionCollapsed ? 'rotate-180' : ''}`}
+                            >
+                                <ChevronDown className="h-4 w-4" />
+                            </button>
+                        )}
+                    </div>
+                    <div
+                        className={`transition-all duration-300 ease-in-out origin-top ${sessionCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-28 opacity-100'}`}
+                        aria-hidden={sessionCollapsed}
+                    >
+                        {useShadSelect ? (
+                            <Select
+                                disabled={disabled || !sessions || sessions.length === 0}
+                                value={selectedSessionId || ''}
+                                onValueChange={(val) => onSessionChange && onSessionChange(val || null)}
+                            >
+                                <SelectTrigger
+                                    dir="rtl"
+                                    className={cn(
+                                        'h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all',
+                                        'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                                        selectedSessionId
+                                            ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                                            : 'border-gray-300 dark:border-gray-600 text-gray-500',
+                                        (disabled || !sessions || sessions.length === 0) && 'opacity-60 cursor-not-allowed'
+                                    )}
+                                >
+                                    <SelectValue placeholder={(!sessions || sessions.length === 0) ? 'لا توجد جلسات' : (sessionLabel || 'اختر جلسة')} />
+                                </SelectTrigger>
+                                <SelectContent
+                                    position="popper"
+                                    dir="rtl"
+                                    className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
+                                >
+                                    {sessions && sessions.length > 0 ? (
+                                        sessions.map(s => (
+                                            <SelectItem
+                                                key={s.id}
+                                                value={s.id}
+                                                className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white flex items-center justify-between gap-2"
+                                            >
+                                                <span className="flex items-center gap-2 min-w-0">
+                                                    <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
+                                                        <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-200" />
+                                                    </span>
+                                                    <span className="truncate">{s.dateLabel}</span>
+                                                    {s.isToday && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white">اليوم</span>}
+                                                </span>
+                                               
+                                            </SelectItem>
+                                        ))
+                                    ) : (
+                                        <SelectItem value="no-sessions" disabled>لا توجد جلسات</SelectItem>
+                                    )}
+                                </SelectContent>
+                            </Select>
+                        ) : (
+                            <select
+                                disabled={disabled || !sessions || sessions.length === 0}
+                                value={selectedSessionId || ''}
+                                onChange={(e) => onSessionChange && onSessionChange(e.target.value || null)}
+                                className={`h-9 w-full text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-8 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${selectedSessionId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${(disabled || !sessions || sessions.length===0) ? 'opacity-60 cursor-not-allowed' : ''} appearance-none`}
+                            >
+                                <option value="">{(!sessions || sessions.length === 0) ? 'لا توجد جلسات' : (sessionLabel || 'اختر جلسة')}</option>
+                                {sessions && sessions.map(s => (
+                                    <option key={s.id} value={s.id}>{s.dateLabel}{s.isToday ? ' (اليوم)' : ''}</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                <button
+                    type="button"
+                    disabled
+                    className="h-10 rounded-xl border border-dashed border-emerald-300 text-emerald-500 text-sm opacity-50 cursor-not-allowed"
+                >
+                    الجلسة (فعّل useInlineSelects)
+                </button>
+            )}
+        </div>
+    );
+    
 
     return (
         <div
             dir="rtl"
             className={cn(
-                'flex flex-col md:flex-row justify-between items-stretch gap-1.5 md:gap-2 w-full p-1.5',
+                // جعل العناصر دائماً في صف واحد بدون التفاف مع تمرير أفقي عند ضيق المساحة
+                'flex flex-row flex-nowrap overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-emerald-300/60 hover:scrollbar-thumb-emerald-400/70 gap-1.5 md:gap-2 w-full p-1.5',
                 'bg-transparent',
+                // منع التفاف العناصر
+                'whitespace-nowrap',
                 className,
                 disabled && 'opacity-60 pointer-events-none'
             )}
@@ -151,7 +253,12 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                                                                         value={t.id}
                                                                         className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white"
                                                                     >
-                                                                        {t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}
+                                                                        <span className="flex items-center gap-2">
+                                                                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
+                                                                                <GraduationCap className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-200" />
+                                                                            </span>
+                                                                            <span className="truncate">{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</span>
+                                                                        </span>
                                                                     </SelectItem>
                                                                 ))
                                                             ) : (
@@ -249,7 +356,12 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                                                         value={c.id}
                                                         className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white"
                                                     >
-                                                        {c.name}
+                                                        <span className="flex items-center gap-2">
+                                                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
+                                                                <BookOpen className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-200" />
+                                                            </span>
+                                                            <span className="truncate">{c.name}</span>
+                                                        </span>
                                                     </SelectItem>
                                                 ))
                                             ) : (
@@ -330,74 +442,7 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
 
             {/* اختيار الجلسة (اختياري) */}
             {showSessionSelect && (
-                <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                    {useInlineSelects ? (
-                        <div className="w-full">
-                            <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1 block mb-1">{sessionLabel || 'الجلسة'}</label>
-                            {useShadSelect ? (
-                                <Select
-                                    disabled={disabled || !sessions || sessions.length === 0}
-                                    value={selectedSessionId || ''}
-                                    onValueChange={(val) => onSessionChange && onSessionChange(val || null)}
-                                >
-                                    <SelectTrigger
-                                        dir="rtl"
-                                        className={cn(
-                                            'h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all',
-                                            'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
-                                            selectedSessionId
-                                                ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
-                                                : 'border-gray-300 dark:border-gray-600 text-gray-500',
-                                            (disabled || !sessions || sessions.length === 0) && 'opacity-60 cursor-not-allowed'
-                                        )}
-                                    >
-                                        <SelectValue placeholder={(!sessions || sessions.length === 0) ? 'لا توجد جلسات' : (sessionLabel || 'اختر جلسة')} />
-                                    </SelectTrigger>
-                                    <SelectContent
-                                        position="popper"
-                                        dir="rtl"
-                                        className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
-                                    >
-                                        {sessions && sessions.length > 0 ? (
-                                            sessions.map(s => (
-                                                <SelectItem
-                                                    key={s.id}
-                                                    value={s.id}
-                                                    className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white flex items-center justify-between gap-2"
-                                                >
-                                                    <span className="truncate">{s.dateLabel}</span>
-                                                    {s.isToday && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white">اليوم</span>}
-                                                </SelectItem>
-                                            ))
-                                        ) : (
-                                            <SelectItem value="no-sessions" disabled>لا توجد جلسات</SelectItem>
-                                        )}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <select
-                                    disabled={disabled || !sessions || sessions.length === 0}
-                                    value={selectedSessionId || ''}
-                                    onChange={(e) => onSessionChange && onSessionChange(e.target.value || null)}
-                                    className={`h-9 w-full text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-8 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${selectedSessionId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${(disabled || !sessions || sessions.length===0) ? 'opacity-60 cursor-not-allowed' : ''} appearance-none`}
-                                >
-                                    <option value="">{(!sessions || sessions.length === 0) ? 'لا توجد جلسات' : (sessionLabel || 'اختر جلسة')}</option>
-                                    {sessions && sessions.map(s => (
-                                        <option key={s.id} value={s.id}>{s.dateLabel}{s.isToday ? ' (اليوم)' : ''}</option>
-                                    ))}
-                                </select>
-                            )}
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            disabled
-                            className="h-10 rounded-xl border border-dashed border-emerald-300 text-emerald-500 text-sm opacity-50 cursor-not-allowed"
-                        >
-                            الجلسة (فعّل useInlineSelects)
-                        </button>
-                    )}
-                </div>
+                <SessionSelectBlock />
             )}
             {/* زر الإضافة (سطح المكتب) */}
             {showAddButton && (
