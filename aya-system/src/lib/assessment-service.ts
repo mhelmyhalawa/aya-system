@@ -148,9 +148,27 @@ export const assessmentService = {
           (assessment.recitation_score || 0)
         ) / 3; // متوسط الدرجات
       }
+      // الإدخال الفعلي في قاعدة البيانات
+      const { data, error } = await supabase
+        .from(ASSESSMENTS_TABLE)
+        .insert([{ ...assessment }])
+        .select(`
+          *,
+          student:student_id (id, full_name, guardian:guardian_id (id, full_name, phone_number)),
+          recorder:recorded_by (id, full_name, role)
+        `)
+        .single();
 
-      console.warn('createAssessment: عملية غير مسموحة من الواجهة بدون Backend');
-      throw new Error('عملية غير مسموحة من الواجهة');
+      if (error) {
+        console.error('Supabase createAssessment error:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('لم يتم إنشاء التقييم');
+      }
+
+      return data as Assessment;
     } catch (error) {
       console.error('خطأ في إنشاء تقييم جديد:', error);
       throw error;
@@ -178,8 +196,27 @@ export const assessmentService = {
         ) / 3; // متوسط الدرجات
       }
 
-      console.warn('updateAssessment: عملية غير مسموحة من الواجهة بدون Backend');
-      throw new Error('عملية غير مسموحة من الواجهة');
+      const { data, error } = await supabase
+        .from(ASSESSMENTS_TABLE)
+        .update({ ...updateData })
+        .eq('id', id)
+        .select(`
+          *,
+          student:student_id (id, full_name, guardian:guardian_id (id, full_name, phone_number)),
+          recorder:recorded_by (id, full_name, role)
+        `)
+        .single();
+
+      if (error) {
+        console.error('Supabase updateAssessment error:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('لم يتم العثور على التقييم لتحديثه');
+      }
+
+      return data as Assessment;
     } catch (error) {
       console.error('خطأ في تحديث التقييم:', error);
       throw error;
@@ -191,8 +228,15 @@ export const assessmentService = {
    */
   deleteAssessment: async (id: number): Promise<void> => {
     try {
-      console.warn('deleteAssessment: عملية غير مسموحة من الواجهة بدون Backend');
-      throw new Error('عملية غير مسموحة من الواجهة');
+      const { error } = await supabase
+        .from(ASSESSMENTS_TABLE)
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Supabase deleteAssessment error:', error);
+        throw error;
+      }
     } catch (error) {
       console.error('خطأ في حذف التقييم:', error);
       throw error;

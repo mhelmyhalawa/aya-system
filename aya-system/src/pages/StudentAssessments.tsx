@@ -3,7 +3,6 @@ import { assessmentService } from '../lib/assessment-service';
 import { getAllStudents } from '../lib/supabase-service';
 import { getAllTeachers, getStudentsByTeacherId } from '../lib/teacher-service';
 import { getAllStudyCircles, getTeacherStudyCircles } from '../lib/study-circle-service';
-import { getCurrentUser } from '../lib/auth-service';
 import { useToast } from '../hooks/use-toast';
 import {
   Assessment,
@@ -704,7 +703,9 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         };
 
         try {
-          await assessmentService.updateAssessment(updateData);
+          console.debug('[Assessment][Update] Payload:', updateData);
+          const updated = await assessmentService.updateAssessment(updateData);
+          console.debug('[Assessment][Update] Result:', updated);
 
           toast({
             title: 'تم تحديث التقييم بنجاح',
@@ -720,16 +721,21 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           // إغلاق النافذة المنبثقة في حالة النجاح
           setIsDialogOpen(false);
         } catch (error: any) {
+          console.error('[Assessment][Update] Error raw:', error);
+          const code = error?.code || error?.status || 'UNKNOWN';
+          const details = error?.details || error?.hint || '';
           toast({
             title: 'خطأ في تحديث التقييم',
-            description: error.message || 'حدث خطأ غير متوقع',
+            description: `${error?.message || 'حدث خطأ غير متوقع'}${details ? ' - ' + details : ''} (رمز: ${code})`,
             variant: 'destructive',
           });
         }
       } else {
         // إضافة تقييم جديد
         try {
+          console.debug('[Assessment][Create] Payload:', dataToSave);
           const newAssessmentResult = await assessmentService.createAssessment(dataToSave);
+          console.debug('[Assessment][Create] Result:', newAssessmentResult);
 
           if (newAssessmentResult && newAssessmentResult.id) {
             toast({
@@ -750,9 +756,12 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             throw new Error('فشل في إضافة التقييم');
           }
         } catch (error: any) {
+          console.error('[Assessment][Create] Error raw:', error);
+          const code = error?.code || error?.status || 'UNKNOWN';
+          const details = error?.details || error?.hint || '';
           toast({
             title: 'خطأ في إضافة التقييم',
-            description: error.message || 'حدث خطأ غير متوقع',
+            description: `${error?.message || 'حدث خطأ غير متوقع'}${details ? ' - ' + details : ''} (رمز: ${code})`,
             variant: 'destructive',
           });
         }
@@ -1220,7 +1229,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                       {filteredCountStr}
                     </span>
                     {showTotalHint && (
-                      <span className="text-[10px] sm:text-[11px] text-yellow-200 truncate" title={`أحدث ${filteredCountStr} من إجمالي ${totalCountStr} سجل`}>
+                      <span className="text-[10px] sm:text-[11px] text-green-200 truncate" title={`أحدث ${filteredCountStr} من إجمالي ${totalCountStr} سجل`}>
                         أحدث {filteredCountStr} من إجمالي {totalCountStr}
                       </span>
                     )}

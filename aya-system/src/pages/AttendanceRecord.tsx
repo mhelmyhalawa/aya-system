@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
   Filter,
   RefreshCw as RefreshCwIcon,
   Users,
+  RotateCcw
 } from "lucide-react";
 //
 import { Profile } from "@/types/profile";
@@ -82,6 +83,8 @@ interface AttendanceRecordProps {
 
 export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordProps) {
   const { toast } = useToast();
+  // مرجع حقل القيمة المخصصة لدقائق التأخير (يُستخدم مع الضغط المطوّل على الأزرار)
+  const customLateInputRef = useRef<HTMLInputElement | null>(null);
 
   // حالة اختيار الحلقة والجلسة
   const [teacherCircles, setTeacherCircles] = useState<StudyCircle[]>([]);
@@ -94,6 +97,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   // بيانات الطلاب والحضور
   const [studentsWithAttendance, setStudentsWithAttendance] = useState<StudentWithAttendance[]>([]);
   const [attendanceFormData, setAttendanceFormData] = useState<Record<string, StudentAttendanceFormData>>({});
+  // نسخة أصلية للاستخدام في إعادة التعيين
+  const [initialAttendanceFormData, setInitialAttendanceFormData] = useState<Record<string, StudentAttendanceFormData>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
   // عدد الطلاب في كل حلقة
@@ -241,6 +246,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
         });
 
         setAttendanceFormData(formData);
+        setInitialAttendanceFormData(formData); // حفظ النسخة الأصلية عند التحميل
         setHasChanges(false);
       } catch (error) {
         console.error("خطأ في جلب بيانات الطلاب والحضور:", error);
@@ -345,6 +351,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           title: "تم بنجاح",
           description: "تم حفظ بيانات الحضور بنجاح",
         });
+        // تحديث النسخة الأصلية بعد الحفظ الناجح
+        setInitialAttendanceFormData(attendanceFormData);
         setHasChanges(false);
       } else {
         toast({
@@ -363,6 +371,17 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     } finally {
       setSavingAttendance(false);
     }
+  };
+
+  // إعادة التعيين إلى آخر نسخة محفوظة
+  const resetAttendanceToInitial = () => {
+    if (!Object.keys(initialAttendanceFormData).length) return;
+    setAttendanceFormData(initialAttendanceFormData);
+    setHasChanges(false);
+    toast({
+      title: 'تم الإرجاع',
+      description: 'تمت إعادة البيانات إلى آخر حالة محفوظة',
+    });
   };
 
   // عرض حوار تأكيد دائماً قبل الحفظ
@@ -607,7 +626,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'studentName',
-      header: '👪 ' +'الطالب / ولي الأمر',
+      header: '👪 ' + 'الطالب / ولي الأمر',
       render: (row) => (
         <div className="flex items-start gap-2 max-w-[280px]">
           <div className="flex flex-col min-w-0 leading-tight">
@@ -685,8 +704,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                   const Icon = option.value === 'present' ? CheckCircle2 : option.value === 'absent' ? X : option.value === 'late' ? Clock : Calendar;
                   const colorClasses = option.value === 'present' ? 'from-green-200 to-green-100 ring-green-300/50 dark:from-green-800 dark:to-green-700 dark:ring-green-600/40 text-green-700 dark:text-green-200'
                     : option.value === 'absent' ? 'from-red-200 to-red-100 ring-red-300/50 dark:from-red-800 dark:to-red-700 dark:ring-red-600/40 text-red-700 dark:text-red-200'
-                    : option.value === 'late' ? 'from-amber-200 to-amber-100 ring-amber-300/50 dark:from-amber-800 dark:to-amber-700 dark:ring-amber-600/40 text-amber-700 dark:text-amber-200'
-                    : 'from-blue-200 to-blue-100 ring-blue-300/50 dark:from-blue-800 dark:to-blue-700 dark:ring-blue-600/40 text-blue-700 dark:text-blue-200';
+                      : option.value === 'late' ? 'from-amber-200 to-amber-100 ring-amber-300/50 dark:from-amber-800 dark:to-amber-700 dark:ring-amber-600/40 text-amber-700 dark:text-amber-200'
+                        : 'from-blue-200 to-blue-100 ring-blue-300/50 dark:from-blue-800 dark:to-blue-700 dark:ring-blue-600/40 text-blue-700 dark:text-blue-200';
                   return (
                     <SelectItem
                       key={option.value}
@@ -713,28 +732,28 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     {
       key: 'late',
       header: '⏰ ' + 'دقائق تأخير',
+      align: 'center',
       render: (row) => {
         const st = attendanceFormData[row.id]?.status;
         if (st !== 'late') return <span className="text-gray-300 text-[11px]">—</span>;
+        const val = attendanceFormData[row.id]?.late_minutes ?? 0;
+        const ratio = val / 60;
+        const shade = val === 0 ? '50' : ratio <= 0.15 ? '100' : ratio <= 0.3 ? '200' : ratio <= 0.45 ? '300' : ratio <= 0.6 ? '400' : ratio <= 0.8 ? '500' : '600';
+        const pillClass = val === 0
+          ? 'bg-gray-100 border-gray-300 text-gray-500'
+          : `bg-amber-${shade} border-amber-${shade === '50' ? '200' : shade} text-amber-${['50','100'].includes(shade)?'800':'50'}`;
         return (
-          <div className="flex items-center gap-1">
-            <Input
-              title="أدخل دقائق التأخير"
-              type="number"
-              min={0}
-              value={attendanceFormData[row.id]?.late_minutes || 0}
-              onChange={(e) => {
-                const value = parseInt(e.target.value) || 0;
-                setAttendanceFormData((prev) => ({
-                  ...prev,
-                  [row.id]: { ...prev[row.id], late_minutes: value < 0 ? 0 : value },
-                }));
-                setHasChanges(true);
-              }}
-              className="h-8 w-16 text-center text-[11px] bg-amber-50 border-amber-300 focus:ring-amber-400/40"
-              placeholder="0"
-            />
-          </div>
+          <LateMinutesInlineEditor
+            value={val}
+            onChange={(newVal) => {
+              setAttendanceFormData(prev => ({
+                ...prev,
+                [row.id]: { ...prev[row.id], late_minutes: newVal }
+              }));
+              setHasChanges(true);
+            }}
+            pillClass={pillClass}
+          />
         );
       }
     },
@@ -766,7 +785,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'actions',
-      header: '⚙️ ' +'تحرير',
+      header: '⚙️ ' + 'تحرير',
       render: (row) => (
         <div className="flex items-center justify-center">
           <Button
@@ -863,13 +882,12 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
         </CardHeader>
         <CardContent
           id="main-card-body"
-          className={`space-y-0 sm:space-y-0.5 px-1 sm:px-4 pt-3 pb-4 transition-all duration-300 ease-in-out origin-top ${mainCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-[3000px] opacity-100'}`}
+          className={`space-y-0 sm:space-y-0.5 px-1 sm:px-4 pt-3 pb-2 transition-[max-height] duration-300 
+                      ease-in-out origin-top ${mainCardCollapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-fit opacity-100'}`}
           aria-hidden={mainCardCollapsed}
         >
-
-
           {/* شريط التحكم بالفلاتر (الأزرار) */}
-          <div className={`flex flex-col md:flex-row justify-end items-center gap-2 mb-2 rounded-md p-1.5 shadow-sm border transition-colors duration-200 ${hasChanges ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-600' : 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-700'}`}> 
+          <div className={`flex flex-col md:flex-row justify-end items-center gap-2 mb-2 rounded-md p-1.5 shadow-sm border transition-colors duration-200 ${hasChanges ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-600' : 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-700'}`}>
             <div className="flex flex-wrap gap-2 items-center ">
               {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
               <Button
@@ -891,46 +909,6 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                 <RefreshCwIcon className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">تحديث</span>
               </Button>
-              {/* زر تعيين الجميع حاضر */}
-              <Button
-                size="sm"
-                onClick={() => setAllStudentsStatus("present")}
-                className="flex items-center gap-1.5 rounded-xl bg-green-100 hover:bg-green-200 text-green-800 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-green-300"
-                title="تعيين كل الطلاب حاضر"
-              >
-                <Check className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">الكل حاضر</span>
-              </Button>
-              {/* زر تعيين الجميع غائب */}
-              <Button
-                size="sm"
-                onClick={() => setAllStudentsStatus("absent")}
-                className="flex items-center gap-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-red-300"
-                title="تعيين كل الطلاب غائب"
-              >
-                <X className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">الكل غائب</span>
-              </Button>
-              {/* زر حفظ الحضور (منقول من الفوتر) */}
-              <Button
-                onClick={attemptSaveAttendance}
-                disabled={!hasChanges || savingAttendance || studentsWithAttendance.length === 0}
-                className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors px-3 py-1 text-[11px] font-medium h-8"
-                title="حفظ الحضور"
-              >
-                {savingAttendance ? (
-                  <>
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span className="hidden sm:inline">جارٍ الحفظ...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">حفظ الحضور</span>
-                  </>
-                )}
-              </Button>
-              {/* تمت إزالة شارة (تغييرات غير محفوظة) والاكتفاء بتلوين الشريط */}
             </div>
           </div>
 
@@ -973,15 +951,117 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
               />
             </div>
           )}
-          {/* اختيار الجلسة مدمج الآن في شريط الفلترة عبر TeacherCircleFilterBar */}
-          {/* تم استبدال قائمة الحلقات القديمة بشريط الفلترة أعلاه */}
-
         </CardContent>
       </Card>
+      {/* Unified responsive summary + date bar */}
+
+
+      {selectedSession && (
+        <div
+          className="flex flex-col md:flex-row gap-2 md:gap-3 mb-3 w-full pt-2"
+        >
+          <div
+            className="flex flex-wrap items-center justify-center md:justify-start bg-white dark:bg-gray-900 border border-emerald-200 dark:border-green-700 rounded-md p-1.5 md:p-2 gap-1 md:gap-1.5 text-[10px] md:text-[11.5px] font-medium"
+          >
+            <span className="inline-flex items-center text-emerald-700 bg-white/60 px-2 py-0.5  gap-1">
+              <Calendar className="h-5 w-5 text-emerald-1500" />
+              {formatDateDisplay(selectedSession.session_date)}
+              {selectedSession.start_time && selectedSession.end_time && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-5 w-5 text-emerald-1500" />
+                  {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center justify-center md:justify-start
+                   bg-white dark:bg-gray-900 border border-green-200 dark:border-green-700
+                   rounded-md p-1.5 md:p-2 gap-1.5 md:gap-2
+                   text-[10.5px] md:text-[12px] font-medium shadow-sm">
+            {/* زر إرجاع التغييرات */}
+            <Button
+              size="sm"
+              onClick={resetAttendanceToInitial}
+              disabled={!hasChanges}
+              className="flex items-center gap-1.5 rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-800 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-gray-300"
+              title="إرجاع التغييرات غير المحفوظة"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">إرجاع</span>
+            </Button>
+            {/* زر تعيين الجميع حاضر */}
+            <Button
+              size="sm"
+              onClick={() => setAllStudentsStatus("present")}
+              className="flex items-center gap-1.5 rounded-xl bg-green-100 hover:bg-green-200 text-green-800 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-green-300"
+              title="تعيين كل الطلاب حاضر"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">الكل حاضر</span>
+            </Button>
+            {/* زر تعيين الجميع غائب */}
+            <Button
+              size="sm"
+              onClick={() => setAllStudentsStatus("absent")}
+              className="flex items-center gap-1.5 rounded-xl bg-red-100 hover:bg-red-200 text-red-800 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8 border border-red-300"
+              title="تعيين كل الطلاب غائب"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">الكل غائب</span>
+            </Button>
+            {/* زر حفظ الحضور (منقول من الفوتر) */}
+            <Button
+              onClick={attemptSaveAttendance}
+              disabled={!hasChanges || savingAttendance || studentsWithAttendance.length === 0}
+              className="flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors px-3 py-1 text-[11px] font-medium h-8"
+              title="حفظ الحضور"
+            >
+              {savingAttendance ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <span className="hidden sm:inline">جارٍ الحفظ...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">حفظ الحضور</span>
+                </>
+              )}
+            </Button>
+          </div>
+          <div
+            className="flex flex-wrap items-center justify-center md:justify-start
+                   bg-white dark:bg-gray-900 border border-green-200 dark:border-green-700
+                   rounded-md p-1.5 md:p-2 gap-1.5 md:gap-2
+                   text-[10.5px] md:text-[12px] font-medium shadow-sm"
+          >
+            <span className="px-1.5 md:px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1 md:gap-1.5 shadow-xs">
+              <Users className="h-3 w-3 md:h-3.5 md:w-3.5 text-emerald-600" />
+              مجموع: {attendanceTableData.length}
+            </span>
+            <span className="px-1.5 md:px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 inline-flex items-center gap-1 md:gap-1.5 shadow-xs">
+              <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5 text-blue-600" />
+              حاضر: {Object.values(attendanceFormData).filter(v => v.status === 'present').length}
+            </span>
+            <span className="px-1.5 md:px-2 py-0.5 rounded-md bg-red-50 border border-red-200 inline-flex items-center gap-1 md:gap-1.5 shadow-xs">
+              <X className="h-3 w-3 md:h-3.5 md:w-3.5 text-red-600" />
+              غائب: {Object.values(attendanceFormData).filter(v => v.status === 'absent').length}
+            </span>
+            <span className="px-1.5 md:px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 inline-flex items-center gap-1 md:gap-1.5 shadow-xs">
+              <Clock className="h-3 w-3 md:h-3.5 md:w-3.5 text-amber-600" />
+              متأخر: {Object.values(attendanceFormData).filter(v => v.status === 'late').length}
+            </span>
+            <span className="px-1.5 md:px-2 py-0.5 rounded-md bg-sky-50 border border-sky-200 inline-flex items-center gap-1 md:gap-1.5 shadow-xs">
+              <Calendar className="h-3 w-3 md:h-3.5 md:w-3.5 text-sky-600" />
+              معذور: {Object.values(attendanceFormData).filter(v => v.status === 'excused').length}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* جدول الحضور لسطح المكتب */}
       {selectedCircle && selectedSession && (
-        <div className="hidden md:block p-2">
+        <div >
           {loadingStudents ? (
             <div className="text-center py-10 bg-white border rounded-xl shadow-sm">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-3 text-green-600" />
@@ -995,270 +1075,73 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
             </div>
           ) : (
             <>
-            <GenericTable<AttendanceTableRow>
-              data={attendanceTableData}
-              columns={attendanceColumns}
-              defaultView="table"
-              enablePagination={true}
-              defaultPageSize={5}
-              pageSizeOptions={[5, 10, 15, 25, 50]}
-              hideSortToggle={false}
-              enableSorting
-              cardGridColumns={{ sm:1, md:2, lg:4, xl:6 }}
-              cardWidth="230px"
-              compactCards
-              cardAutoLayout
-              cardMinWidth={217.5}
-              getRowClassName={(row) => getAttendanceRowClass(row)}
-              title={(
-                <div className="w-full flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
-                        <CalendarCheck className="h-4 w-4 text-yellow-500" />
-                        {getCircleName(selectedCircle)}
-                      </span>
-                      <span className="hidden md:inline-flex items-center text-[10px] text-emerald-700 bg-white/60 px-2 py-0.5 rounded border border-emerald-200 gap-1">
-                        <Calendar className="h-3 w-3 text-emerald-500" />
-                        {formatDateDisplay(selectedSession.session_date)}
-                        {selectedSession.start_time && selectedSession.end_time && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-emerald-500" />
-                            {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="bg-transparent border-2 border-green-300 rounded-lg px-2 py-2 flex gap-1">
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1"><Users className="h-3 w-3 text-emerald-600" /> مجموع: {attendanceTableData.length}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-600" /> حاضر: {Object.values(attendanceFormData).filter(v=>v.status==='present').length}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-red-50 border border-red-200 inline-flex items-center gap-1"><X className="h-3 w-3 text-red-600" /> غائب: {Object.values(attendanceFormData).filter(v=>v.status==='absent').length}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 inline-flex items-center gap-1"><Clock className="h-3 w-3 text-amber-600" /> متأخر: {Object.values(attendanceFormData).filter(v=>v.status==='late').length}</span>
-                      <span className="px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200 inline-flex items-center gap-1"><Calendar className="h-3 w-3 text-sky-600" /> معذور: {Object.values(attendanceFormData).filter(v=>v.status==='excused').length}</span>
+              <GenericTable<AttendanceTableRow>
+                data={attendanceTableData}
+                columns={attendanceColumns}
+                defaultView="table"
+                enablePagination={true}
+                defaultPageSize={10}
+                pageSizeOptions={[10, 15, 25, 50]}
+                hideSortToggle={false}
+                enableSorting
+                cardPageSize={10}
+                cardGridColumns={{ sm: 1, md: 2, lg: 4, xl: 6 }}
+                //cardWidth="230px"
+                compactCards
+                cardAutoLayout
+                cardMinWidth={217.5}
+                getRowClassName={(row) => getAttendanceRowClass(row)}
+                title={(
+                  <div className="w-full flex flex-col gap-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                          <CalendarCheck className="h-4 w-4 text-yellow-500" />
+                          {getCircleName(selectedCircle)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="md:hidden flex items-center justify-start text-[10px] text-emerald-700 bg-white/60 px-2 py-0.5 rounded border border-emerald-200 gap-1">
-                    <Calendar className="h-3 w-3 text-emerald-500" />
-                    {formatDateDisplay(selectedSession.session_date)}
-                    {selectedSession.start_time && selectedSession.end_time && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-emerald-500" />
-                        {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-            />
+                )}
+              />
             </>
           )}
         </div>
       )}
 
-      <div className="mb-4"></div>
-      {selectedCircle && selectedSession && (
-        <Card className="md:hidden border border-green-300 rounded-xl shadow-md overflow-hidden">
-          {/* الهيدر */}
-          <CardHeader className="bg-gradient-to-r from-green-700 to-green-600 text-white p-2.5 border-b border-green-400">
-            <div className="flex flex-col gap-1.5">
-              {/* Header with title and controls in flex layout */}
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-bold flex items-center gap-1">
-                  <CalendarCheck className="h-3.5 w-3.5 text-yellow-300" />
-                  <span className="line-clamp-1">{getCircleName(selectedCircle)}</span>
-                </CardTitle>
-              </div>
-
-              {/* Session date and time info */}
-              <div className="flex items-center justify-between">
-                <CardDescription className="text-[10px] text-green-50 flex items-center gap-1">
-                  <Calendar className="h-3 w-3 text-green-200" />
-                  {formatDateDisplay(selectedSession.session_date)}
-                  {selectedSession.start_time && selectedSession.end_time && (
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-green-200" />
-                      {formatTimeDisplay(selectedSession.start_time)} - {formatTimeDisplay(selectedSession.end_time)}
-                    </span>
-                  )}
-                </CardDescription>
-              </div>
-
-              {/* Compact attendance summary */}
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {renderAttendanceSummary()}
-              </div>
+      {/* نافذة تأكيد الحفظ (تظهر لأننا نستخدم showSaveConfirm) */}
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-[340px] bg-white dark:bg-gray-900 rounded-lg shadow-2xl border border-green-200 dark:border-green-700 p-4 space-y-3 animate-in fade-in zoom-in">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gradient-to-br from-green-100 to-green-200 dark:from-green-700 dark:to-green-600 border border-green-300 dark:border-green-500">
+                <Save className="h-4 w-4 text-green-700 dark:text-green-100" />
+              </span>
+              <h2 className="text-sm font-semibold text-green-800 dark:text-green-100">تأكيد حفظ الحضور</h2>
             </div>
-          </CardHeader>
-
-          {/* أزرار الكل حاضر/غائب أزيلت من هنا وتم نقلها للأعلى */}
-          {/* المحتوى */}
-          <CardContent className="p-3">
-            {loadingStudents ? (
-              <div className="text-center py-6">
-                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-green-600" />
-                <p className="text-gray-500 text-xs">جارٍ تحميل بيانات الطلاب...</p>
-              </div>
-            ) : studentsWithAttendance.length === 0 ? (
-              <div className="text-center py-6 bg-green-50 rounded-lg">
-                <AlertCircle className="h-6 w-6 mx-auto mb-2 text-amber-500" />
-                <p className="text-sm font-medium text-green-800">لا يوجد طلاب</p>
-                <p className="text-[11px] text-gray-600">
-                  يرجى إضافة طلاب لهذه الحلقة.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {studentsWithAttendance.map((item, idx) => (
-                  <div
-                    key={item.student.id}
-                    className="border rounded-lg p-2 bg-white shadow-sm"
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold border border-emerald-300">
-                          {idx + 1}
-                        </span>
-                        <UserRound className="h-5 w-5 text-gray-400" />
-                        <div>
-                          <p className="text-sm font-medium">
-                            {item.student.full_name}
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            {item.student.guardian?.full_name}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditAttendance(item.student.id)}
-                        className="h-7 w-7 p-0"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    {/* الحضور */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select
-                        value={
-                          attendanceFormData[item.student.id]?.status || "present"
-                        }
-                        onValueChange={(value) =>
-                          handleStatusChange(item.student.id, value as AttendanceStatus)
-                        }
-                      >
-                        <SelectTrigger
-                          dir="rtl"
-                          className={cn(
-                            'h-8 text-xs px-2 rounded-md border transition-all text-right',
-                            'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
-                            attendanceFormData[item.student.id]?.status === 'present' && 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold',
-                            attendanceFormData[item.student.id]?.status === 'absent' && 'border-red-400/80 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-semibold',
-                            attendanceFormData[item.student.id]?.status === 'late' && 'border-amber-400/80 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold',
-                            attendanceFormData[item.student.id]?.status === 'excused' && 'border-blue-400/80 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-semibold'
-                          )}
-                        >
-                          <SelectValue placeholder="اختر الحالة">
-                            <span className="flex items-center gap-1.5">
-                              {attendanceFormData[item.student.id]?.status === 'present' && (
-                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-green-200 to-green-100 dark:from-green-800 dark:to-green-700 shadow-sm ring-1 ring-green-300/50 dark:ring-green-600/40">
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-700 dark:text-green-200" />
-                                </span>
-                              )}
-                              {attendanceFormData[item.student.id]?.status === 'absent' && (
-                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-red-200 to-red-100 dark:from-red-800 dark:to-red-700 shadow-sm ring-1 ring-red-300/50 dark:ring-red-600/40">
-                                  <X className="h-3.5 w-3.5 text-red-700 dark:text-red-200" />
-                                </span>
-                              )}
-                              {attendanceFormData[item.student.id]?.status === 'late' && (
-                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-amber-200 to-amber-100 dark:from-amber-800 dark:to-amber-700 shadow-sm ring-1 ring-amber-300/50 dark:ring-amber-600/40">
-                                  <Clock className="h-3.5 w-3.5 text-amber-700 dark:text-amber-200" />
-                                </span>
-                              )}
-                              {attendanceFormData[item.student.id]?.status === 'excused' && (
-                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-blue-200 to-blue-100 dark:from-blue-800 dark:to-blue-700 shadow-sm ring-1 ring-blue-300/50 dark:ring-blue-600/40">
-                                  <Calendar className="h-3.5 w-3.5 text-blue-700 dark:text-blue-200" />
-                                </span>
-                              )}
-                              <span className="font-medium">
-                                {getAttendanceStatusName(
-                                  attendanceFormData[item.student.id]?.status || 'present'
-                                )}
-                              </span>
-                            </span>
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent dir="rtl" className="text-right text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-60 overflow-auto">
-                          {attendanceStatusOptions.map(option => {
-                            const Icon = option.value === 'present' ? CheckCircle2 : option.value === 'absent' ? X : option.value === 'late' ? Clock : Calendar;
-                            const colorClasses = option.value === 'present' ? 'from-green-200 to-green-100 ring-green-300/50 dark:from-green-800 dark:to-green-700 dark:ring-green-600/40 text-green-700 dark:text-green-200'
-                              : option.value === 'absent' ? 'from-red-200 to-red-100 ring-red-300/50 dark:from-red-800 dark:to-red-700 dark:ring-red-600/40 text-red-700 dark:text-red-200'
-                              : option.value === 'late' ? 'from-amber-200 to-amber-100 ring-amber-300/50 dark:from-amber-800 dark:to-amber-700 dark:ring-amber-600/40 text-amber-700 dark:text-amber-200'
-                              : 'from-blue-200 to-blue-100 ring-blue-300/50 dark:from-blue-800 dark:to-blue-700 dark:ring-blue-600/40 text-blue-700 dark:text-blue-200';
-                            return (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                                className={cn(
-                                  'cursor-pointer rounded-[6px] px-2 py-1.5 transition-colors flex items-center gap-2',
-                                  'data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700',
-                                  'data-[state=checked]:bg-green-700 data-[state=checked]:text-white'
-                                )}
-                              >
-                                <span className={cn('inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br shadow-sm ring-1', colorClasses)}>
-                                  <Icon className="h-3.5 w-3.5" />
-                                </span>
-                                <span className="truncate font-medium">{option.label}</span>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-
-                      {attendanceFormData[item.student.id]?.status === "late" && (
-                        <Input
-                          title="أدخل دقائق التأخير"
-                          type="number"
-                          min={0}
-                          value={
-                            attendanceFormData[item.student.id]?.late_minutes || 0
-                          }
-                          onChange={(e) => {
-                            const value = parseInt(e.target.value) || 0;
-                            setAttendanceFormData((prev) => ({
-                              ...prev,
-                              [item.student.id]: {
-                                ...prev[item.student.id],
-                                late_minutes: value < 0 ? 0 : value,
-                              },
-                            }));
-                            setHasChanges(true);
-                          }}
-                          className="h-8 text-center text-xs bg-amber-50 border-amber-300"
-                          placeholder="دقائق التأخير"
-                        />
-                      )}
-                    </div>
-
-                    {attendanceFormData[item.student.id]?.note && (
-                      <div className="mt-1 flex items-center gap-1 text-[11px] text-gray-600">
-                        <FileText className="h-3 w-3" />
-                        <span className="truncate">
-                          {attendanceFormData[item.student.id]?.note}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-
-          {/* الفوتر أزيل زر الحفظ منه بعد نقله للأعلى */}
-        </Card>
+            <p className="text-[12px] leading-relaxed text-gray-600 dark:text-gray-300">
+              هل أنت متأكد أنك تريد حفظ بيانات الحضور الحالية؟ سيتم استبدال أي بيانات محفوظة سابقة لهذه الجلسة.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowSaveConfirm(false)}
+                className="h-8 px-3 text-[11px] rounded-md border-gray-300 bg-white hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-600 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+              >إلغاء</Button>
+              <Button
+                type="button"
+                disabled={pendingSave || savingAttendance}
+                onClick={confirmAttendanceSave}
+                className="h-8 px-4 text-[11px] rounded-md bg-green-600 hover:bg-green-700 text-white disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                {(pendingSave || savingAttendance) && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
+                {pendingSave || savingAttendance ? 'جارٍ الحفظ...' : 'تأكيد'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
-
 
       {/* نافذة تحرير معلومات حضور طالب */}
       <FormDialog
@@ -1318,16 +1201,9 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           {/* دقائق التأخير إذا كان متأخر */}
           {editForm.status === 'late' && (
             <FormRow label="دقائق التأخير">
-              <Input
-                id="late-minutes"
-                type="number"
-                min={0}
+              <LateMinutesDialogEditor
                 value={editForm.late_minutes || 0}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  setEditForm({ ...editForm, late_minutes: value < 0 ? 0 : value });
-                }}
-                className="bg-orange-50 border-orange-200 text-orange-900 rounded-md text-sm py-1 px-2"
+                onChange={(v) => setEditForm(f => ({ ...f, late_minutes: v }))}
               />
             </FormRow>
           )}
@@ -1345,40 +1221,70 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           </FormRow>
         </div>
       </FormDialog>
-      <DeleteConfirmationDialog
-        isOpen={showSaveConfirm}
-        onOpenChange={setShowSaveConfirm}
-        title="تأكيد حفظ الحضور"
-        description={(() => {
-          if (!selectedSession) return null;
-          const sessionDate = new Date(selectedSession.session_date);
-          const today = new Date(); today.setHours(0,0,0,0); sessionDate.setHours(0,0,0,0);
-          const isFuture = sessionDate.getTime() > today.getTime();
-          return (
-            <div className="space-y-2 text-right">
-              <p>{isFuture ? 'تنبيه: هذه جلسة بتاريخ مستقبلي وسيتم تسجيل الحضور مسبقاً.' : 'سيتم حفظ حالات الحضور الحالية.'}</p>
-              <p className="font-medium text-emerald-700">هل أنت متأكد من المتابعة؟</p>
-              <div className="mt-2 bg-blue-50 border border-blue-200 rounded-md p-2 text-[13px]">
-                <div className="flex items-center gap-2 font-semibold text-blue-800">
-                  <CalendarCheck className="h-4 w-4" />
-                  <span>تفاصيل الجلسة</span>
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-[12px] text-blue-700">
-                  <span className="font-medium">التاريخ:</span>
-                  <span>{formatDateDisplay(selectedSession.session_date)}</span>
-                  <span className="font-medium">الوقت:</span>
-                  <span>{selectedSession.start_time && selectedSession.end_time ? `${formatTimeDisplay(selectedSession.start_time)} - ${formatTimeDisplay(selectedSession.end_time)}` : '-'}</span>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-        deleteButtonText={pendingSave ? 'جارٍ الحفظ...' : 'نعم، حفظ'}
-        cancelButtonText="إلغاء"
-        onConfirm={confirmAttendanceSave}
-        isLoading={pendingSave}
-      />
     </div>
   );
 }
+
+// ====== مكون محرر دقائق التأخير (مضمن في الجدول) ======
+interface LateMinutesInlineEditorProps { value: number; onChange: (val:number)=>void; pillClass?: string; }
+const LateMinutesInlineEditor: React.FC<LateMinutesInlineEditorProps> = ({ value, onChange, pillClass }) => {
+  const [open,setOpen]=useState(false);
+  const presets=[5,10,15,20,25,30,45,60];
+  return (
+    <div className="relative inline-block">
+      <button type="button" onClick={()=>setOpen(o=>!o)} className={`h-6 min-w-[50px] px-2 rounded-full border flex items-center justify-center gap-1 text-[10px] font-medium shadow-sm ${pillClass}`} title="تحرير دقائق التأخير">
+        <Clock className="h-3 w-3" />{value}د
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 left-1/2 -translate-x-1/2 w-56 bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-600 rounded-lg p-2 shadow-xl">
+          <div className="flex flex-wrap gap-1 mb-2">
+            {presets.map(p=>{
+              const active=p===value; return (
+                <button key={p} type="button" onClick={()=>{onChange(p); setOpen(false);}} className={`h-7 px-2 rounded-md text-[10px] border ${active?'bg-amber-600 border-amber-700 text-white':'bg-amber-100 border-amber-300 text-amber-700 hover:bg-amber-200'}`}>{p}</button>
+              );})}
+            <button type="button" onClick={()=>{onChange(0); setOpen(false);}} className={`h-7 px-2 rounded-md text-[10px] border ${value===0?'bg-gray-600 border-gray-700 text-white':'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'}`}>0</button>
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="range" min={0} max={60} value={value} onChange={(e)=>onChange(Number(e.target.value))} className="w-full accent-amber-500" />
+            <span className="w-9 text-center text-[10px] font-semibold text-amber-700">{value}</span>
+          </div>
+          <div className="flex justify-end mt-2">
+            <button type="button" onClick={()=>setOpen(false)} className="text-[10px] px-2 py-1 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300">اغلاق</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ====== مكون محرر دقائق التأخير في الحوار ======
+interface LateMinutesDialogEditorProps { value:number; onChange:(val:number)=>void; }
+const LateMinutesDialogEditor: React.FC<LateMinutesDialogEditorProps> = ({ value, onChange }) => {
+  const presets=[5,10,15,20,25,30,45,60];
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1">
+        {presets.map(p=>{ const active=p===value; return (
+          <button key={p} type="button" onClick={()=>onChange(p)} className={`h-8 px-3 rounded-md text-[11px] border ${active?'bg-amber-600 border-amber-700 text-white shadow':'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'}`}>{p}</button>
+        );})}
+        <button type="button" onClick={()=>onChange(0)} className={`h-8 px-3 rounded-md text-[11px] border ${value===0?'bg-gray-600 border-gray-700 text-white shadow':'bg-gray-100 border-gray-300 text-gray-700 hover:bg-gray-200'}`}>0</button>
+      </div>
+      <div className="flex items-center gap-3">
+        <input type="range" min={0} max={60} value={value} onChange={(e)=>onChange(Number(e.target.value))} className="flex-1 accent-amber-500" />
+        <div className="w-12 text-center text-[12px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-md py-1">{value}</div>
+      </div>
+      <div className="flex items-center gap-2 text-[10px] text-gray-500"><Clock className="h-3 w-3 text-amber-500" />اسحب الشريط أو اختر قيمة جاهزة. الحد الأعلى 60.</div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] text-gray-400">زيادة سريعة:</span>
+        {[1,2,3,4].map(step => (
+          <button key={step} type="button" onClick={()=>onChange(Math.min(60, value + step))} className="h-6 px-2 rounded-md text-[10px] bg-white border border-gray-300 text-gray-600 hover:bg-gray-100">+{step}</button>
+        ))}
+        <button type="button" onClick={()=>onChange(value>0?value-1:0)} className="h-6 px-2 rounded-md text-[10px] bg-white border border-gray-300 text-gray-600 hover:bg-gray-100">-1</button>
+        <button type="button" onClick={()=>onChange(value>5?value-5:0)} className="h-6 px-2 rounded-md text-[10px] bg-white border border-gray-300 text-gray-600 hover:bg-gray-100">-5</button>
+      </div>
+    </div>
+  );
+};
+
+export default AttendanceRecord;
 
