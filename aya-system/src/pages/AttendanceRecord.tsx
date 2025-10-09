@@ -596,7 +596,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
   const attendanceColumns: Column<AttendanceTableRow>[] = useMemo(() => ([
     {
       key: '__index',
-      header: '#',
+      header: '🔢',
       width: '48px',
       align: 'center',
       render: (_row, globalIndex) => (
@@ -607,7 +607,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'studentName',
-      header: 'الطالب / ولي الأمر',
+      header: '👪 ' +'الطالب / ولي الأمر',
       render: (row) => (
         <div className="flex items-start gap-2 max-w-[280px]">
           <div className="flex flex-col min-w-0 leading-tight">
@@ -619,7 +619,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'status',
-      header: 'الحالة',
+      header: '📋 ' + 'الحالة',
       render: (row) => {
         const st = attendanceFormData[row.id]?.status || 'present';
         const colorMap: Record<string, string> = {
@@ -637,22 +637,73 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
               <SelectTrigger
                 id={`attendance-status-${row.id}`}
                 dir="rtl"
-                className={cn('h-8 text-[11px] leading-none rounded-full border px-3 py-0 flex items-center justify-between gap-1 shadow-sm transition-colors', colorMap[st] || 'border-gray-300 text-gray-600')}
+                className={cn(
+                  // base
+                  'h-9 text-right truncate max-w-full min-w-[120px] text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all',
+                  'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                  // selected state styling derived from provided teacher select (green variant) + subtle status accent ring
+                  st === 'present' && 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold',
+                  st === 'absent' && 'border-red-400/80 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-semibold',
+                  st === 'late' && 'border-amber-400/80 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold',
+                  st === 'excused' && 'border-blue-400/80 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-semibold'
+                )}
               >
                 <SelectValue placeholder="الحالة">
-                  {getAttendanceStatusName(st)}
+                  <span className="flex items-center gap-1.5">
+                    {st === 'present' && (
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-green-200 to-green-100 dark:from-green-800 dark:to-green-700 shadow-sm ring-1 ring-green-300/50 dark:ring-green-600/40">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-700 dark:text-green-200" />
+                      </span>
+                    )}
+                    {st === 'absent' && (
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-red-200 to-red-100 dark:from-red-800 dark:to-red-700 shadow-sm ring-1 ring-red-300/50 dark:ring-red-600/40">
+                        <X className="h-3.5 w-3.5 text-red-700 dark:text-red-200" />
+                      </span>
+                    )}
+                    {st === 'late' && (
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-amber-200 to-amber-100 dark:from-amber-800 dark:to-amber-700 shadow-sm ring-1 ring-amber-300/50 dark:ring-amber-600/40">
+                        <Clock className="h-3.5 w-3.5 text-amber-700 dark:text-amber-200" />
+                      </span>
+                    )}
+                    {st === 'excused' && (
+                      <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-blue-200 to-blue-100 dark:from-blue-800 dark:to-blue-700 shadow-sm ring-1 ring-blue-300/50 dark:ring-blue-600/40">
+                        <Calendar className="h-3.5 w-3.5 text-blue-700 dark:text-blue-200" />
+                      </span>
+                    )}
+                    <span className="font-medium">
+                      {getAttendanceStatusName(st as AttendanceStatus)}
+                    </span>
+                  </span>
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent position="popper" dir="rtl" className="text-right text-[11px] rounded-md border border-emerald-200 shadow-md bg-white">
-                {attendanceStatusOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="cursor-pointer data-[highlighted]:bg-emerald-100 data-[state=checked]:font-semibold rounded-sm text-[11px]"
-                  >
-                    {option.label}
-                  </SelectItem>
-                ))}
+              <SelectContent
+                position="popper"
+                dir="rtl"
+                className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-60 overflow-auto"
+              >
+                {attendanceStatusOptions.map(option => {
+                  const Icon = option.value === 'present' ? CheckCircle2 : option.value === 'absent' ? X : option.value === 'late' ? Clock : Calendar;
+                  const colorClasses = option.value === 'present' ? 'from-green-200 to-green-100 ring-green-300/50 dark:from-green-800 dark:to-green-700 dark:ring-green-600/40 text-green-700 dark:text-green-200'
+                    : option.value === 'absent' ? 'from-red-200 to-red-100 ring-red-300/50 dark:from-red-800 dark:to-red-700 dark:ring-red-600/40 text-red-700 dark:text-red-200'
+                    : option.value === 'late' ? 'from-amber-200 to-amber-100 ring-amber-300/50 dark:from-amber-800 dark:to-amber-700 dark:ring-amber-600/40 text-amber-700 dark:text-amber-200'
+                    : 'from-blue-200 to-blue-100 ring-blue-300/50 dark:from-blue-800 dark:to-blue-700 dark:ring-blue-600/40 text-blue-700 dark:text-blue-200';
+                  return (
+                    <SelectItem
+                      key={option.value}
+                      value={option.value}
+                      className={cn(
+                        'cursor-pointer rounded-[6px] px-2 py-1.5 transition-colors flex items-center gap-2',
+                        'data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700',
+                        'data-[state=checked]:bg-green-700 data-[state=checked]:text-white'
+                      )}
+                    >
+                      <span className={cn('inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br shadow-sm ring-1', colorClasses)}>
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate font-medium"> {option.label}</span>
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -661,7 +712,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'late',
-      header: 'دقائق تأخير',
+      header: '⏰ ' + 'دقائق تأخير',
       render: (row) => {
         const st = attendanceFormData[row.id]?.status;
         if (st !== 'late') return <span className="text-gray-300 text-[11px]">—</span>;
@@ -689,7 +740,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'note',
-      header: 'ملاحظة',
+      header: '📝 ' + 'ملاحظة',
       render: (row) => (
         attendanceFormData[row.id]?.note ? (
           <button
@@ -715,7 +766,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     },
     {
       key: 'actions',
-      header: 'تحرير',
+      header: '⚙️ ' +'تحرير',
       render: (row) => (
         <div className="flex items-center justify-center">
           <Button
@@ -978,7 +1029,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                         )}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-medium">
+                    <div className="bg-transparent border-2 border-green-300 rounded-lg px-2 py-2 flex gap-1">
                       <span className="px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1"><Users className="h-3 w-3 text-emerald-600" /> مجموع: {attendanceTableData.length}</span>
                       <span className="px-1.5 py-0.5 rounded bg-blue-50 border border-blue-200 inline-flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-blue-600" /> حاضر: {Object.values(attendanceFormData).filter(v=>v.status==='present').length}</span>
                       <span className="px-1.5 py-0.5 rounded bg-red-50 border border-red-200 inline-flex items-center gap-1"><X className="h-3 w-3 text-red-600" /> غائب: {Object.values(attendanceFormData).filter(v=>v.status==='absent').length}</span>
@@ -1097,23 +1148,71 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                           handleStatusChange(item.student.id, value as AttendanceStatus)
                         }
                       >
-                        <SelectTrigger className="h-8 text-xs px-2">
+                        <SelectTrigger
+                          dir="rtl"
+                          className={cn(
+                            'h-8 text-xs px-2 rounded-md border transition-all text-right',
+                            'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                            attendanceFormData[item.student.id]?.status === 'present' && 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold',
+                            attendanceFormData[item.student.id]?.status === 'absent' && 'border-red-400/80 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 font-semibold',
+                            attendanceFormData[item.student.id]?.status === 'late' && 'border-amber-400/80 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-semibold',
+                            attendanceFormData[item.student.id]?.status === 'excused' && 'border-blue-400/80 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-semibold'
+                          )}
+                        >
                           <SelectValue placeholder="اختر الحالة">
-                            {getAttendanceStatusName(
-                              attendanceFormData[item.student.id]?.status || "present"
-                            )}
+                            <span className="flex items-center gap-1.5">
+                              {attendanceFormData[item.student.id]?.status === 'present' && (
+                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-green-200 to-green-100 dark:from-green-800 dark:to-green-700 shadow-sm ring-1 ring-green-300/50 dark:ring-green-600/40">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-700 dark:text-green-200" />
+                                </span>
+                              )}
+                              {attendanceFormData[item.student.id]?.status === 'absent' && (
+                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-red-200 to-red-100 dark:from-red-800 dark:to-red-700 shadow-sm ring-1 ring-red-300/50 dark:ring-red-600/40">
+                                  <X className="h-3.5 w-3.5 text-red-700 dark:text-red-200" />
+                                </span>
+                              )}
+                              {attendanceFormData[item.student.id]?.status === 'late' && (
+                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-amber-200 to-amber-100 dark:from-amber-800 dark:to-amber-700 shadow-sm ring-1 ring-amber-300/50 dark:ring-amber-600/40">
+                                  <Clock className="h-3.5 w-3.5 text-amber-700 dark:text-amber-200" />
+                                </span>
+                              )}
+                              {attendanceFormData[item.student.id]?.status === 'excused' && (
+                                <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-gradient-to-br from-blue-200 to-blue-100 dark:from-blue-800 dark:to-blue-700 shadow-sm ring-1 ring-blue-300/50 dark:ring-blue-600/40">
+                                  <Calendar className="h-3.5 w-3.5 text-blue-700 dark:text-blue-200" />
+                                </span>
+                              )}
+                              <span className="font-medium">
+                                {getAttendanceStatusName(
+                                  attendanceFormData[item.student.id]?.status || 'present'
+                                )}
+                              </span>
+                            </span>
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
-                          {attendanceStatusOptions.map((option) => (
-                            <SelectItem
-                              key={option.value}
-                              value={option.value}
-                              className="text-xs"
-                            >
-                              {option.label}
-                            </SelectItem>
-                          ))}
+                        <SelectContent dir="rtl" className="text-right text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-60 overflow-auto">
+                          {attendanceStatusOptions.map(option => {
+                            const Icon = option.value === 'present' ? CheckCircle2 : option.value === 'absent' ? X : option.value === 'late' ? Clock : Calendar;
+                            const colorClasses = option.value === 'present' ? 'from-green-200 to-green-100 ring-green-300/50 dark:from-green-800 dark:to-green-700 dark:ring-green-600/40 text-green-700 dark:text-green-200'
+                              : option.value === 'absent' ? 'from-red-200 to-red-100 ring-red-300/50 dark:from-red-800 dark:to-red-700 dark:ring-red-600/40 text-red-700 dark:text-red-200'
+                              : option.value === 'late' ? 'from-amber-200 to-amber-100 ring-amber-300/50 dark:from-amber-800 dark:to-amber-700 dark:ring-amber-600/40 text-amber-700 dark:text-amber-200'
+                              : 'from-blue-200 to-blue-100 ring-blue-300/50 dark:from-blue-800 dark:to-blue-700 dark:ring-blue-600/40 text-blue-700 dark:text-blue-200';
+                            return (
+                              <SelectItem
+                                key={option.value}
+                                value={option.value}
+                                className={cn(
+                                  'cursor-pointer rounded-[6px] px-2 py-1.5 transition-colors flex items-center gap-2',
+                                  'data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700',
+                                  'data-[state=checked]:bg-green-700 data-[state=checked]:text-white'
+                                )}
+                              >
+                                <span className={cn('inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br shadow-sm ring-1', colorClasses)}>
+                                  <Icon className="h-3.5 w-3.5" />
+                                </span>
+                                <span className="truncate font-medium">{option.label}</span>
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
 

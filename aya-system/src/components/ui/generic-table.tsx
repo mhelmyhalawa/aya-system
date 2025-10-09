@@ -139,13 +139,15 @@ export function GenericTable<T extends { id: string }>(props: {
     const sortGradientClass = React.useMemo(() => {
         switch (sortDirection) {
             case 'asc':
-                return 'bg-gradient-to-r from-emerald-500 via-green-500 to-lime-400 dark:from-emerald-700 dark:via-green-700 dark:to-lime-600';
+                return 'bg-gradient-to-r from-green-100 via-emerald-100 to-lime-100 dark:from-emerald-800 dark:via-green-800 dark:to-lime-700 drop-shadow-sm';
             case 'desc':
-                return 'bg-gradient-to-r from-green-700 via-green-600 to-emerald-500 dark:from-green-800 dark:via-green-700 dark:to-emerald-600';
+                return 'bg-gradient-to-r from-emerald-100 via-green-100 to-teal-100 dark:from-green-800 dark:via-emerald-800 dark:to-teal-700 drop-shadow-sm';
             default:
-                return 'bg-gradient-to-r from-green-600 via-emerald-500 to-green-400 dark:from-green-800 dark:via-green-700 dark:to-green-600';
+                return 'bg-gradient-to-r from-green-50 via-emerald-100 to-green-50 dark:from-green-900 dark:via-emerald-900 dark:to-green-800 drop-shadow';
         }
     }, [sortDirection]);
+
+
     // فهرس البطاقة الحالية على الموبايل (نعرض بطاقة واحدة مع تنقل)
     const [mobileCardIndex, setMobileCardIndex] = useState(0);
     // الترقيم
@@ -409,16 +411,15 @@ export function GenericTable<T extends { id: string }>(props: {
             {/* الهيدر (موبايل مبسط + سطح مكتب كامل) */}
             {isMobile ? (
                 <div className="flex flex-col gap-1 mb-0 p-2.5
-    bg-gradient-to-br from-green-100 via-green-200 to-emerald-100 
-    dark:from-green-950 dark:via-emerald-950 dark:to-green-900 
-    border border-green-300/40 dark:border-green-800/60 
-    rounded-xl shadow-sm">
+                                bg-gradient-to-br from-green-100 via-green-200 to-emerald-100 
+                                dark:from-green-950 dark:via-emerald-950 dark:to-green-900 
+                                border border-green-300/40 dark:border-green-800/60 
+                                rounded-xl shadow-sm">
 
                     {/* الصف الأول: العنوان + زر الطي */}
                     {(title || collapsible || onToggleCollapse) && (
                         <div className="flex items-center justify-between w-full">
-                            <div className="flex-1 text-center text-xs font-semibold 
-          text-green-900 dark:text-green-100 leading-tight tracking-wide">
+                            <div className="flex-1 text-center text-xs font-semibold text-green-900 dark:text-green-100 leading-tight tracking-wide">
                                 {title}
                             </div>
                             {(collapsible || onToggleCollapse) && (
@@ -675,7 +676,7 @@ export function GenericTable<T extends { id: string }>(props: {
                     {/* وضع الجدول */}
                     {!effectiveCollapsed && displayData.length > 0 && viewMode === 'table' && (
                         <div className="border border-green-300 dark:border-green-800 overflow-hidden bg-white 
-                dark:bg-green-950/20 shadow-[0_4px_6px_rgba(0,0,0,0.1),0_8px_15px_rgba(0,0,0,0.1)] h-full flex flex-col">
+                                        dark:bg-green-950/20 shadow-[0_4px_6px_rgba(0,0,0,0.1),0_8px_15px_rgba(0,0,0,0.1)] h-full flex flex-col">
                             {/* تمت إزالة شريط الترقيم العلوي المستقل - تم دمجه في الهيدر */}
                             <div className={cn(
                                 "custom-scrollbar scrollbar-green scroll-fade-overlay rounded-b-lg flex-1",
@@ -684,7 +685,7 @@ export function GenericTable<T extends { id: string }>(props: {
                                 !effectiveCollapsed && 'overflow-x-auto overflow-auto'
                             )}>
                                 <Table className="direction-rtl w-full border-collapse text-[11px] sm:text-[12px]">
-                                    <TableHeader className={cn('sticky top-0 z-10 shadow-inner', sortGradientClass)}>
+                                    <TableHeader className={cn('sticky top-0 z-10 shadow-inner', sortGradientClass, 'text-green-800 dark:text-green-50')}> {/* improved contrast */}
                                         <TableRow>
                                             {columns.map((column, colIdx) => {
                                                 const alignClass =
@@ -698,7 +699,8 @@ export function GenericTable<T extends { id: string }>(props: {
                                                         key={column.key}
                                                         className={cn(
                                                             alignClass,
-                                                            'font-bold text-white py-2 sm:py-3 px-2 sm:px-4 border-r border-green-600/50 dark:border-green-800/50',
+                                                            // زيادة حجم خط العناوين وتحسين التباين (استخدام لون داكن في الوضع الفاتح وأفتح في الداكن)
+                                                            'font-bold text-green-800 dark:text-green-50 py-2 sm:py-3 px-2 sm:px-4 border-r border-green-600/50 dark:border-green-800/50 text-[12px] sm:text-[13px] md:text-[14px] tracking-wide',
                                                             !hideSortToggle && enableSorting && colIdx === 0 && 'cursor-pointer select-none hover:bg-green-600/60',
                                                             hideSortToggle && enableSorting && colIdx === 0 && 'pointer-events-none'
                                                         )}
@@ -712,11 +714,11 @@ export function GenericTable<T extends { id: string }>(props: {
                                                             {/* إشارة حالة الترتيب: سهم مزدوج محايد عند عدم اختيار اتجاه */}
                                                             {!hideSortToggle && enableSorting && colIdx === 0 && (
                                                                 sortDirection === null ? (
-                                                                    <ArrowUpDown className="h-3 w-3 text-white/60" />
+                                                                    <ArrowUpDown className="h-3 w-3 text-green-700/60 dark:text-white/60" />
                                                                 ) : sortDirection === 'asc' ? (
-                                                                    <ChevronUp className="h-3 w-3 text-yellow-300" />
+                                                                    <ChevronUp className="h-3 w-3 text-yellow-500 dark:text-yellow-300" />
                                                                 ) : (
-                                                                    <ChevronDown className="h-3 w-3 text-yellow-300" />
+                                                                    <ChevronDown className="h-3 w-3 text-yellow-500 dark:text-yellow-300" />
                                                                 )
                                                             )}
                                                         </span>
@@ -905,10 +907,22 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 style={cardWidth ? { width: cardWidth } : undefined}
                                             >
                                                 {/* الرأس (لون ديناميكي حسب حالة الترتيب) */}
-                                                <div className={cn('flex items-center justify-between', compactCards ? 'bg-emerald-600/85 text-white px-2 py-1.5 border-b border-emerald-500/60' : cn('text-white', sortGradientClass, 'px-2 sm:px-3 py-1.5 sm:py-2.5 rounded-t-lg shadow-md'))}> 
-                                                    <h3 className={cn('font-bold truncate flex-1 flex items-center gap-2', compactCards ? 'text-[11px] tracking-tight' : 'text-sm sm:text-base tracking-wide')}> 
+                                                <div
+                                                    className={cn(
+                                                        'flex items-center justify-between relative overflow-hidden group/card-header',
+                                                        compactCards
+                                                            ? 'text-green-900 px-2 py-1.5 rounded-t-lg bg-gradient-to-br from-green-100 via-emerald-100 to-teal-100 border-b border-emerald-200/60'
+                                                            : 'text-green-900 px-2 sm:px-3 py-1.5 sm:py-2.5 rounded-t-lg shadow-sm bg-gradient-to-br from-green-50 via-emerald-100 to-teal-50'
+                                                    )}
+                                                >
+
+
+                                                    {/* طبقة لمعان خفيفة */}
+                                                    <span className="pointer-events-none absolute inset-0 opacity-0 group-hover/card-header:opacity-15 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.9),transparent_65%)] transition-opacity duration-300" />
+                                                    <span className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-emerald-300/40 via-teal-200/40 to-green-300/40" />
+                                                    <h3 className={cn('font-bold truncate flex-1 flex items-center gap-2 drop-shadow-sm', compactCards ? 'text-[12px] sm:text-[12.5px] tracking-tight' : 'text-[13px] sm:text-sm md:text-base tracking-wide')}>
                                                         {indexColumn && (
-                                                            <span className={cn('inline-flex items-center justify-center border border-white/30 text-xs font-semibold shadow-inner backdrop-blur-sm', compactCards ? 'min-w-[20px] h-[20px] rounded-md bg-white/20' : 'min-w-[26px] h-[26px] rounded-full bg-white/15')}> 
+                                                            <span className={cn('inline-flex items-center justify-center border border-white/40 text-[11px] font-semibold shadow-inner backdrop-blur-sm text-emerald-50', compactCards ? 'min-w-[22px] h-[22px] rounded-md bg-white/20' : 'min-w-[28px] h-[28px] rounded-full bg-white/20')}>
                                                                 {indexColumn.render ? indexColumn.render(item, globalIndex) : (item as any)[indexColumn.key] ?? (globalIndex + 1)}
                                                             </span>
                                                         )}
@@ -919,21 +933,21 @@ export function GenericTable<T extends { id: string }>(props: {
                                                 </div>
 
                                                 {/* المحتوى */}
-                                                <div className={cn('w-full', compactCards && 'text-[11px]')}> 
+                                                <div className={cn('w-full', compactCards && 'text-[11px]')}>
                                                     {/* نسخة الجدول - تظهر من sm وفوق */}
-                                                    <table className={cn('hidden sm:table w-full border border-green-300 dark:border-green-700 table-fixed', compactCards ? 'text-[10px]' : 'text-[11px] sm:text-xs')}> 
+                                                    <table className={cn('hidden sm:table w-full border border-green-300 dark:border-green-700 table-fixed', compactCards ? 'text-[10px]' : 'text-[11px] sm:text-xs')}>
                                                         <tbody>
                                                             {visibleColumns.map((column) => {
                                                                 const value = column.render
                                                                     ? column.render(item)
                                                                     : (item as any)[column.key];
                                                                 return (
-                                                                    <tr key={`${item.id}-${column.key}-row`} className={compactCards ? 'hover:bg-green-50/60' : ''}> 
-                                                                        <td className={cn('w-[30%] border border-green-300 dark:border-green-700 text-right', compactCards ? 'px-1.5 py-1 font-semibold text-[10px] text-green-700/90' : 'px-2 py-1 font-medium text-green-700 dark:text-green-300')}> 
+                                                                    <tr key={`${item.id}-${column.key}-row`} className={compactCards ? 'hover:bg-green-50/60' : ''}>
+                                                                        <td className={cn('w-[30%] border border-green-300 dark:border-green-700 text-right', compactCards ? 'px-1.5 py-1 font-semibold text-[10px] text-green-700/90' : 'px-2 py-1 font-medium text-green-700 dark:text-green-300')}>
                                                                             {column.header}
                                                                         </td>
-                                                                        <td className={cn('w-[70%] border border-green-300 dark:border-green-700 text-right bg-green-50 dark:bg-green-900/50', compactCards ? 'px-1.5 py-1' : 'px-2 py-1 text-green-800 dark:text-green-100')}> 
-                                                                            <div className={cn('w-full sm:max-w-xs border border-green-200 dark:border-green-700 rounded-md flex items-center justify-center', compactCards ? 'px-1.5 py-0.5 min-h-[20px] text-[10px] bg-white/70' : 'px-2 py-1 min-h-[24px] sm:min-h-[26px] text-[11px] sm:text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30')}> 
+                                                                        <td className={cn('w-[70%] border border-green-300 dark:border-green-700 text-right bg-green-50 dark:bg-green-900/50', compactCards ? 'px-1.5 py-1' : 'px-2 py-1 text-green-800 dark:text-green-100')}>
+                                                                            <div className={cn('w-full sm:max-w-xs border border-green-200 dark:border-green-700 rounded-md flex items-center justify-center', compactCards ? 'px-1.5 py-0.5 min-h-[20px] text-[10px] bg-white/70' : 'px-2 py-1 min-h-[24px] sm:min-h-[26px] text-[11px] sm:text-sm text-green-800 dark:text-green-100 bg-green-50 dark:bg-green-800/30')}>
                                                                                 {value !== null && value !== undefined ? (
                                                                                     typeof value === "object" && React.isValidElement(value) ? (
                                                                                         value
