@@ -251,7 +251,7 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                         )}
                     >
                         <div className="flex items-center justify-start gap-2">
-                        <SelectValue placeholder={'🤵 ' + teacherLabel} />
+                        <SelectValue placeholder={'🧑‍🏫 ' + teacherLabel} />
                         </div>
                     </SelectTrigger>
                     <SelectContent
@@ -271,7 +271,7 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                             >
                             <span className="flex items-center gap-2">
                                 <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
-                                🤵
+                                🧑‍🏫
                                 </span>
                                 <span className="truncate">{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</span>
                             </span>
@@ -388,7 +388,7 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                             )}
                         >
                             <div className="flex items-center justify-start gap-2">
-                            <SelectValue placeholder={circles.length === 0 ? 'لا توجد حلقات' : '🧿 ' + circleLabel} />
+                            <SelectValue placeholder={circles.length === 0 ? 'لا توجد حلقات' : '🕋 ' + circleLabel} />
                             </div>
                         </SelectTrigger>
                         <SelectContent
@@ -408,7 +408,7 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                                 >
                                 <span className="flex items-center gap-2">
                                     <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
-                                    🧿
+                                    🕋
                                     </span>
                                     <span className="truncate">{c.name}</span>
                                 </span>

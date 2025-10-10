@@ -1200,7 +1200,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                   className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                   title={guardiansLabels.addGuardian}
                 >
-                  <span className="text-lg">👤</span>
+                  <span className="text-lg">🤵</span>
                   <span className="hidden sm:inline"> {guardiansLabels.addGuardian}</span>
                 </Button>
               )}
@@ -1210,7 +1210,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                 title={studentsLabels.addStudent}
               >
-                <span className="text-lg">🧒</span>
+                <span className="text-lg">🧑‍🎓</span>
                 <span className="hidden sm:inline">{studentsLabels.addStudent}</span>
               </Button>
             </div>
@@ -1254,7 +1254,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <div className="h-6 w-6 shrink-0 rounded-md bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                      <UserCircle className="h-3.5 w-3.5" />
+                      🤵
                     </div>
                     <span className={`truncate text-sm ${selectedGuardianIds.length ? 'text-green-700 font-medium' : filterFieldPlaceholder}`}>
                       {selectedGuardianIds.length === 0 && (guardiansLabels.guardian || 'اختر ولياً')}
@@ -1327,6 +1327,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         cardMaxFieldsCollapsed={4}
         enableCardExpand={true}
         hideSortToggle={false}
+        cardPageSize={4}
         className={`overflow-hidden ${TABLE_BASE_CLASS} ${TABLE_TEXT_BASE}`}
         getRowClassName={(_, index) => getZebraRowClass(index)}
         columns={([
@@ -1339,35 +1340,32 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
           },
           {
             key: 'full_name',
-            header: `👤 ${studentsLabels.name}`,
+            header: `🧑‍🎓 ${studentsLabels.name}`,
             important: true,
             render: (item: any) => (
               <div className="flex flex-col">
-                <span className="font-medium leading-snug">{item.full_name}</span>
-                {item.guardian?.full_name && (
-                  <span className="text-[10px] text-gray-500">{item.guardian.full_name}</span>
-                )}
+                <span className="font-medium leading-snug">{'🧑‍🎓 ' + item.full_name + ' ' + item.guardian.full_name}</span>
               </div>
             )
           },
           ...(userRole !== 'teacher' ? [{
             key: 'teacher',
-            header: `🎓 ${studentsLabels.teacherColumn}`,
-            align: 'center',
+            header: `🧑‍🏫 ${studentsLabels.teacherColumn}`,
+           
             render: (item: any) => item.study_circle?.teacher?.full_name ? (
-              <div className="flex items-center justify-center gap-1">
-                <GraduationCap className="h-4 w-4 text-islamic-green/60" />
+              <div className="flex gap-1">
+                🧑‍🏫
                 <span className="text-xs">{item.study_circle.teacher.full_name}</span>
               </div>
             ) : <span className="text-muted-foreground">—</span>
           }] : []),
           {
             key: 'study_circle',
-            header: `📘 ${studentsLabels.studyCircleShort}`,
-            align: 'center',
+            header: `🕋 ${studentsLabels.studyCircleShort}`,
+            //align: 'center',
             render: (item: any) => (
-              <div className="flex items-center justify-center gap-1">
-                <BookOpen className="h-4 w-4 text-islamic-green/60" />
+              <div className="flex gap-1">
+                🕋
                 <span className="text-xs">{item.study_circle?.name || '-'}</span>
               </div>
             )
@@ -1375,25 +1373,25 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
           {
             key: 'grade',
             header: `🏷️ ${studentsLabels.gradeShort}`,
-            align: 'center',
+            //align: 'center',
             render: (item: any) => (
-              <span className="text-xs">{studentsLabels.gradeOptions.find(g => g.value === (item.grade_level || item.grade))?.label || (item.grade_level || item.grade || '-')}</span>
+              <span className="text-xs">{'🏷️ ' + studentsLabels.gradeOptions.find(g => g.value === (item.grade_level || item.grade))?.label || (item.grade_level || item.grade || '-')}</span>
             )
           },
           {
             key: 'memorized_parts',
             header: `📖 ${studentsLabels.memorizeLevelHeader}`,
-            align: 'center',
+            //align: 'center',
             render: (item: any) => (
-              <span className="text-xs">{studentsLabels.quranPartsOptions.find(p => p.value === item.memorized_parts)?.label || item.memorized_parts || '-'}</span>
+              <span className="text-xs">{'📖 ' + studentsLabels.quranPartsOptions.find(p => p.value === item.memorized_parts)?.label || item.memorized_parts || '-'}</span>
             )
           },
           {
             key: 'gender',
-            header: `⚧ ${studentsLabels.gender || 'الجنس'}`,
+            header: `👫 ${studentsLabels.gender || 'الجنس'}`,
             align: 'center',
             render: (item: any) => (
-              <span className="text-xs">{item.gender === 'male' ? studentsLabels.genderMale : item.gender === 'female' ? studentsLabels.genderFemale : '-'}</span>
+              <span className="text-xs">{item.gender === 'male' ? '👦 ' + studentsLabels.genderMale : item.gender === 'female' ?  '👧 ' + studentsLabels.genderFemale : '-'}</span>
             )
           },
           {
@@ -1498,7 +1496,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
       {/* حوار اختيار ولي الأمر */}
       <FormDialog
-        title={' أولياء الأمور'}
+        title={'اختيار أولياء الأمور'}
         open={isGuardianPickerOpen}
         onOpenChange={setIsGuardianPickerOpen}
         onSave={() => setIsGuardianPickerOpen(false)}
@@ -1553,8 +1551,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
-                      <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                      أولياء الأمور
+                      🤵 أولياء الأمور
                     </span>
                   </div>
                 </div>
@@ -1564,12 +1561,10 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             enablePagination
             defaultPageSize={5}
             pageSizeOptions={[5, 10, 20, 50]}
-            cardMaxFieldsCollapsed={3}
-            enableCardExpand={true}
-
+            cardPageSize={5}
             data={filteredGuardiansForPicker}
             getRowClassName={(item: any, index) => `${getSelectableRowClass((selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')), index)} cursor-pointer`}
-            hideSortToggle
+            hideSortToggle={false}
             className={`${TABLE_BASE_CLASS} text-[10px] sm:text-[11px]`}
             columns={([
               {

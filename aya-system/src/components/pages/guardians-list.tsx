@@ -1,8 +1,6 @@
 import { AlertCircle, Database, FileDown, Mail, Pencil, Phone, RefreshCw, Trash2, UserCircle, UserPlus, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA, Plus } from 'lucide-react';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 // Removed manual pagination components (now using GenericTable internal pagination)
 import { Search, MapPin, GraduationCap } from 'lucide-react';
@@ -12,7 +10,6 @@ import { getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { addStudent } from "@/lib/supabase-service";
 import { getteachers } from "@/lib/profile-service";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"; // legacy usages elsewhere
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Guardian, GuardianCreate, GuardianUpdate } from "@/types/guardian";
@@ -20,7 +17,6 @@ import { StudentCreate } from "@/types/student";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 // Unified labels system
 import { getLabels } from '@/lib/labels';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile } from "@/types/profile";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from '@/lib/supabase-client';
@@ -951,26 +947,6 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 <Filter className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">فلتر</span>
               </Button>
-              {/* زر الترتيب */}
-              <Button
-                type="button"
-                variant={listSortDirection ? 'default' : 'outline'}
-                onClick={toggleListSort}
-                title={listSortDirection === null ? 'ترتيب تصاعدي حسب الاسم' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
-                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200
-                  ${listSortDirection === null
-                    ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600'
-                    : listSortDirection === 'asc'
-                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
-              >
-                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
-                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
-                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">
-                  {listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
-                </span>
-              </Button>
               {/* زر التحديث */}
               <Button
                 variant="outline"
@@ -1001,7 +977,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                   className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                   title={guardiansLabels.addGuardian}
                 >
-                  <span className="text-lg">👤</span>
+                  <span className="text-lg">🤵</span>
                   <span className="hidden sm:inline"> {guardiansLabels.addGuardian}</span>
                 </Button>
               )}
@@ -1012,7 +988,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 title={guardiansLabels.addStudent}
               >
                 {/* الأيقونة */}
-                <span className="text-lg">🧒</span>
+                <span className="text-lg">🧑‍🎓</span>
                 {/* النص يظهر فقط في الديسكتوب */}
                 <span className="hidden sm:inline">{guardiansLabels.addStudent}</span>
               </Button>
@@ -1046,25 +1022,24 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           },
           {
             key: 'full_name',
-            header: `👤 ${guardiansLabels.fullName}`,
+            header: `🤵 ${guardiansLabels.fullName}`,
             align: 'right' as const,
             important: true,
             render: (item) => (
               <span className="font-medium whitespace-pre-line leading-snug">
-                {item.full_name}
+                🤵 {item.full_name}
               </span>
             )
           },
 
           {
             key: 'phone_number',
-            header: `📞 ${guardiansLabels.phoneNumber}`,
+            header: `📲 ${guardiansLabels.phoneNumber}`,
             align: 'center' as const,
             render: (guardian) =>
               guardian.phone_number ? (
                 <div className="flex items-center justify-center gap-1">
-                  <Phone className="h-4 w-4 text-islamic-green/60" />
-                  <span dir="ltr" className="text-islamic-green/80">{guardian.phone_number}</span>
+                  <span dir="ltr" className="text-islamic-green/80">{'📲'} {guardian.phone_number}</span>
                 </div>
               ) : (
                 <span className="text-muted-foreground">—</span>
@@ -1077,9 +1052,9 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             render: (guardian) =>
               guardian.email ? (
                 <div className="flex items-center justify-end gap-1">
-                  <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-islamic-green/60" />
+
                   <span dir="ltr" className="text-islamic-green/80 text-xs truncate block">
-                    {guardian.email}
+                    {'📧'} {guardian.email}
                   </span>
                 </div>
               ) : (
@@ -1090,7 +1065,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
           },
           {
             key: 'students_count',
-            header: `👶 ${guardiansLabels.studentCount}`,
+            header: `👥 ${guardiansLabels.studentCount}`,
             align: 'center' as const,
             render: (guardian) => (
               <div className="w-full flex items-center justify-center">
@@ -1193,6 +1168,17 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
             ),
           },
         ]}
+        title={(
+          <div className="w-full flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                 🤵 أولياء الأمور 
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
         emptyMessage={searchTerm ? guardiansLabels.noSearchResults : guardiansLabels.noGuardians}
         onRefresh={loadGuardians}
         onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddGuardian : undefined}
@@ -1201,9 +1187,10 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
         pageSizeOptions={[8, 16, 48, 100]}
         cardMaxFieldsCollapsed={4}
         enableCardExpand={isMobile}
+        cardPageSize={4}
         className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
         getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
-        hideSortToggle={true}
+        hideSortToggle={false}
       />
       {/* حوار إضافة ولي أمر */}
       <FormDialog
@@ -1370,7 +1357,7 @@ export function Guardians({ onNavigate, userRole, userId }: GuardiansProps) {
                 },
                 {
                   key: 'full_name',
-                  header: `👤 ${studentsLabels.name}`,
+                  header: `🧑‍🎓 ${studentsLabels.name}`,
                   align: 'center' as const,
                   important: true,
                   render: (student) => (

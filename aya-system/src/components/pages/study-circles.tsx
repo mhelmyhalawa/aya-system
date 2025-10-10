@@ -32,6 +32,7 @@ import {
   BookUser
 } from "lucide-react";
 import { StudyCircle, StudyCircleCreate, StudyCircleUpdate } from "@/types/study-circle";
+import type { Student } from '@/types/student';
 import { Profile } from "@/types/profile";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,6 +47,8 @@ import { getLabels } from "@/lib/labels";
 const { studyCirclesLabels, errorMessages, commonLabels } = getLabels('ar');
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
+import { getAllStudents } from '@/lib/supabase-service';
+import { getStudentsCountInCircles } from '@/lib/student-count-service';
 import { StudyCircleSchedule, weekdayOptions, formatTime } from "@/types/study-circle-schedule";
 import { GenericTable, Column } from "../ui/generic-table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -68,6 +71,8 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   const [activeTab, setActiveTab] = useState<'all-records' | 'my-records'>(userRole === 'teacher' ? 'my-records' : 'all-records');
   const [teachers, setTeachers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+  // خريطة أعداد الطلاب لكل حلقة
+  const [studentsCountMap, setStudentsCountMap] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState("");
   // اظهار/اخفاء صندوق البحث
   const [showFilters, setShowFilters] = useState<boolean>(false);
@@ -103,6 +108,11 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
   const [editScheduleForm, setEditScheduleForm] = useState({ weekday: "0", start_time: "", end_time: "", location: "" });
   const [savingNewSchedule, setSavingNewSchedule] = useState(false);
   const [savingScheduleEdit, setSavingScheduleEdit] = useState(false);
+  // حالة عرض قائمة طلاب الحلقة المختارة
+  const [openStudentsDialog, setOpenStudentsDialog] = useState(false);
+  const [selectedCircleForStudents, setSelectedCircleForStudents] = useState<StudyCircle | null>(null);
+  const [studentsInCircle, setStudentsInCircle] = useState<Student[]>([]);
+  const [loadingStudentsInCircle, setLoadingStudentsInCircle] = useState(false);
 
   // حالة النموذج
   const [circleId, setCircleId] = useState<string>("");
@@ -127,6 +137,13 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
       // نجلب دائمًا كل الحلقات (لإمكانية عرض تب "كل الحلقات")
       const allData = await getAllStudyCircles();
       setCircles(allData);
+      // جلب أعداد الطلاب لكل حلقة
+      try {
+        const counts = await getStudentsCountInCircles(allData.map(c => c.id));
+        setStudentsCountMap(counts);
+      } catch (e) {
+        console.warn('تعذر جلب أعداد الطلاب للحلقات');
+      }
 
       // إذا كان الدور معلم نجلب حلقاته الخاصة
       if (userRole === 'teacher' && userId) {
@@ -253,6 +270,27 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     setSelectedCircleForSchedule(circle);
     setOpenScheduleDialog(true);
     loadCircleSchedules(circle.id);
+  };
+
+  // فتح حوار طلاب الحلقة
+  const handleOpenStudentsDialog = async (circle: StudyCircle) => {
+    setSelectedCircleForStudents(circle);
+    setOpenStudentsDialog(true);
+    await loadStudentsForCircle(circle.id);
+  };
+
+  const loadStudentsForCircle = async (circleId: string) => {
+    setLoadingStudentsInCircle(true);
+    try {
+      const all = await getAllStudents();
+      const filtered = all.filter(s => (s.study_circle_id === circleId) || (s.study_circle && s.study_circle.id === circleId));
+      setStudentsInCircle(filtered);
+    } catch (e) {
+      console.error('خطأ في جلب طلاب الحلقة', e);
+      setStudentsInCircle([]);
+    } finally {
+      setLoadingStudentsInCircle(false);
+    }
   };
 
   // إغلاق ديالوج الجدولة
@@ -548,6 +586,28 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
     }
   };
 
+  // دالة مساعدة لتنسيق قيمة الصف (دعم kg1 / kg2 والأرقام)
+  const formatGrade = (raw?: string | null): string => {
+    if (!raw) return '-';
+    const v = raw.trim().toLowerCase();
+    // أنماط الروضة
+    if (v === 'kg1' || v === 'kg 1' || v === 'kg-1' || v === 'kg') return 'روضة 1';
+    if (v === 'kg2' || v === 'kg 2' || v === 'kg-2') return 'روضة 2';
+    // أرقام عربية/إنجليزية (1-12 مثلاً)
+    const numMatch = v.match(/^(\d{1,2})$/);
+    if (numMatch) {
+      const n = parseInt(numMatch[1], 10);
+      // خريطة مبسطة للألقاب (يمكن توسيعها لاحقًا)
+      const map: Record<number, string> = {
+        1: 'الأول', 2: 'الثاني', 3: 'الثالث', 4: 'الرابع', 5: 'الخامس', 6: 'السادس',
+        7: 'السابع', 8: 'الثامن', 9: 'التاسع', 10: 'العاشر', 11: 'الحادي عشر', 12: 'الثاني عشر'
+      };
+      return map[n] ? `الصف ${map[n]}` : `الصف ${n}`;
+    }
+    // إبقاء القيمة كما هي إذا لم تُعرف
+    return raw;
+  };
+
   // التحقق من الصلاحيات
   if (userRole !== 'superadmin' && userRole !== 'admin' && userRole !== 'teacher') {
     return (
@@ -821,12 +881,11 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           },
           {
             key: 'name',
-            header: `𑁍 ${studyCirclesLabels.name}`,
+            header: `🕋 ${studyCirclesLabels.name}`,
             important: true,
             render: (c) => (
               <div className="flex items-center gap-2">
-                <BookUser className="h-4 w-4 text-green-700 dark:text-green-300" />
-                <span>{c.name}</span>
+                🕋<span>{c.name}</span>
               </div>
             )
           },
@@ -835,22 +894,37 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
             header: `👨‍🏫 ${studyCirclesLabels.teacher}`,
             render: (c) => (
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-green-700 dark:text-green-300" />
-                <span>{c.teacher?.full_name || studyCirclesLabels.unassignedTeacher}</span>
+                👨‍🏫<span>{c.teacher?.full_name || studyCirclesLabels.unassignedTeacher}</span>
               </div>
             )
           },
           {
             key: 'max_students',
-            header: `👥 ${studyCirclesLabels.maxStudents}`,
+            header: `👥 الطلاب (الحالي/الحد)`,
             align: 'center',
-            render: (c) => c.max_students ? (
-              <div className="flex gap-1 justify-center">
-                <Users className="h-4 w-4 text-green-700 dark:text-green-300" />
-                <span>{c.max_students}</span>
-                طالب
-              </div>
-            ) : <span className="text-green-500/60">-</span>
+            render: (c) => {
+              const current = studentsCountMap[c.id] ?? 0;
+              const max = c.max_students;
+              const overLimit = max !== undefined && max !== null && current > max;
+              const atLimit = max !== undefined && max !== null && current === max;
+              // استخدام inline-flex بدلاً من flex للسماح لمحاذاة text-center في الخلية بتوسيط العنصر كله
+              const baseClasses = "inline-flex items-center gap-1 justify-center px-2 py-1 rounded-full text-[11px] font-semibold border shadow-sm transition-colors";
+              const colorClasses = overLimit
+                ? "border-red-500 bg-red-100 hover:bg-red-200 text-red-700"
+                : atLimit
+                  ? "border-yellow-500 bg-yellow-100 hover:bg-yellow-200 text-yellow-700"
+                  : "border-green-400 bg-green-50 hover:bg-green-100 text-green-700";
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); handleOpenStudentsDialog(c); }}
+                  className={`${baseClasses} ${colorClasses} justify-center`}
+                  title="عرض طلاب الحلقة"
+                >
+                  👥 <span className="tabular-nums">{current}{max ? ` / ${max}` : ''}</span>
+                </button>
+              );
+            }
           },
           ...((userRole === 'superadmin' || userRole === 'admin') ? [{
             key: 'actions',
@@ -894,14 +968,17 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
           <GenericTable
             data={displayedCircles}
             columns={columns}
-            title={
-              <div className="flex items-center gap-2 w-full">
-                <BookOpen className="h-4 w-4 md:h-5 md:w-5 text-green-600 drop-shadow-sm" />
-                <span className="font-extrabold text-green-600 text-sm md:text-base tracking-wide truncate">
-                  {studyCirclesLabels.title}
-                </span>
+            title={(
+              <div className="w-full flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                      🕋 {studyCirclesLabels.title}
+                    </span>
+                  </div>
+                </div>
               </div>
-            }
+            )}
             emptyMessage={searchTerm ? studyCirclesLabels.searchNoResults : (activeTab === 'my-records' ? 'لا توجد حلقات خاصة بك' : studyCirclesLabels.noCircles)}
             onAddNew={(userRole === 'superadmin' || userRole === 'admin') ? handleAddCircle : undefined}
             onRefresh={loadCircles}
@@ -1306,6 +1383,73 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
         deleteButtonText={studyCirclesLabels.schedule.deleteDialog.deleteButton}
         cancelButtonText={studyCirclesLabels.schedule.deleteDialog.cancelButton}
       />
+
+      {/* حوار عرض طلاب الحلقة باستخدام FormDialog */}
+      <FormDialog
+        title={`👥 طلاب حلقة: ${selectedCircleForStudents?.name || ''}`}
+        open={openStudentsDialog}
+        onOpenChange={setOpenStudentsDialog}
+        onSave={() => { /* لا يوجد حفظ */ }}
+        showSaveButton={false}
+        hideCancelButton={true}
+        maxWidth="850px"
+        fullBleedBody
+        transparentBody
+        lightOverlay
+        mode="edit"
+      >
+        <div className="p-2 sm:p-3">
+          {loadingStudentsInCircle ? (
+            <div className="flex flex-col items-center justify-center py-10">
+              <div className="animate-spin rounded-full h-9 w-9 border-b-2 border-green-600 mb-4"></div>
+              <span className="text-xs sm:text-sm text-green-700">جاري تحميل الطلاب...</span>
+            </div>
+          ) : studentsInCircle.length === 0 ? (
+            <div className="text-center py-12 border border-dashed border-green-300 rounded-xl bg-white/70">
+              <p className="text-sm font-medium text-green-700">لا يوجد طلاب في هذه الحلقة حاليا</p>
+            </div>
+          ) : (
+            <GenericTable
+              title={(
+                <div className="w-full flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                        🕋 {selectedCircleForStudents?.name}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              data={studentsInCircle.map((s, idx) => ({ ...s, id: s.id || String(idx) }))}
+              columns={[
+                { key: 'row_index', header: '🔢', align: 'center', render: (_s: any, i) => <span className="font-semibold text-green-700">{(i ?? 0) + 1}</span> },
+                { key: 'full_name', header: '🧑‍🎓 الاسم', important: true, render: (s: Student) => <span className="font-medium">{s.full_name}</span> },
+                { key: 'guardian', header: '👪 ولي الأمر', render: (s: Student) => <span>{s.guardian?.full_name || '-'}</span> },
+                {
+                  key: 'grade_level',
+                  header: '🎓 الصف',
+                  align: 'center',
+                  // بعض السجلات قد تحتوي الحقل grade فقط (تمت إضافته في المابر للتوافق) لذا نستخدمه كخطة بديلة
+                  render: (s: Student & { grade?: string }) => {
+                    const raw = s.grade_level || s.grade;
+                    const formatted = formatGrade(raw);
+                    return raw ? <span title={raw}>{formatted}</span> : <span className="text-green-500/50">-</span>;
+                  }
+                },
+                { key: 'phone_number', header: '📲 الجوال', align: 'center', render: (s: Student) => s.phone_number ? <span className="tracking-wide">{s.phone_number}</span> : <span className="text-green-500/50">-</span> },
+              ]}
+              defaultView="table"
+              enablePagination
+              defaultPageSize={10}
+              pageSizeOptions={[5, 10, 20, 50]}
+              hideSortToggle={false}
+              cardPageSize={6}
+              className="rounded-lg border border-green-300 shadow bg-white"
+            />
+          )}
+        </div>
+      </FormDialog>
 
     </div>
   );

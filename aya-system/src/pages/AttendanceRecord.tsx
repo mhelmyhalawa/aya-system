@@ -956,12 +956,13 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
       {/* Unified responsive summary + date bar */}
 
 
-      {selectedSession && (
+      {selectedSession && attendanceTableData.length > 0 && (
         <div
-          className="flex flex-col md:flex-row gap-2 md:gap-3 mb-3 w-full pt-2"
+          className="flex flex-col md:flex-row gap-1 md:gap-2 mb-3 w-full pt-1.5 px-1 sm:px-0 justify-center md:justify-between items-center"
         >
           <div
-            className="flex flex-wrap items-center justify-center md:justify-start bg-white dark:bg-gray-900 border border-emerald-200 dark:border-green-700 rounded-md p-1.5 md:p-2 gap-1 md:gap-1.5 text-[10px] md:text-[11.5px] font-medium"
+            className="flex flex-wrap items-center justify-center md:justify-start bg-white dark:bg-gray-900 border border-emerald-200 
+            dark:border-green-700 rounded-md p-1.5 md:p-2 gap-1 md:gap-1.5 text-[10px] md:text-[11.5px] font-medium"
           >
             <span className="inline-flex items-center text-emerald-700 bg-white/60 px-2 py-0.5  gap-1">
               <Calendar className="h-5 w-5 text-emerald-1500" />
@@ -1061,7 +1062,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
       {/* جدول الحضور لسطح المكتب */}
       {selectedCircle && selectedSession && (
-        <div >
+        <div>
           {loadingStudents ? (
             <div className="text-center py-10 bg-white border rounded-xl shadow-sm">
               <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-3 text-green-600" />
