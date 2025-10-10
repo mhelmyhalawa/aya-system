@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GenericTable, Column } from "../ui/generic-table";
 import { Input } from "@/components/ui/input";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink } from "@/components/ui/pagination";
+import { PaginationItem, PaginationLink } from "@/components/ui/pagination";
 import { UserRole } from "@/types/profile";
 import { StudyCircle } from "@/types/study-circle";
 import { useState, useEffect, useMemo } from "react";
@@ -34,7 +34,6 @@ import { Guardian, GuardianCreate } from "@/types/guardian";
 import { Profile } from "@/types/profile";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeleteConfirmationDialog } from "../ui/delete-confirmation-dialog";
 import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getAllGuardians, addGuardian } from "@/lib/guardian-service";
@@ -43,6 +42,8 @@ import { createStudent, updateStudent as updateStudentWithHistory } from "@/lib/
 import { searchStudents as searchStudentsApi, getAllStudents as getAllStudentsApi, deleteStudent } from "@/lib/supabase-service";
 import { exportStudentsToJson } from "@/lib/database-service";
 import { getteacherHistoryForStudent } from "@/lib/teacher-history-service";
+// مكون شريط فلترة المعلم والحلقة الموحد
+import { TeacherCircleFilterBar, type BasicEntity } from '@/components/filters/TeacherCircleFilterBar';
 
 interface StudentsListProps { onNavigate: (path: string) => void; userRole?: UserRole; userId?: string | null; }
 
@@ -70,7 +71,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   const [guardianPickerSearch, setGuardianPickerSearch] = useState("");
   const [selectedGuardianIds, setSelectedGuardianIds] = useState<string[]>([]);
   const [teachers, setteachers] = useState<Profile[]>([]);
-  const [teacherSearchTerm, setteacherSearchTerm] = useState("");
+  // دمج البحث الخاص بالمعلم مع البحث العام (searchTerm)
 
   // حالة الحلقات الدراسية
   const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
@@ -82,6 +83,26 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   const [formTeacherId, setFormTeacherId] = useState<string>("");
   const [formStudyCircleId, setFormStudyCircleId] = useState<string>("");
   const [isLoadingStudyCircles, setIsLoadingStudyCircles] = useState<boolean>(false);
+
+  // تحويل بيانات المعلمين إلى BasicEntity لاستخدامها في TeacherCircleFilterBar
+  const teacherEntities: BasicEntity[] = useMemo(() => {
+    // احسب عدد الحلقات لكل معلم ثم احتفظ فقط بمن لديه حلقات
+    return teachers.map(t => ({
+      id: t.id,
+      name: t.full_name,
+      circles_count: studyCircles.filter(sc => sc.teacher?.id === t.id).length
+    })).filter(t => (t.circles_count || 0) > 0);
+  }, [teachers, studyCircles]);
+
+  // تحويل بيانات الحلقات إلى BasicEntity (تعتمد على المعلم المحدد إن وجد)
+  const circleSource = selectedTeacherId ? teacherStudyCircles : studyCircles;
+  const circleEntities: BasicEntity[] = useMemo(() => {
+    return circleSource.map(c => ({
+      id: c.id,
+      name: c.name || '-',
+      teacher_id: c.teacher?.id
+    }));
+  }, [circleSource]);
 
   // تنفيذ استرجاع البيانات عند تحميل المكون
   useEffect(() => {
@@ -507,8 +528,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         }
       }
 
-  // ملاحظة: لم نعد نصفر حقل البحث هنا حتى لا نفقد كلمات البحث عند التحديث
-  console.log('إجمالي الطلاب الذين تم تحميلهم:', studentsList.length);
+      // ملاحظة: لم نعد نصفر حقل البحث هنا حتى لا نفقد كلمات البحث عند التحديث
+      console.log('إجمالي الطلاب الذين تم تحميلهم:', studentsList.length);
 
       if (studentsList.length > 0) {
         console.log('نموذج للطالب الأول:', {
@@ -761,7 +782,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
     setListSortDirection(prev => prev === null ? 'asc' : prev === 'asc' ? 'desc' : null);
   };
   // لم نعد نستخدم حقول البحث النصي المباشرة للمعلم والحلقة، سيتم استبدالها بقوائم اختيار مع ترقيم صفحات
-  // سنعيد استعمال teacherSearchTerm كسيرش داخلي في حوار اختيار المعلم فقط، ونضيف حقل جديد للحلقة
+  // تم دمج البحث الخاص بالمعلم داخل searchTerm العام
   const [circlePickerSearch, setCirclePickerSearch] = useState("");
   // حوارات اختيار المعلم والحلقة
   const [isTeacherPickerOpen, setIsTeacherPickerOpen] = useState(false);
@@ -887,9 +908,9 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
       // فلتر ولي الأمر المحدد (إن وُجد)
       // بيانات ولي الأمر في الطالب لا تحتوي id ضمن النوع الحالي؛ نستخدم phone_number كبديل (مع افتراض uniqueness)
-  // بعض السجلات قد لا تحتوي على id لولي الأمر (اعتماداً على select المستخدم في الاستعلام) لذا نستخدم phone_number كمعرف بديل
-  const guardianKey = (student as any).guardian?.id || student.guardian?.phone_number;
-  const matchesGuardian = selectedGuardianIds.length === 0 || (guardianKey && selectedGuardianIds.includes(guardianKey));
+      // بعض السجلات قد لا تحتوي على id لولي الأمر (اعتماداً على select المستخدم في الاستعلام) لذا نستخدم phone_number كمعرف بديل
+      const guardianKey = (student as any).guardian?.id || student.guardian?.phone_number;
+      const matchesGuardian = selectedGuardianIds.length === 0 || (guardianKey && selectedGuardianIds.includes(guardianKey));
 
       return matchesSearch && matchesGrade && matchesStudyCircle && matchesTeacher && matchesGuardian;
     });
@@ -933,8 +954,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
   // فلترة قوائم الاختيار (المعلم / الحلقة)
   const filteredTeachersForPicker = useMemo(() => {
-    return teachers.filter(t => !teacherSearchTerm || t.full_name.toLowerCase().includes(teacherSearchTerm.toLowerCase()));
-  }, [teachers, teacherSearchTerm]);
+    return teachers.filter(t => !searchTerm || t.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [teachers, searchTerm]);
   const filteredCirclesForPicker = useMemo(() => {
     return allCirclesForSelection.filter(c => !circlePickerSearch || (c.name || '').toLowerCase().includes(circlePickerSearch.toLowerCase()));
   }, [allCirclesForSelection, circlePickerSearch]);
@@ -1080,6 +1101,25 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
     );
   }
 
+  // توحيد تنسيق الجداول: تعريف ثوابت وأدوات مساعدة خارج JSX
+  const TABLE_BASE_CLASS = "rounded-xl border border-green-300 shadow-md";
+  const TABLE_TEXT_BASE = "text-xs"; // يمكن تخصيصه لاحقاً حسب السياق
+  const getZebraRowClass = (index: number) => `${index % 2 === 0 ? 'bg-green-50' : 'bg-white'} hover:bg-green-100 transition-colors`;
+  const getSelectableRowClass = (isSelected: boolean, index: number) => isSelected
+    ? 'bg-green-100/70 hover:bg-green-100 transition-colors'
+    : getZebraRowClass(index);
+  const getHistoryRowClass = (index: number) => getZebraRowClass(index);
+
+  // ==== تنسيق موحد لشريط الفلترة العلوي (حقول المعلم / الحلقة / ولي الأمر / البحث) ====
+  const filterFieldBase = 'h-10 w-full rounded-lg border px-3 pr-9 text-sm flex items-center gap-2 bg-white dark:bg-green-950 transition-colors focus:outline-none focus:ring-2 focus:ring-green-400/40 focus:border-green-500';
+  const filterFieldPlaceholder = 'text-gray-500';
+  const filterFieldSelected = 'border-green-400 bg-green-50 text-green-700 font-medium';
+  const filterFieldUnselected = 'border-gray-300 dark:border-green-700';
+  const guardianButtonBase = 'group relative w-full px-3 rounded-lg border flex items-center justify-between overflow-hidden transition-colors focus:outline-none focus:ring-2 focus:ring-green-400/40';
+  const guardianButtonSelected = 'border-green-400 bg-green-50';
+  const guardianButtonUnselected = 'border-gray-300 dark:border-green-700 bg-white dark:bg-green-950';
+  const searchInputClass = `${filterFieldBase} ${filterFieldUnselected}`;
+
   return (
     <div className="w-full max-w-[1600px] mx-auto">
       <Card className="pt-2 pb-0 px-0 sm:px-0 shadow-lg border-0">
@@ -1133,18 +1173,6 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 <span className="hidden sm:inline">فلتر</span>
               </Button>
               <Button
-                type="button"
-                variant={listSortDirection ? 'default' : 'outline'}
-                onClick={toggleListSort}
-                title={listSortDirection === null ? 'ترتيب تصاعدي حسب الاسم' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
-                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200 ${listSortDirection === null ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600' : listSortDirection === 'asc' ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500' : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
-              >
-                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
-                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
-                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</span>
-              </Button>
-              <Button
                 variant="outline"
                 className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                 onClick={handleRefreshClick}
@@ -1188,35 +1216,48 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             </div>
           </div>
           {showFilters && (
-            <div className="mt-2 mb-2 w-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3 flex flex-col md:flex-row gap-3">
-              {/* بحث الطالب */}
-              <div className="relative flex-1 min-w-[180px]">
-                <Search className="absolute right-3 top-3 h-4 w-4 text-green-500" />
-                <Input
-                  placeholder={studentsLabels.searchPlaceholder}
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-3 pr-10 w-full bg-white dark:bg-green-950"
-                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            <div className="mt-2 mb-2 w-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3 grid grid-cols-1 md:grid-cols-12 gap-3" dir="rtl">
+              {/* 1. المعلّم + الحلقة (أولاً للتسلسل المنطقي) */}
+              <div className="col-span-1 md:col-span-6 order-1 mb-2 md:mb-0">
+                <TeacherCircleFilterBar
+                  teachers={(teacherEntities as any[]).map(t => ({ id: t.id, name: (t.full_name || t.name || '') }))}
+                  circles={(circleEntities as any[]).map(c => ({ id: c.id, name: (c.name || ''), teacher_id: (c.teacher_id || (c.teacher?.id) || '') }))}
+                  selectedTeacherId={selectedTeacherId || null}
+                  selectedCircleId={studyCircleId || null}
+                  searchQuery={searchTerm}
+                  onSearchChange={(val) => setSearchTerm(val)}
+                  useInlineSelects
+                  useShadSelect
+                  hideFieldLabels={true}
+                  mobileStackedLayout={true}
+                  teacherLabel="اختر معلماً"
+                  circleLabel="اختر حلقة"
+                  onTeacherChange={(id) => {
+                    handleTeacherChange(id || '');
+                    setTimeout(() => handleSearch(), 120);
+                  }}
+                  onCircleChange={(id) => {
+                    setStudyCircleId(id || '');
+                    setTimeout(() => handleSearch(), 100);
+                  }}
+                  disabled={isTeacherCirclesLoading || isLoadingStudyCircles}
                 />
               </div>
-              {/* اختيار ولي الأمر (قائمة مع ترقيم صفحات) */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
+              {/* 2. ولي الأمر */}
+              <div className="col-span-1 md:col-span-3 order-2 flex items-center mb-2 md:mb-0">
                 <button
                   type="button"
                   aria-haspopup="dialog"
                   onClick={() => setIsGuardianPickerOpen(true)}
-                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden
-                    ${selectedGuardianIds.length ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                    hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
+                  className={`h-10 w-full ${guardianButtonBase} ${selectedGuardianIds.length ? guardianButtonSelected : guardianButtonUnselected}`}
                   title={guardiansLabels.guardian}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                      <UserCircle className="h-4 w-4" />
+                    <div className="h-6 w-6 shrink-0 rounded-md bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
+                      <UserCircle className="h-3.5 w-3.5" />
                     </div>
-                    <span className={`truncate text-sm ${selectedGuardianIds.length ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                      {selectedGuardianIds.length === 0 && (guardiansLabels.guardian || 'اختر أولياء')}
+                    <span className={`truncate text-sm ${selectedGuardianIds.length ? 'text-green-700 font-medium' : filterFieldPlaceholder}`}>
+                      {selectedGuardianIds.length === 0 && (guardiansLabels.guardian || 'اختر ولياً')}
                       {selectedGuardianIds.length === 1 && selectedGuardians[0]?.full_name}
                       {selectedGuardianIds.length > 1 && `${selectedGuardianIds.length} أولياء محددون`}
                     </span>
@@ -1232,119 +1273,20 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                     )}
                     <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isGuardianPickerOpen ? 'rotate-180' : ''}`} />
                   </div>
-                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
                 </button>
               </div>
-              {/* اختيار المعلم */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
-                {userRole === 'teacher' ? (
-                  <div
-                    className={`relative w-full h-10 px-3 rounded-xl border flex items-center gap-2 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900 border-green-400`}
-                    title={studentsLabels.teacherColumn}
-                  >
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                      <GraduationCap className="h-4 w-4" />
-                    </div>
-                    <span className="truncate text-sm text-green-700 font-medium">
-                      {selectedTeacher?.full_name || 'المعلم'}
-                    </span>
-                    <div className="ml-auto flex items-center gap-1">
-                      <span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span>
-                      <span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">{teacherStudyCircles.length}</span>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    aria-haspopup="dialog"
-                    onClick={() => setIsTeacherPickerOpen(true)}
-                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden
-                      ${selectedTeacher ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                      hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                    title={studentsLabels.teacherColumn}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                        <GraduationCap className="h-4 w-4" />
-                      </div>
-                      <span className={`truncate text-sm ${selectedTeacher ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                        {selectedTeacher ? selectedTeacher.full_name : (studentsLabels.teacherPlaceholder || 'اختر معلماً')}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 pl-1">
-                      {selectedTeacher && (
-                        <span
-                          onClick={(e) => { e.stopPropagation(); setSelectedTeacherId(''); setStudyCircleId(''); }}
-                          className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                        >
-                          إزالة
-                        </span>
-                      )}
-                      <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isTeacherPickerOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                  </button>
-                )}
-              </div>
-              {/* اختيار الحلقة */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1">
-                {userRole === 'teacher' && teacherStudyCircles.length === 1 ? (
-                  <div className="relative w-full h-10 px-3 rounded-xl border border-green-300 dark:border-green-700 bg-white dark:bg-green-950 flex items-center gap-2">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                      <BookOpen className="h-4 w-4" />
-                    </div>
-                    <span className="truncate text-sm text-green-700 font-medium">{teacherStudyCircles[0]?.name || 'حلقة'}</span>
-                    <div className="ml-auto flex items-center gap-1">
-                      <span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span>
-                      <span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">1</span>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    aria-haspopup="dialog"
-                    disabled={userRole === 'teacher' && isTeacherCirclesLoading}
-                    onClick={() => {
-                      if ((allCirclesForSelection?.length || 0) === 0) {
-                        toast({ title: 'لا توجد حلقات متاحة', description: 'لا يمكنك فتح الاختيار حالياً لأنه لا توجد حلقات مرتبطة', variant: 'destructive' });
-                        return;
-                      }
-                      setIsCirclePickerOpen(true);
-                    }}
-                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
-                      ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                      hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                    title={studentsLabels.studyCircleShort}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                        <BookOpen className="h-4 w-4" />
-                      </div>
-                      {isTeacherCirclesLoading ? (
-                        <div className="flex items-center gap-2 w-full">
-                          <div className="h-3 w-20 rounded-full bg-gradient-to-r from-green-200/40 via-green-300/60 to-green-200/40 animate-pulse" />
-                          <div className="h-3 w-10 rounded-full bg-gradient-to-r from-green-200/40 via-green-300/60 to-green-200/40 animate-pulse" />
-                        </div>
-                      ) : (
-                        <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                          {selectedCircle ? selectedCircle.name : (studentsLabels.studyCirclePlaceholder || 'اختر حلقة')}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 pl-1">
-                      {selectedCircle && !isTeacherCirclesLoading && (
-                        <span
-                          onClick={(e) => { e.stopPropagation(); setStudyCircleId(''); }}
-                          className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                        >
-                          إزالة
-                        </span>
-                      )}
-                      <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isCirclePickerOpen ? 'rotate-180' : ''}`} />
-                    </div>
-                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                  </button>
-                )}
+              {/* 3. البحث */}
+              <div className="col-span-1 md:col-span-3 order-3 flex items-center">
+                <div className="relative flex items-center w-full">
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-400" />
+                  <Input
+                    placeholder={studentsLabels.searchPlaceholder}
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`h-[42px] ${filterFieldBase} ${filterFieldUnselected} pr-10 text-[11px] sm:text-xs`}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -1355,20 +1297,24 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
       {/* جدول الطلاب بنمط محسّن مع ترقيم داخلي */}
       <GenericTable
-       title={
-                <div className="flex w-full items-center gap-2 min-w-0 justify-start" dir="rtl">
-                  <UserCircle className="h-4 w-4 text-yellow-300 shrink-0 drop-shadow" />
-                  <span className="text-white font-semibold text-[13px] sm:text-sm tracking-tight whitespace-nowrap">
-                    بيانات الطلاب
-                  </span>
-                  <span
-                    aria-label={`عدد الطلاب: ${filteredStudents.length}`}
-                    className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-gradient-to-br from-yellow-300 via-amber-300 to-yellow-400 text-green-900 text-[11px] sm:text-[12px] font-extrabold shadow-sm ring-1 ring-yellow-200/60 tracking-wide"
-                  >
-                    {filteredStudents.length.toLocaleString('ar-EG')}
-                  </span>
-                </div>
-              }        
+        title={
+          <div className="w-full flex flex-col gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                  بيانات الطلاب :
+                  <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                </span>
+                <span
+                  aria-label={`عدد الطلاب: ${filteredStudents.length}`}
+                  className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-gradient-to-br from-yellow-300 via-amber-300 to-yellow-400 text-green-900 text-[11px] sm:text-[12px] font-extrabold shadow-sm ring-1 ring-yellow-200/60 tracking-wide"
+                >
+                  {filteredStudents.length} طالب/طالبة
+                </span>
+              </div>
+            </div>
+          </div>
+        }
         data={(listSortDirection ? [...filteredStudents].sort((a, b) => {
           if (listSortDirection === 'asc') return a.full_name.localeCompare(b.full_name, 'ar');
           if (listSortDirection === 'desc') return b.full_name.localeCompare(a.full_name, 'ar');
@@ -1380,9 +1326,9 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         pageSizeOptions={[6, 12, 24, 48, 100, 200, 500]}
         cardMaxFieldsCollapsed={4}
         enableCardExpand={true}
-        hideSortToggle
-        className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
-        getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
+        hideSortToggle={false}
+        className={`overflow-hidden ${TABLE_BASE_CLASS} ${TABLE_TEXT_BASE}`}
+        getRowClassName={(_, index) => getZebraRowClass(index)}
         columns={([
           {
             key: 'row_index',
@@ -1552,7 +1498,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
       {/* حوار اختيار ولي الأمر */}
       <FormDialog
-        title={guardiansLabels.guardian || 'ولي الأمر'}
+        title={' أولياء الأمور'}
         open={isGuardianPickerOpen}
         onOpenChange={setIsGuardianPickerOpen}
         onSave={() => setIsGuardianPickerOpen(false)}
@@ -1602,15 +1548,29 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             </div>
           </div>
           <GenericTable
-            title={guardiansLabels.guardian || 'أولياء الأمور'}
+            title={(
+              <div className="w-full flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                      <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                      أولياء الأمور
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             defaultView="table"
             enablePagination
             defaultPageSize={5}
             pageSizeOptions={[5, 10, 20, 50]}
+            cardMaxFieldsCollapsed={3}
+            enableCardExpand={true}
+
             data={filteredGuardiansForPicker}
-            getRowClassName={(item: any, index) => `${(selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')) ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
+            getRowClassName={(item: any, index) => `${getSelectableRowClass((selectedGuardianIds.includes(item.id) || selectedGuardianIds.includes(item.phone_number || '')), index)} cursor-pointer`}
             hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
+            className={`${TABLE_BASE_CLASS} text-[10px] sm:text-[11px]`}
             columns={([
               {
                 key: 'row_index',
@@ -1662,197 +1622,6 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
               }
             ]) as Column<any>[]}
             emptyMessage={guardiansLabels.noGuardians || 'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
-      {/* حوار اختيار المعلم */}
-      <FormDialog
-        title={studentsLabels.teacherColumn || 'المعلم'}
-        open={isTeacherPickerOpen}
-        onOpenChange={setIsTeacherPickerOpen}
-        onSave={() => setIsTeacherPickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="640px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder={studentsLabels.teacherPlaceholder || '🔍 اسم المعلم'}
-                value={teacherSearchTerm}
-                onChange={(e) => setteacherSearchTerm(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 
-                dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          </div>
-          <GenericTable
-            title={studentsLabels.teacherColumn}
-            defaultView="table"
-            enablePagination
-            defaultPageSize={4}
-            pageSizeOptions={[4, 8, 16, 48, 100]}
-            data={filteredTeachersForPicker}
-            getRowClassName={(item: any, index) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              {
-                key: 'row_index',
-                header: '🔢',
-                width: 'auto',
-                align: 'center',
-                render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
-              },
-              {
-                key: 'full_name',
-                header: studentsLabels.name,
-                width: 'auto',
-                render: (item: any) => (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectTeacher(item)}
-                    className="flex items-center justify-between w-full text-right group"
-                  >
-                    <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === selectedTeacherId ? 'text-green-700' : ''}`}>{item.full_name}</span>
-                    {item.id === selectedTeacherId}
-                  </button>
-                )
-              },
-              {
-                key: 'circles_count',
-                header: '📘 عدد الحلقات',
-                width: 'auto',
-                align: 'center',
-                render: (item: any) => (
-                  <span className="text-xs font-semibold text-green-700">{teacherCirclesCountMap[item.id] ?? 0}</span>
-                )
-              },
-              {
-                key: 'actions',
-                header: `⚙️ ${studentsLabels.actions}`,
-                align: 'center',
-                render: (item: any) => {
-                  const sel = item.id === selectedTeacherId;
-                  return (
-                    <div className="flex items-center justify-center">
-                      <button
-                        type="button"
-                        disabled={sel}
-                        onClick={() => handleSelectTeacher(item)}
-                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
-                          ${sel ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
-                        title={sel ? 'محدد' : 'تحديد'}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  );
-                }
-              }
-            ]) as Column<any>[]}
-            emptyMessage={studentsLabels.noStudents || 'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
-      {/* حوار اختيار الحلقة */}
-      <FormDialog
-        title={studentsLabels.studyCircleShort || 'الحلقة'}
-        open={isCirclePickerOpen}
-        onOpenChange={setIsCirclePickerOpen}
-        onSave={() => setIsCirclePickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="640px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder={studentsLabels.studyCirclePlaceholder || '🔍 اسم الحلقة'}
-                value={circlePickerSearch}
-                onChange={(e) => setCirclePickerSearch(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          </div>
-          <GenericTable
-            title={studentsLabels.studyCircleShort}
-            defaultView="table"
-            enablePagination
-            defaultPageSize={4}
-            pageSizeOptions={[4, 8, 16, 48, 100]}
-            data={filteredCirclesForPicker}
-            getRowClassName={(item: any, index) => `${item.id === studyCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              {
-                key: 'row_index',
-                header: '🔢',
-                width: '40px',
-                align: 'center',
-                render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>
-              },
-              {
-                key: 'name',
-                header: `📘 ${studentsLabels.studyCircleShort}`,
-                render: (item: any) => (
-                  <button
-                    type="button"
-                    onClick={() => handleSelectCircle(item)}
-                    className="flex items-center justify-between w-full group"
-                  >
-                    <span className={`text-sm font-medium group-hover:text-green-700 ${item.id === studyCircleId ? 'text-green-700' : ''}`}>{item.name}</span>
-                    {item.id === studyCircleId}
-                  </button>
-                )
-              },
-              {
-                key: 'students_count',
-                header: '👥 عدد الطلاب',
-                align: 'center',
-                render: (item: any) => (
-                  <span className="text-xs font-semibold text-green-700">{circleStudentsCountMap[item.id] ?? 0}</span>
-                )
-              },
-              {
-                key: 'max_students',
-                header: '👥 الحد الأقصى',
-                align: 'center',
-                render: (item: any) => (
-                  <span className="text-xs font-medium">{(item.max_students ?? item.capacity) || '-'}</span>
-                )
-              },
-              {
-                key: 'actions',
-                header: `⚙️ ${studentsLabels.actions}`,
-                align: 'center',
-                render: (item: any) => {
-                  const sel = item.id === studyCircleId;
-                  return (
-                    <div className="flex items-center justify-center">
-                      <button
-                        type="button"
-                        disabled={sel}
-                        onClick={() => handleSelectCircle(item)}
-                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
-                          ${sel ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
-                        title={sel ? 'محددة' : 'تحديد'}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  );
-                }
-              }
-            ]) as Column<any>[]}
-            emptyMessage={studentsLabels.noStudents || 'لا يوجد بيانات'}
           />
         </div>
       </FormDialog>
@@ -1953,6 +1722,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 { key: 'end_date', header: teacherHistoryLabels.endDateHeader },
                 { key: 'duration', header: teacherHistoryLabels.durationHeader },
               ]) as Column<any>[]}
+              className={`${TABLE_BASE_CLASS} ${TABLE_TEXT_BASE}`}
+              getRowClassName={(_, index) => getHistoryRowClass(index)}
               emptyMessage={teacherHistoryLabels.noHistoryShort}
             />
           ) : (

@@ -14,9 +14,13 @@ import {
  * TeacherCircleFilterBar
  * مكوّن فلترة عام قابل لإعادة الاستخدام مستلهم من نمط شاشة السجلات.
  * يحتوي فقط على:
- * - حقل بحث نصي للبحث في المعلمين أو الحلقات (حسب الصفحة التي تدمجه فيها)
  * - زر/قائمة اختيار المعلم
  * - زر/قائمة اختيار الحلقة
+ * - حقل بحث نصي للبحث في المعلمين أو الحلقات (اختياري)
+ * 
+ * يدعم تصميم متجاوب: 
+ * - نمط افتراضي: عرض قياسي
+ * - نمط خاص (mobileStackedLayout=true): عمودي في جميع الأحجام، المعلم في الأعلى والحلقة في الأسفل
  *
  * لا يدير حالة الحوارات الداخلية لاختيار المعلم/الحلقات؛ يُفترض أن الصفحة الأم توفّر ذلك إن احتاجت.
  * هنا نعرض فقط أزرار تفتح حوارات خارجية (callback) أو قد تُستبدل بـ <select> بسيط لو رغبت لاحقاً.
@@ -65,6 +69,8 @@ export interface TeacherCircleFilterBarProps {
     showSessionSelect?: boolean;                                         // تفعيل إظهار حقل اختيار الجلسة
     sessionLabel?: string;                                               // نص حقل الجلسة
     sessionCollapsible?: boolean;                                        // تمكين الطي لحقل الجلسة
+    hideFieldLabels?: boolean;                                           // إخفاء عناوين الحقول (المعلم / الحلقة / الجلسة)
+    mobileStackedLayout?: boolean;                                       // عند تفعيله: عرض عمودي مع المعلم في الأعلى والحلقة في الأسفل
 }
 
 export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
@@ -102,7 +108,9 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
     onSessionChange,
     showSessionSelect = false,
     sessionLabel = 'الجلسة',
-    sessionCollapsible = false
+    sessionCollapsible = false,
+    hideFieldLabels = false,
+    mobileStackedLayout = false // عند تفعيله: عرض عمودي مع المعلم في الأعلى والحلقة في الأسفل
 }) => {
     const selectedTeacher = selectedTeacherId ? teachers.find(t => t.id === selectedTeacherId) : undefined;
     const selectedCircle = selectedCircleId ? circles.find(c => c.id === selectedCircleId) : undefined;
@@ -208,257 +216,329 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
         <div
             dir="rtl"
             className={cn(
-                // موبايل: ترتيب عمودي، شاشات متوسطة فأعلى: صف أفقي
-                'flex flex-col md:flex-row md:flex-nowrap md:overflow-x-auto md:scrollbar-thin md:scrollbar-track-transparent md:scrollbar-thumb-emerald-300/60 md:hover:scrollbar-thumb-emerald-400/70 gap-2 md:gap-2 w-full p-1.5',
-                'bg-transparent',
-                // منع التفاف فقط على الشاشات الكبيرة
-                'md:whitespace-nowrap',
-                className,
-                disabled && 'opacity-60 pointer-events-none'
+            'w-full bg-transparent',
+            mobileStackedLayout
+                ? 'flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-3'
+                : 'flex flex-wrap md:flex-nowrap items-center gap-3',
+            className,
+            disabled && 'opacity-60 pointer-events-none'
             )}
         >
             {/* اختيار المعلم */}
-            <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative w-full">
-                                {useInlineSelects ? (
-                    <div className="grid gap-1.5 w-full">
-                        <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">المعلم</label>
-                                                {useShadSelect ? (
-                                                    <Select
-                                                        disabled={disabled || teachers.length === 0}
-                                                        value={selectedTeacherId || ''}
-                                                        onValueChange={(val) => onTeacherChange && onTeacherChange(val || null)}
-                                                    >
-                                                        <SelectTrigger
-                                                            dir="rtl"
-                                                            className={cn(
-                                                                'h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all',
-                                                                'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
-                                                                selectedTeacherId
-                                                                    ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
-                                                                    : 'border-gray-300 dark:border-gray-600 text-gray-500',
-                                                                (disabled || teachers.length === 0) && 'opacity-60 cursor-not-allowed'
-                                                            )}
-                                                        >
-                                                            <SelectValue placeholder={teacherLabel} />
-                                                        </SelectTrigger>
-                                                        <SelectContent
-                                                            position="popper"
-                                                            dir="rtl"
-                                                            className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
-                                                        >
-                                                            {teachers.length > 0 ? (
-                                                                teachers.map(t => (
-                                                                    <SelectItem
-                                                                        key={t.id}
-                                                                        value={t.id}
-                                                                        className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white"
-                                                                    >
-                                                                        <span className="flex items-center gap-2">
-                                                                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
-                                                                                <GraduationCap className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-200" />
-                                                                            </span>
-                                                                            <span className="truncate">{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</span>
-                                                                        </span>
-                                                                    </SelectItem>
-                                                                ))
-                                                            ) : (
-                                                                <SelectItem value="no-teachers" disabled>لا يوجد معلمون</SelectItem>
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                ) : (
-                                                    <select
-                                                            disabled={disabled || teachers.length === 0}
-                                                            value={selectedTeacherId || ''}
-                                                            onChange={(e) => {
-                                                                    const val = e.target.value || null;
-                                                                    onTeacherChange && onTeacherChange(val || null);
-                                                            }}
-                                                            className={`h-9 w-full text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-8 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${selectedTeacherId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${disabled || teachers.length===0 ? 'opacity-60 cursor-not-allowed' : ''} appearance-none`}
-                                                    >
-                                                            <option value="">{teacherLabel}</option>
-                                                            {teachers.map(t => (
-                                                                    <option key={t.id} value={t.id}>{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</option>
-                                                            ))}
-                                                    </select>
-                                                )}
-                    </div>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={onTeacherClick}
-                        disabled={disabled || teachers.length === 0}
-                        className={cn(
-                            'group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed',
-                            selectedTeacher
-                                ? 'border-emerald-400 bg-gradient-to-br from-white to-emerald-50/60 dark:from-emerald-900/30 dark:to-emerald-900'
-                                : 'border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950',
-                            'hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50'
-                        )}
-                        title={teacherLabel}
+            <div className={cn(
+            'flex items-center relative',
+            mobileStackedLayout ? 'w-full md:flex-1' : 'flex-1'
+            )}>
+            {useInlineSelects ? (
+                <div className="w-full">
+                {!hideFieldLabels && <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">المعلم</label>}
+                {useShadSelect ? (
+                    <Select
+                    disabled={disabled || teachers.length === 0}
+                    value={selectedTeacherId || ''}
+                    onValueChange={(val) => onTeacherChange && onTeacherChange(val || null)}
                     >
-                        <div className="flex items-center gap-2 min-w-0">
-                            <div className="h-7 w-7 shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-600">
-                                <GraduationCap className="h-4 w-4" />
-                            </div>
-                            <span className={cn('truncate text-sm', selectedTeacher ? 'text-emerald-700 font-medium' : 'text-gray-500')}>
-                                {selectedTeacher ? selectedTeacher.name : teacherLabel}
-                            </span>
-                            {showCounts && selectedTeacher?.circles_count != null && (
-                                <span className="text-[10px] px-2 py-1 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-emerald-50 ring-1 ring-emerald-400/50 shadow-sm shrink-0">
-                                    {selectedTeacher.circles_count} حلقة
+                    <SelectTrigger
+                        dir="rtl"
+                        className={cn(
+                        'text-right truncate max-w-full min-w-0 transition-all',
+                        mobileStackedLayout ? 'h-10 px-3 pr-3 text-sm rounded-xl' : 'h-9 px-2 pr-2 text-[11px] sm:text-xs rounded-md',
+                        'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                        selectedTeacherId
+                            ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-500',
+                        (disabled || teachers.length === 0) && 'opacity-60 cursor-not-allowed'
+                        )}
+                    >
+                        <div className="flex items-center justify-start gap-2">
+                        <SelectValue placeholder={'🤵 ' + teacherLabel} />
+                        </div>
+                    </SelectTrigger>
+                    <SelectContent
+                        position="popper"
+                        dir="rtl"
+                        className={cn(
+                        "text-right rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto",
+                        mobileStackedLayout ? "text-sm" : "text-[11px] sm:text-xs"
+                        )}
+                    >
+                        {teachers.length > 0 ? (
+                        teachers.map(t => (
+                            <SelectItem
+                            key={t.id}
+                            value={t.id}
+                            className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white"
+                            >
+                            <span className="flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
+                                🤵
                                 </span>
-                            )}
+                                <span className="truncate">{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</span>
+                            </span>
+                            </SelectItem>
+                        ))
+                        ) : (
+                        <SelectItem value="no-teachers" disabled>لا يوجد معلمون</SelectItem>
+                        )}
+                    </SelectContent>
+                    </Select>
+                ) : (
+                    <div className="relative">
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                        <div className={cn(
+                        "rounded-md bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600",
+                        mobileStackedLayout ? "h-7 w-7" : "h-6 w-6"
+                        )}>
+                        <GraduationCap className={cn(
+                            mobileStackedLayout ? "h-4 w-4" : "h-3.5 w-3.5"
+                        )} />
                         </div>
-                        <div className="flex items-center gap-1 pl-1">
-                            <ChevronDown className="h-4 w-4 text-emerald-500" />
-                        </div>
-                        <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-emerald-300/60" />
-                    </button>
+                    </div>
+                    <select
+                        disabled={disabled || teachers.length === 0}
+                        value={selectedTeacherId || ''}
+                        onChange={(e) => {
+                        const val = e.target.value || null;
+                        onTeacherChange && onTeacherChange(val || null);
+                        }}
+                        className={`w-full text-right truncate max-w-full min-w-0 transition-all focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm appearance-none ${mobileStackedLayout ? 'h-10 px-3 pr-10 text-sm rounded-xl' : 'h-9 px-2 pr-10 text-[11px] sm:text-xs rounded-md'} ${selectedTeacherId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${disabled || teachers.length===0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    >
+                        <option value="">{teacherLabel}</option>
+                        {teachers.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</option>
+                        ))}
+                    </select>
+                    </div>
                 )}
+                </div>
+            ) : (
+                <button
+                type="button"
+                onClick={onTeacherClick}
+                disabled={disabled || teachers.length === 0}
+                className={cn(
+                    'group relative w-full px-3 text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed',
+                    mobileStackedLayout ? 'h-12 rounded-xl border-2' : 'h-10 rounded-xl border',
+                    selectedTeacher
+                    ? 'border-emerald-400 bg-gradient-to-br from-white to-emerald-50/60 dark:from-emerald-900/30 dark:to-emerald-900'
+                    : 'border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950',
+                    'hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50'
+                )}
+                title={teacherLabel}
+                >
+                <div className="flex items-center gap-2 min-w-0">
+                    <div className={cn(
+                    "shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-600",
+                    mobileStackedLayout ? "h-8 w-8" : "h-7 w-7"
+                    )}>
+                    <GraduationCap className={cn(
+                        mobileStackedLayout ? "h-5 w-5" : "h-4 w-4"
+                    )} />
+                    </div>
+                    <span className={cn(
+                    'truncate', 
+                    mobileStackedLayout ? 'text-base' : 'text-sm',
+                    selectedTeacher ? 'text-emerald-700 font-medium' : 'text-gray-500'
+                    )}>
+                    {selectedTeacher ? selectedTeacher.name : teacherLabel}
+                    </span>
+                    {showCounts && selectedTeacher?.circles_count != null && (
+                    <span className="text-[10px] px-2 py-1 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-emerald-50 ring-1 ring-emerald-400/50 shadow-sm shrink-0">
+                        {selectedTeacher.circles_count} حلقة
+                    </span>
+                    )}
+                </div>
+                <div className="flex items-center gap-1 pl-1">
+                    <ChevronDown className={cn(
+                    "text-emerald-500",
+                    mobileStackedLayout ? "h-5 w-5" : "h-4 w-4"
+                    )} />
+                </div>
+                <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-emerald-300/60" />
+                </button>
+            )}
             </div>
 
             {/* اختيار الحلقة + زر الإضافة (موبايل) */}
-            <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative w-full">
-                {useInlineSelects ? (
-                    <div className="w-full">
-                        <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1 block mb-1">الحلقة</label>
-                        <div className="flex items-stretch gap-1">
-                            <div className="flex-1 min-w-0">
-                                {useShadSelect ? (
-                                    <Select
-                                        disabled={disabled || circles.length === 0}
-                                        value={selectedCircleId || ''}
-                                        onValueChange={(val) => onCircleChange && onCircleChange(val || null)}
-                                    >
-                                        <SelectTrigger
-                                            dir="rtl"
-                                            className={cn(
-                                                'h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all',
-                                                'focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800',
-                                                selectedCircleId
-                                                    ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
-                                                    : 'border-gray-300 dark:border-gray-600 text-gray-500',
-                                                (disabled || circles.length === 0) && 'opacity-60 cursor-not-allowed'
-                                            )}
-                                        >
-                                            <SelectValue placeholder={circles.length === 0 ? 'لا توجد حلقات' : circleLabel} />
-                                        </SelectTrigger>
-                                        <SelectContent
-                                            position="popper"
-                                            dir="rtl"
-                                            className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
-                                        >
-                                            {circles.length > 0 ? (
-                                                circles.map(c => (
-                                                    <SelectItem
-                                                        key={c.id}
-                                                        value={c.id}
-                                                        className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white"
-                                                    >
-                                                        <span className="flex items-center gap-2">
-                                                            <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
-                                                                <BookOpen className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-200" />
-                                                            </span>
-                                                            <span className="truncate">{c.name}</span>
-                                                        </span>
-                                                    </SelectItem>
-                                                ))
-                                            ) : (
-                                                <SelectItem value="no-circles" disabled>لا توجد حلقات</SelectItem>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    <select
-                                        disabled={disabled || circles.length === 0}
-                                        value={selectedCircleId || ''}
-                                        onChange={(e) => {
-                                            const val = e.target.value || null;
-                                            onCircleChange && onCircleChange(val || null);
-                                        }}
-                                        className={`h-9 w-full text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-8 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${selectedCircleId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${disabled || circles.length===0 ? 'opacity-60 cursor-not-allowed' : ''} appearance-none`}
-                                    >
-                                        <option value="">{circles.length === 0 ? 'لا توجد حلقات' : circleLabel}</option>
-                                        {circles.map(c => (
-                                            <option key={c.id} value={c.id}>{c.name}</option>
-                                        ))}
-                                    </select>
-                                )}
-                            </div>
-                            {showAddButton && (!requireCircleBeforeAdd || selectedCircleId) && (
-                                <button
-                                    type="button"
-                                    onClick={onAddClick}
-                                    className="h-9 md:hidden flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-3 text-[11px] font-medium flex-shrink-0"
-                                    title={addButtonTooltip || addButtonLabel}
-                                >
-                                    <Plus className="w-3.5 h-3.5" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex items-stretch gap-1">
-                        <button
-                            type="button"
-                            onClick={onCircleClick}
-                            disabled={disabled || circles.length === 0}
-                            className={cn(
-                                'group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed',
-                                selectedCircle
-                                    ? 'border-emerald-400 bg-gradient-to-br from-white to-emerald-50/60 dark:from-emerald-900/30 dark:to-emerald-900'
-                                    : 'border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950',
-                                'hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50'
-                            )}
-                            title={circleLabel}
+            <div className={cn(
+            'flex items-center relative',
+            mobileStackedLayout ? 'w-full md:flex-1' : 'flex-1'
+            )}>
+            {useInlineSelects ? (
+                <div className="w-full">
+                {!hideFieldLabels && <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">الحلقة</label>}
+                <div className="flex items-center gap-1">
+                    <div className="flex-1 min-w-0">
+                    {useShadSelect ? (
+                        <Select
+                        disabled={disabled || circles.length === 0}
+                        value={selectedCircleId || ''}
+                        onValueChange={(val) => onCircleChange && onCircleChange(val || null)}
                         >
-                            <div className="flex items-center gap-2 min-w-0">
-                                <div className="h-7 w-7 shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-600">
-                                    <BookOpen className="h-4 w-4" />
-                                </div>
-                                <span className={cn('truncate text-sm', selectedCircle ? 'text-emerald-700 font-medium' : 'text-gray-500')}>
-                                    {selectedCircle ? selectedCircle.name : circles.length === 0 ? 'لا توجد حلقات' : circleLabel}
+                        <SelectTrigger
+                            dir="rtl"
+                            className={cn(
+                            'text-right truncate max-w-full min-w-0 transition-all',
+                            mobileStackedLayout ? 'h-10 px-3 pr-3 text-sm rounded-xl' : 'h-9 px-2 pr-2 text-[11px] sm:text-xs rounded-md',
+                            'focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                            selectedCircleId
+                                ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                                : 'border-gray-300 dark:border-gray-600 text-gray-500',
+                            (disabled || circles.length === 0) && 'opacity-60 cursor-not-allowed'
+                            )}
+                        >
+                            <div className="flex items-center justify-start gap-2">
+                            <SelectValue placeholder={circles.length === 0 ? 'لا توجد حلقات' : '🧿 ' + circleLabel} />
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent
+                            position="popper"
+                            dir="rtl"
+                            className={cn(
+                            "text-right rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto",
+                            mobileStackedLayout ? "text-sm" : "text-[11px] sm:text-xs"
+                            )}
+                        >
+                            {circles.length > 0 ? (
+                            circles.map(c => (
+                                <SelectItem
+                                key={c.id}
+                                value={c.id}
+                                className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white"
+                                >
+                                <span className="flex items-center gap-2">
+                                    <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
+                                    🧿
+                                    </span>
+                                    <span className="truncate">{c.name}</span>
                                 </span>
+                                </SelectItem>
+                            ))
+                            ) : (
+                            <SelectItem value="no-circles" disabled>لا توجد حلقات</SelectItem>
+                            )}
+                        </SelectContent>
+                        </Select>
+                    ) : (
+                        <div className="relative">
+                        <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                            <div className={cn(
+                            "rounded-md bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600",
+                            mobileStackedLayout ? "h-7 w-7" : "h-6 w-6"
+                            )}>
+                            <BookOpen className={cn(
+                                mobileStackedLayout ? "h-4 w-4" : "h-3.5 w-3.5"
+                            )} />
                             </div>
-                            <div className="flex items-center gap-1 pl-1">
-                                <ChevronDown className="h-4 w-4 text-emerald-500" />
-                            </div>
-                            <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-emerald-300/60" />
-                        </button>
-                        {showAddButton && (!requireCircleBeforeAdd || selectedCircleId) && (
-                            <button
-                                type="button"
-                                onClick={onAddClick}
-                                className="h-10 md:hidden flex items-center justify-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-3 text-[11px] font-medium flex-shrink-0"
-                                title={addButtonTooltip || addButtonLabel}
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                            </button>
-                        )}
+                        </div>
+                        <select
+                            disabled={disabled || circles.length === 0}
+                            value={selectedCircleId || ''}
+                            onChange={(e) => {
+                            const val = e.target.value || null;
+                            onCircleChange && onCircleChange(val || null);
+                            }}
+                            className={`w-full text-right truncate max-w-full min-w-0 transition-all focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm appearance-none ${mobileStackedLayout ? 'h-10 px-3 pr-10 text-sm rounded-xl' : 'h-9 px-2 pr-10 text-[11px] sm:text-xs rounded-md'} ${selectedCircleId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${disabled || circles.length===0 ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        >
+                            <option value="">{circles.length === 0 ? 'لا توجد حلقات' : circleLabel}</option>
+                            {circles.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                        </div>
+                    )}
                     </div>
+                    {showAddButton && (!requireCircleBeforeAdd || selectedCircleId) && (
+                    <button
+                        type="button"
+                        onClick={onAddClick}
+                        className="h-9 md:hidden flex items-center justify-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-3 text-[11px] font-medium flex-shrink-0"
+                        title={addButtonTooltip || addButtonLabel}
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                    </button>
+                    )}
+                </div>
+                </div>
+            ) : (
+                <div className="flex items-stretch gap-1 w-full">
+                <button
+                    type="button"
+                    onClick={onCircleClick}
+                    disabled={disabled || circles.length === 0}
+                    className={cn(
+                    'group relative w-full px-3 text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed',
+                    mobileStackedLayout ? 'h-12 rounded-xl border-2' : 'h-10 rounded-xl border',
+                    selectedCircle
+                        ? 'border-emerald-400 bg-gradient-to-br from-white to-emerald-50/60 dark:from-emerald-900/30 dark:to-emerald-900'
+                        : 'border-emerald-300 dark:border-emerald-700 bg-white dark:bg-emerald-950',
+                    'hover:border-emerald-400 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50'
+                    )}
+                    title={circleLabel}
+                >
+                    <div className="flex items-center gap-2 min-w-0">
+                    <div className={cn(
+                        "shrink-0 rounded-lg bg-emerald-100 dark:bg-emerald-800 flex items-center justify-center text-emerald-600",
+                        mobileStackedLayout ? "h-8 w-8" : "h-7 w-7"
+                    )}>
+                        <BookOpen className={cn(
+                        mobileStackedLayout ? "h-5 w-5" : "h-4 w-4"
+                        )} />
+                    </div>
+                    <span className={cn(
+                        'truncate',
+                        mobileStackedLayout ? 'text-base' : 'text-sm',
+                        selectedCircle ? 'text-emerald-700 font-medium' : 'text-gray-500'
+                    )}>
+                        {selectedCircle ? selectedCircle.name : circles.length === 0 ? 'لا توجد حلقات' : circleLabel}
+                    </span>
+                    </div>
+                    <div className="flex items-center gap-1 pl-1">
+                    <ChevronDown className={cn(
+                        "text-emerald-500",
+                        mobileStackedLayout ? "h-5 w-5" : "h-4 w-4"
+                    )} />
+                    </div>
+                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-emerald-300/60" />
+                </button>
+                {showAddButton && (!requireCircleBeforeAdd || selectedCircleId) && (
+                    <button
+                    type="button"
+                    onClick={onAddClick}
+                    className="h-10 md:hidden flex items-center justify-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-3 text-[11px] font-medium flex-shrink-0"
+                    title={addButtonTooltip || addButtonLabel}
+                    >
+                    <Plus className="w-3.5 h-3.5" />
+                    </button>
                 )}
+                </div>
+            )}
             </div>
 
             {/* اختيار الجلسة (اختياري) */}
             {showSessionSelect && (
+            <div className={cn(
+                mobileStackedLayout ? 'w-full md:flex-1' : 'flex-1'
+            )}>
                 <SessionSelectBlock />
+            </div>
             )}
+
             {/* زر الإضافة (سطح المكتب) */}
             {showAddButton && (
-                <div className="hidden md:flex md:w-auto flex-col gap-1 items-stretch justify-end">
-                    {(!requireCircleBeforeAdd || selectedCircleId) && (
-                        <button
-                            type="button"
-                            onClick={onAddClick}
-                            className="h-10 flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-4 text-[12px] font-medium"
-                            title={addButtonTooltip || addButtonLabel}
-                        >
-                            <Plus className="w-4 h-4" />
-                            <span>{addButtonLabel}</span>
-                        </button>
-                    )}
-                </div>
+            <div className="hidden md:flex flex-col gap-1 items-stretch justify-end md:justify-center md:w-auto">
+                {(!requireCircleBeforeAdd || selectedCircleId) && (
+                <button
+                    type="button"
+                    onClick={onAddClick}
+                    className="h-10 flex items-center gap-1.5 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-sm transition-colors px-4 text-[12px] font-medium"
+                    title={addButtonTooltip || addButtonLabel}
+                >
+                    <Plus className="w-4 h-4" />
+                    <span>{addButtonLabel}</span>
+                </button>
+                )}
+            </div>
             )}
         </div>
     );

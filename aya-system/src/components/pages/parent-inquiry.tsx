@@ -74,7 +74,7 @@ interface TeacherHistory {
 }
 
 export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
-    
+
     const [phoneNumber, setPhoneNumber] = useState('');
     const [students, setStudents] = useState<Student[]>([]);
     const [guardian, setGuardian] = useState<Guardian | null>(null);
@@ -92,7 +92,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
     const [teacherHistory, setTeacherHistory] = useState<TeacherHistory[]>([]);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [guardianExpanded, setGuardianExpanded] = useState(false);
-    
+
     // تم إزالة مفتاح إعادة التحميل، غير ضروري
     const PERSIST_KEY = 'guardianExpandedPref';
 
@@ -463,9 +463,9 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                 console.error('خطأ في استرجاع سجل المعلمين:', error);
                 return [];
             }
-            
+
             if (!data) return [];
-            
+
             return data.map((record: any) => ({
                 id: record.id,
                 teacherName: record.profiles?.full_name || 'غير معروف',
@@ -480,7 +480,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
 
     // فتح نافذة تفاصيل الطالب (مباشر + تسجيل واضح)
     const handleStudentClick = (student: Student) => {
-        console.log('%c[handleStudentClick]','color:green', student.id, student.fullName);
+        console.log('%c[handleStudentClick]', 'color:green', student.id, student.fullName);
         setSelectedStudent(student);
         setDialogOpen(true);
         fetchTeacherHistory(student.id)
@@ -679,7 +679,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                             )}
                                         >
                                             <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-islamic-green/5 via-transparent to-accent/10" />
-                                            
+
                                             <CardHeader className="relative pb-3 bg-gradient-to-r from-islamic-green/5 to-accent/5">
                                                 <CardTitle className="text-base md:text-lg font-bold text-islamic-green flex items-start justify-between gap-2">
                                                     <div className="flex flex-col gap-1 max-w-[72%]">
@@ -800,7 +800,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                                     className="w-full rounded-xl border-islamic-green text-islamic-green hover:bg-islamic-green/10 font-medium text-[12px] tracking-wide focus-visible:ring-2 focus-visible:ring-islamic-green/50"
                                                     data-btn="student-details"
                                                     onClick={(e) => {
-                                                        console.log('%c[Button onClick fired]','color:purple', 'studentId=', student.id);
+                                                        console.log('%c[Button onClick fired]', 'color:purple', 'studentId=', student.id);
                                                         handleStudentClick(student);
                                                     }}
                                                 >
@@ -834,12 +834,14 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                 <div className="space-y-4 mt-2">
                                     <div></div>
                                     {/* Personal Information */}
-                                    <div className="bg-gradient-to-b from-green-900 via-green-500 to-green-200 dark:from-green-900 dark:via-green-800 dark:to-green-600 rounded-xl p-2 sm:p-4 shadow-md border border-green-200 dark:border-green-700">
-                                        <h3 className="flex flex-wrap items-center justify-between gap-1 sm:gap-2 text-xs sm:text-sm font-semibold text-white dark:text-white mb-2 sm:mb-4 border-b border-green-200 dark:border-green-700 pb-1 sm:pb-2">
-                                            <div className="flex items-center gap-1 sm:gap-2">
-                                                🧾 المعلومات الشخصية :
-                                                <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                                                <span className="text-yellow-300 text-xs sm:text-sm truncate">{selectedStudent.fullName}</span>
+                                    <div className="bg-gradient-to-b from-emerald-50 via-emerald-100 to-emerald-200 dark:from-emerald-800 dark:via-emerald-700 dark:to-emerald-600 rounded-xl p-2 sm:p-4 shadow-md border border-emerald-200 dark:border-emerald-600 transition-colors">
+                                        <h3 className="flex flex-wrap items-center justify-between gap-1 sm:gap-2 text-xs sm:text-sm font-semibold text-emerald-900 dark:text-emerald-100 mb-2 sm:mb-4 border-b border-emerald-300 dark:border-emerald-600 pb-1 sm:pb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                                    🧾 المعلومات الشخصية :
+                                                    <UserCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                                                    {selectedStudent.fullName}
+                                                </span>
                                             </div>
                                             <button
                                                 type="button"
@@ -848,7 +850,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                                     setPersonalInfoCollapsed(!personalInfoCollapsed);
                                                 }}
                                                 className={cn(
-                                                    'h-7 w-7 inline-flex items-center justify-center rounded-lg border border-white/30 bg-white/10 text-white hover:bg-white/20 transition-all shadow-sm transform',
+                                                    'h-7 w-7 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:border-emerald-500 dark:bg-emerald-700 dark:text-emerald-100 dark:hover:bg-emerald-600 transition-all shadow-sm transform',
                                                     !personalInfoCollapsed && 'rotate-180'
                                                 )}
                                                 aria-label={personalInfoCollapsed ? "عرض المعلومات الشخصية" : "إخفاء المعلومات الشخصية"}
@@ -861,7 +863,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                         <div className={`grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-4 ${personalInfoCollapsed ? 'hidden' : ''}`}>
 
                                             {/* الصف الدراسي */}
-                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-2 border border-green-200 dark:border-green-700">
+                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-2 border border-emerald-200 dark:border-emerald-600">
                                                 <Label className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300">الصف الدراسي</Label>
                                                 <p className="font-medium text-[11px] sm:text-sm text-gray-800 dark:text-green-200 mt-0.5 sm:mt-1 truncate">
                                                     {getGradeArabicName(selectedStudent.grade)}
@@ -869,7 +871,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                             </div>
 
                                             {/* الحلقة */}
-                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-2 border border-green-200 dark:border-green-700">
+                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-2 border border-emerald-200 dark:border-emerald-600">
                                                 <Label className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-300">الحلقة</Label>
                                                 <p className="font-medium text-[11px] sm:text-sm text-gray-800 dark:text-green-200 mt-0.5 sm:mt-1 truncate">
                                                     {getCircleName(selectedStudent.circleName)}
@@ -877,7 +879,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                             </div>
 
                                             {/* المعلم الحالي */}
-                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-3 border border-green-200 dark:border-green-700">
+                                            <div className="bg-sky-200 dark:bg-sky-700 rounded-lg shadow-sm p-3 border border-emerald-200 dark:border-emerald-600">
                                                 <Label className="text-xs text-gray-500 dark:text-gray-300">المعلم الحالي</Label>
                                                 <p className="font-medium text-gray-800 dark:text-green-200 mt-1">
                                                     {selectedStudent.teacherName || 'غير محدد'}
@@ -892,11 +894,17 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                     {/* Attendance */}
                                     <div>
                                         <GenericTable
-                                            title={<h3 className="flex flex-wrap items-center gap-1 sm:gap-2 
-                                                                            text-xs sm:text-sm font-semibold text-white dark:text-purple-500 
-                                                                            mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
-                                                📅 سجل الحضور
-                                            </h3>}
+                                            title={(
+                                                <div className="w-full flex flex-col gap-1.5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                                                📅 سجل الحضور
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                             defaultView="table"
                                             enablePagination
                                             defaultPageSize={5}
@@ -967,12 +975,17 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                     <div>
                                         {selectedStudent.grades && selectedStudent.grades.length > 0 ? (
                                             <GenericTable
-                                                title={<h3 className="flex flex-wrap items-center gap-1 sm:gap-2 
-                                                                                text-xs sm:text-sm font-semibold text-white 
-                                                                                dark:text-white 
-                                                                                mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
-                                                    📖 سجل الحفظ والتقييم
-                                                </h3>}
+                                                title={(
+                                                    <div className="w-full flex flex-col gap-1.5">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                                                    📖 سجل الحفظ والتقييم
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 defaultView="table"
                                                 enablePagination
                                                 defaultPageSize={5}
@@ -1018,11 +1031,18 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                     {/* Notes */}
                                     <div>
                                         <GenericTable
-                                            title={<h3 className="flex flex-wrap items-center gap-1 sm:gap-2 
-                                                                            text-xs sm:text-sm font-semibold text-white dark:text-purple-500 
-                                                                            mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
-                                                📝 ملاحظات المعلم
-                                            </h3>}
+
+                                            title={(
+                                                <div className="w-full flex flex-col gap-1.5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                                                📝 ملاحظات المعلم
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                             defaultView="table"
                                             enablePagination
                                             defaultPageSize={5}
@@ -1070,9 +1090,17 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                     {/* Teacher History */}
                                     <div>
                                         <GenericTable
-                                            title={<h3 className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm font-semibold text-white dark:text-purple-500 mb-2 sm:mb-4 border-b border-white pb-1 sm:pb-2">
-                                                👨‍🏫 سجل المعلمين السابقين
-                                            </h3>}
+                                            title={(
+                                                <div className="w-full flex flex-col gap-1.5">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                                                👨‍🏫 سجل المعلمين السابقين
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
                                             defaultView="table"
                                             enablePagination
                                             defaultPageSize={5}
@@ -1089,7 +1117,7 @@ export function ParentInquiry({ onNavigate }: ParentInquiryProps) {
                                             columns={[
                                                 {
                                                     key: 'row_index',
-                                                    header: '�',
+                                                    header: '🔢',
                                                     width: '40px',
                                                     align: 'center',
                                                     render: (_: any, globalIndex?: number) => <span className="text-[11px] font-medium">{(globalIndex ?? 0) + 1}</span>

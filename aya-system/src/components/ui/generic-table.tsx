@@ -92,6 +92,8 @@ export function GenericTable<T extends { id: string }>(props: {
     cardAutoLayout?: boolean;
     /** أقل عرض للبطاقة عند استخدام auto layout */
     cardMinWidth?: number; // px
+    /** تخصيص ستايل شارة الفهرس (index) داخل نمط البطاقات */
+    indexBadgeClassName?: string;
 }) {
     const {
         data,
@@ -130,6 +132,7 @@ export function GenericTable<T extends { id: string }>(props: {
         compactCards = false,
         cardAutoLayout = false,
         cardMinWidth = 220,
+        indexBadgeClassName,
     } = props;
 
     const [viewMode, setViewMode] = useState<'table' | 'card'>(defaultView);
@@ -922,7 +925,15 @@ export function GenericTable<T extends { id: string }>(props: {
                                                     <span className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-emerald-300/40 via-teal-200/40 to-green-300/40" />
                                                     <h3 className={cn('font-bold truncate flex-1 flex items-center gap-2 drop-shadow-sm', compactCards ? 'text-[12px] sm:text-[12.5px] tracking-tight' : 'text-[13px] sm:text-sm md:text-base tracking-wide')}>
                                                         {indexColumn && (
-                                                            <span className={cn('inline-flex items-center justify-center border border-white/40 text-[11px] font-semibold shadow-inner backdrop-blur-sm text-emerald-50', compactCards ? 'min-w-[22px] h-[22px] rounded-md bg-white/20' : 'min-w-[28px] h-[28px] rounded-full bg-white/20')}>
+                                                            <span
+                                                                className={cn(
+                                                                    // الأساس الجديد: تباين أعلى مع ألوان فاتحة
+                                                                    'inline-flex items-center justify-center font-bold select-none ring-1 ring-emerald-300/70 shadow-sm bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-500 text-white dark:from-emerald-500 dark:via-emerald-600 dark:to-teal-600',
+                                                                    compactCards ? 'min-w-[22px] h-[22px] rounded-md text-[10px]' : 'min-w-[30px] h-[30px] rounded-full text-[11px]',
+                                                                    'outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 transition-colors duration-200',
+                                                                    indexBadgeClassName // السماح بالكتابة فوق الستايل
+                                                                )}
+                                                            >
                                                                 {indexColumn.render ? indexColumn.render(item, globalIndex) : (item as any)[indexColumn.key] ?? (globalIndex + 1)}
                                                             </span>
                                                         )}
