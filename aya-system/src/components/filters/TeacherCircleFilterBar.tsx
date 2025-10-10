@@ -30,6 +30,7 @@ export interface BasicEntity {
     name: string;
     circles_count?: number; // للمعلم
     teacher_id?: string;    // للحلقة (إن احتجت ربطها بمعلم)
+    students_count?: number; // للحلقة: عدد الطلاب (اختياري لو متاح من الخادم)
 }
 
 export interface TeacherCircleFilterBarProps {
@@ -71,6 +72,12 @@ export interface TeacherCircleFilterBarProps {
     sessionCollapsible?: boolean;                                        // تمكين الطي لحقل الجلسة
     hideFieldLabels?: boolean;                                           // إخفاء عناوين الحقول (المعلم / الحلقة / الجلسة)
     mobileStackedLayout?: boolean;                                       // عند تفعيله: عرض عمودي مع المعلم في الأعلى والحلقة في الأسفل
+    teacherCirclesCountMap?: Record<string, number>;                     // خريطة عدد الحلقات لكل معلم (بديل عن circles_count)
+    circleStudentsCountMap?: Record<string, number>;                     // خريطة عدد الطلاب لكل حلقة
+    // اختيار تلقائي للمستخدم الحالي إذا كان ضمن قائمة المعلمين ولم يُحدد شيء بعد
+    currentUserId?: string;                                              // معرف المستخدم الحالي (قد يكون معلماً)
+    autoSelectCurrentTeacher?: boolean;                                  // تفعيل الاختيار التلقائي
+    autoSelectSingleCircle?: boolean;                                    // عند اختيار معلم وله حلقة واحدة تُختار تلقائياً
 }
 
 export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
@@ -111,17 +118,78 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
     sessionCollapsible = false,
     hideFieldLabels = false,
     mobileStackedLayout = false // عند تفعيله: عرض عمودي مع المعلم في الأعلى والحلقة في الأسفل
+    ,teacherCirclesCountMap,
+    circleStudentsCountMap,
+    currentUserId,
+    autoSelectCurrentTeacher = true,
+    autoSelectSingleCircle = true
 }) => {
     const selectedTeacher = selectedTeacherId ? teachers.find(t => t.id === selectedTeacherId) : undefined;
     const selectedCircle = selectedCircleId ? circles.find(c => c.id === selectedCircleId) : undefined;
     const [sessionCollapsed, setSessionCollapsed] = React.useState(false);
+    // مراجع لمنع إعادة التحديد التلقائي بعد مسح المستخدم للاختيارات
+    const userClearedTeacherRef = React.useRef(false);
+    const userClearedCircleRef = React.useRef(false);
+
+    // تأثير اختيار المعلّم الحالي تلقائياً
+    React.useEffect(() => {
+        if (!autoSelectCurrentTeacher) return;
+        if (selectedTeacherId) return;
+        if (userClearedTeacherRef.current) return; // المستخدم اختار جميع المعلمين سابقاً
+        if (!currentUserId) return;
+        if (teachers.some(t => t.id === currentUserId)) {
+            onTeacherChange && onTeacherChange(currentUserId);
+        }
+    }, [autoSelectCurrentTeacher, selectedTeacherId, currentUserId, teachers, onTeacherChange]);
+
+    // تأثير اختيار الحلقة الوحيدة تلقائياً
+    React.useEffect(() => {
+        if (!autoSelectSingleCircle) return;
+        if (selectedCircleId) return;
+        if (userClearedCircleRef.current) return; // المستخدم اختار جميع الحلقات
+        if (!selectedTeacherId) return;
+        const teacherCircles = circles.filter(c => c.teacher_id === selectedTeacherId);
+        if (teacherCircles.length === 1) {
+            onCircleChange && onCircleChange(teacherCircles[0].id);
+        }
+    }, [autoSelectSingleCircle, selectedTeacherId, selectedCircleId, circles, onCircleChange]);
+
+    // ترتيب أبجدي (عربي) للمعلمين والحلقات دون تعديل المصفوفات الأصلية
+    const teachersSorted = React.useMemo(() => {
+        return [...teachers].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar')); 
+    }, [teachers]);
+    const circlesSorted = React.useMemo(() => {
+        return [...circles].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar')); 
+    }, [circles]);
+
+    // === حسابات احتياطية للأعداد في حال لم تُمرَّر الخرائط من الخارج ===
+    const computedTeacherCirclesCountMap = React.useMemo(() => {
+        if (teacherCirclesCountMap) return teacherCirclesCountMap; // استخدم الممرَّر إن وجد
+        const map: Record<string, number> = {};
+        circles.forEach(c => {
+            const tid = c.teacher_id;
+            if (tid) map[tid] = (map[tid] || 0) + 1;
+        });
+        return map;
+    }, [teacherCirclesCountMap, circles]);
+
+    const computedCircleStudentsCountMap = React.useMemo(() => {
+        if (circleStudentsCountMap) return circleStudentsCountMap; // استخدم الممرَّر إن وجد
+        const map: Record<string, number> = {};
+        circles.forEach(c => {
+            if (c.students_count != null) map[c.id] = c.students_count;
+        });
+        return map;
+    }, [circleStudentsCountMap, circles]);
 
     const SessionSelectBlock: React.FC = () => (
         <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
             {useInlineSelects ? (
                 <div className="w-full">
-                    <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">{sessionLabel || 'الجلسة'}</label>
+                                        <div className="flex items-center justify-between mb-1">
+                                                {!hideFieldLabels && (
+                                                    <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">{sessionLabel || 'الجلسة'}</label>
+                                                )}
                         {sessionCollapsible && (
                             <button
                                 type="button"
@@ -235,8 +303,17 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                 {useShadSelect ? (
                     <Select
                     disabled={disabled || teachers.length === 0}
-                    value={selectedTeacherId || ''}
-                    onValueChange={(val) => onTeacherChange && onTeacherChange(val || null)}
+                    value={selectedTeacherId || '__ALL__'}
+                    onValueChange={(val) => {
+                        if (!onTeacherChange) return;
+                        if (val === '__ALL__') {
+                            userClearedTeacherRef.current = true; // منع إعادة الاختيار التلقائي
+                            onTeacherChange(null);
+                        } else {
+                            userClearedTeacherRef.current = false; // السماح بالاختيار التلقائي لاحقاً إذا مسح المستخدم مرة أخرى
+                            onTeacherChange(val || null);
+                        }
+                    }}
                     >
                     <SelectTrigger
                         dir="rtl"
@@ -262,8 +339,20 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                         mobileStackedLayout ? "text-sm" : "text-[11px] sm:text-xs"
                         )}
                     >
-                        {teachers.length > 0 ? (
-                        teachers.map(t => (
+                        <SelectItem
+                            key="__all_teachers"
+                            value="__ALL__"
+                            className="cursor-pointer rounded-[6px] px-2 py-1.5 transition-colors text-emerald-800 dark:text-emerald-200 font-medium data-[highlighted]:bg-emerald-600 data-[highlighted]:text-white dark:data-[highlighted]:bg-emerald-700 data-[state=checked]:bg-emerald-700 data-[state=checked]:text-white"
+                        >
+                            <span className="flex items-center gap-2">
+                                <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-gradient-to-br from-emerald-200 via-emerald-300 to-emerald-200 dark:from-emerald-700 dark:via-emerald-600 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-400/40 dark:ring-emerald-500/40">🌐</span>
+                                <span className="truncate flex items-center gap-1 tracking-wide">جميع المعلمين</span>
+                            </span>
+                        </SelectItem>
+                        {teachersSorted.length > 0 ? (
+                        teachersSorted.map(t => {
+                            const circlesCount = t.circles_count ?? computedTeacherCirclesCountMap[t.id];
+                            return (
                             <SelectItem
                             key={t.id}
                             value={t.id}
@@ -273,10 +362,17 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                                 <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
                                 🧑‍🏫
                                 </span>
-                                <span className="truncate">{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</span>
+                                <span className="truncate flex items-center gap-1">
+                                    {t.name}
+                                    {showCounts && circlesCount != null && (
+                                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm">
+                                            🕋 {circlesCount}
+                                        </span>
+                                    )}
+                                </span>
                             </span>
                             </SelectItem>
-                        ))
+                        ); })
                         ) : (
                         <SelectItem value="no-teachers" disabled>لا يوجد معلمون</SelectItem>
                         )}
@@ -304,9 +400,12 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                         className={`w-full text-right truncate max-w-full min-w-0 transition-all focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm appearance-none ${mobileStackedLayout ? 'h-10 px-3 pr-10 text-sm rounded-xl' : 'h-9 px-2 pr-10 text-[11px] sm:text-xs rounded-md'} ${selectedTeacherId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${disabled || teachers.length===0 ? 'opacity-60 cursor-not-allowed' : ''}`}
                     >
                         <option value="">{teacherLabel}</option>
-                        {teachers.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}{showCounts && t.circles_count != null ? ` (${t.circles_count} حلقة)` : ''}</option>
-                        ))}
+                        {teachersSorted.map(t => {
+                            const circlesCount = t.circles_count ?? computedTeacherCirclesCountMap[t.id];
+                            return (
+                                <option key={t.id} value={t.id}>{t.name}{showCounts && circlesCount != null ? ` (${circlesCount})` : ''}</option>
+                            );
+                        })}
                     </select>
                     </div>
                 )}
@@ -340,15 +439,34 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                     mobileStackedLayout ? 'text-base' : 'text-sm',
                     selectedTeacher ? 'text-emerald-700 font-medium' : 'text-gray-500'
                     )}>
-                    {selectedTeacher ? selectedTeacher.name : teacherLabel}
+                    {selectedTeacher ? (
+                        <span className="flex items-center gap-1">
+                            {selectedTeacher.name}
+                            {showCounts && (selectedTeacher.circles_count ?? computedTeacherCirclesCountMap[selectedTeacher.id]) != null && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm">
+                                    🕋 {(selectedTeacher.circles_count ?? computedTeacherCirclesCountMap[selectedTeacher.id])}
+                                </span>
+                            )}
+                        </span>
+                    ) : teacherLabel}
                     </span>
-                    {showCounts && selectedTeacher?.circles_count != null && (
+                    {showCounts && (selectedTeacher?.circles_count ?? (selectedTeacher ? computedTeacherCirclesCountMap[selectedTeacher.id] : undefined)) != null && (
                     <span className="text-[10px] px-2 py-1 rounded-full bg-gradient-to-r from-emerald-600 to-emerald-500 text-emerald-50 ring-1 ring-emerald-400/50 shadow-sm shrink-0">
-                        {selectedTeacher.circles_count} حلقة
+                        {(selectedTeacher?.circles_count ?? (selectedTeacher ? computedTeacherCirclesCountMap[selectedTeacher.id] : 0))} حلقة
                     </span>
                     )}
                 </div>
                 <div className="flex items-center gap-1 pl-1">
+                    {selectedTeacher && onTeacherChange && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); userClearedTeacherRef.current = true; onTeacherChange(null); }}
+                            className="p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/30 text-red-500 transition"
+                            title="مسح الاختيار"
+                        >
+                            <X className={cn("h-3.5 w-3.5")} />
+                        </button>
+                    )}
                     <ChevronDown className={cn(
                     "text-emerald-500",
                     mobileStackedLayout ? "h-5 w-5" : "h-4 w-4"
@@ -372,8 +490,16 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                     {useShadSelect ? (
                         <Select
                         disabled={disabled || circles.length === 0}
-                        value={selectedCircleId || ''}
-                        onValueChange={(val) => onCircleChange && onCircleChange(val || null)}
+                        value={selectedCircleId || '__ALL_CIRCLES__'}
+                        onValueChange={(val) => {
+                            if (!onCircleChange) return;
+                            if (val === '__ALL_CIRCLES__') {
+                                userClearedCircleRef.current = true;
+                                onCircleChange(null);
+                            } else {
+                                onCircleChange(val || null);
+                            }
+                        }}
                         >
                         <SelectTrigger
                             dir="rtl"
@@ -399,8 +525,20 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                             mobileStackedLayout ? "text-sm" : "text-[11px] sm:text-xs"
                             )}
                         >
-                            {circles.length > 0 ? (
-                            circles.map(c => (
+                            <SelectItem
+                                key="__all_circles"
+                                value="__ALL_CIRCLES__"
+                                className="cursor-pointer rounded-[6px] px-2 py-1.5 transition-colors text-emerald-800 dark:text-emerald-200 font-medium data-[highlighted]:bg-emerald-600 data-[highlighted]:text-white dark:data-[highlighted]:bg-emerald-700 data-[state=checked]:bg-emerald-700 data-[state=checked]:text-white"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span className="inline-flex items-center justify-center h-6 w-6 rounded-md bg-gradient-to-br from-teal-200 via-emerald-300 to-teal-200 dark:from-emerald-700 dark:via-teal-600 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-400/40 dark:ring-emerald-500/40">📚</span>
+                                    <span className="truncate flex items-center gap-1 tracking-wide">جميع الحلقات</span>
+                                </span>
+                            </SelectItem>
+                            {circlesSorted.length > 0 ? (
+                                circlesSorted.map(c => {
+                                    const studentsCount = computedCircleStudentsCountMap[c.id];
+                                    return (
                                 <SelectItem
                                 key={c.id}
                                 value={c.id}
@@ -410,10 +548,17 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                                     <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
                                     🕋
                                     </span>
-                                    <span className="truncate">{c.name}</span>
+                                        <span className="truncate flex items-center gap-1">
+                                            {c.name}
+                                            {studentsCount != null && (
+                                                <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-teal-600 text-white shadow-sm">
+                                                    👥 {studentsCount}
+                                                </span>
+                                            )}
+                                        </span>
                                 </span>
                                 </SelectItem>
-                            ))
+                                ); })
                             ) : (
                             <SelectItem value="no-circles" disabled>لا توجد حلقات</SelectItem>
                             )}
@@ -441,9 +586,12 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                             className={`w-full text-right truncate max-w-full min-w-0 transition-all focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm appearance-none ${mobileStackedLayout ? 'h-10 px-3 pr-10 text-sm rounded-xl' : 'h-9 px-2 pr-10 text-[11px] sm:text-xs rounded-md'} ${selectedCircleId ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${disabled || circles.length===0 ? 'opacity-60 cursor-not-allowed' : ''}`}
                         >
                             <option value="">{circles.length === 0 ? 'لا توجد حلقات' : circleLabel}</option>
-                            {circles.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
+                            {circlesSorted.map(c => {
+                                const studentsCount = computedCircleStudentsCountMap[c.id];
+                                return (
+                                    <option key={c.id} value={c.id}>{c.name}{studentsCount != null ? ` (${studentsCount})` : ''}</option>
+                                );
+                            })}
                         </select>
                         </div>
                     )}
@@ -490,7 +638,16 @@ export const TeacherCircleFilterBar: React.FC<TeacherCircleFilterBarProps> = ({
                         mobileStackedLayout ? 'text-base' : 'text-sm',
                         selectedCircle ? 'text-emerald-700 font-medium' : 'text-gray-500'
                     )}>
-                        {selectedCircle ? selectedCircle.name : circles.length === 0 ? 'لا توجد حلقات' : circleLabel}
+                        {selectedCircle ? (
+                            <span className="flex items-center gap-1">
+                                {selectedCircle.name}
+                                {selectedCircle && computedCircleStudentsCountMap[selectedCircle.id] != null && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-600 text-white shadow-sm">
+                                        👥 {computedCircleStudentsCountMap[selectedCircle.id]}
+                                    </span>
+                                )}
+                            </span>
+                        ) : circles.length === 0 ? 'لا توجد حلقات' : circleLabel}
                     </span>
                     </div>
                     <div className="flex items-center gap-1 pl-1">

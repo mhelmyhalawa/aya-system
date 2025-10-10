@@ -580,6 +580,7 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
                 selectedCircleId={selectedCircle}
                 searchQuery={searchTerm}
                 onSearchChange={setSearchTerm}
+                hideFieldLabels={true}
                 onTeacherChange={(id) => { setTeacherId(id); setSelectedCircle(null); }}
                 onCircleChange={(id) => setSelectedCircle(id)}
                 onClearTeacher={() => { setTeacherId(null); setSelectedCircle(null); }}

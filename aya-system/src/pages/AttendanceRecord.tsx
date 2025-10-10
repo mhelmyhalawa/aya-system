@@ -117,6 +117,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     if (currentUser?.role === 'teacher') return currentUser.id;
     return null;
   });
+  // مرجع لمنع إعادة التعيين التلقائي بعد أن يختار المستخدم "جميع المعلمين"
+  const userClearedTeacherRef = useRef(false);
 
   // (أزيلت آليات تصفح/كاروسيل الجلسات بعد دمج اختيار الجلسة في شريط الفلترة)
 
@@ -458,6 +460,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
   // تأكيد تهيئة selectedTeacherId للمعلّم (مع عدم الكتابة فوق اختيار يدوي لاحق)
   useEffect(() => {
+    if (userClearedTeacherRef.current) return; // المستخدم اختار جميع المعلمين
     if (currentUser?.role === 'teacher' && !selectedTeacherId) {
       setSelectedTeacherId(currentUser.id);
     }
@@ -465,6 +468,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
   // في حالة كان المستخدم Admin/Superadmin لكنه أيضاً معلّم (مربوط كـ teacher في بعض الحلقات) ولم يتم اختيار معلم بعد
   useEffect(() => {
+    if (userClearedTeacherRef.current) return; // لا تعيد التحديد بعد أن اختار المستخدم الجميع
     if ((currentUser?.role === 'admin' || currentUser?.role === 'superadmin') && !selectedTeacherId) {
       const teachesAny = baseCircles.some(c => c.teacher?.id === currentUser.id);
       if (teachesAny) {
@@ -918,7 +922,8 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                 teachers={teachersForFilter}
                 circles={filteredCircles.map(c => ({ id: c.id, name: c.name, teacher_id: c.teacher?.id }))}
                 selectedTeacherId={selectedTeacherId}
-                selectedCircleId={selectedCircle}
+                selectedCircleId={selectedCircle || null}
+                hideFieldLabels={true}
                 showSessionSelect
                 sessions={circleSessions.map(s => {
                   const d = new Date(s.session_date); const t = new Date();
@@ -933,15 +938,40 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                 searchQuery={searchTerm}
                 onSearchChange={(val) => setSearchTerm(val)}
                 onTeacherChange={(id) => {
-                  setSelectedTeacherId(id);
-                  if (id) {
-                    const first = baseCircles.find(c => c.teacher?.id === id);
-                    setSelectedCircle(first?.id || '');
+                  if (id === null) {
+                    userClearedTeacherRef.current = true; // تفعيل منع إعادة التحديد التلقائي
                   } else {
-                    setSelectedCircle(baseCircles[0]?.id || '');
+                    userClearedTeacherRef.current = false;
+                  }
+                  setSelectedTeacherId(id);
+                  if (!id) {
+                    const stillValid = selectedCircle && baseCircles.some(c => c.id === selectedCircle);
+                    if (!stillValid) {
+                      setSelectedCircle('');
+                      setSelectedSession(null);
+                      setCircleSessions([]);
+                    }
+                  } else {
+                    const teacherFirst = baseCircles.find(c => c.teacher?.id === id);
+                    if (!teacherFirst) {
+                      setSelectedCircle('');
+                      setSelectedSession(null);
+                      setCircleSessions([]);
+                    } else if (teacherFirst.id !== selectedCircle) {
+                      setSelectedCircle(teacherFirst.id);
+                    }
                   }
                 }}
-                onCircleChange={(id) => { if (id) handleCircleChange(id); }}
+                onCircleChange={(id) => {
+                  if (!id) {
+                    // جميع الحلقات => نفرغ الاختيار ونزيل الجلسات
+                    setSelectedCircle('');
+                    setSelectedSession(null);
+                    setCircleSessions([]);
+                    return;
+                  }
+                  handleCircleChange(id);
+                }}
                 useInlineSelects
                 useShadSelect
                 teacherLabel="اختر معلماً"
@@ -1097,8 +1127,7 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
-                          <CalendarCheck className="h-4 w-4 text-yellow-500" />
-                          {getCircleName(selectedCircle)}
+                          🕋 حلقة : {getCircleName(selectedCircle)}
                         </span>
                       </div>
                     </div>

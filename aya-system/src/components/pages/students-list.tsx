@@ -650,19 +650,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
     }
   };
 
-  // زر التحديث: إذا كانت هناك فلاتر أو المستخدم معلم نستدعي البحث بالمعايير، وإلا تحميل كامل
+  // زر التحديث: يمسح كل الشروط ويعرض جميع البيانات (للمعلم يقتصر على نطاقه الطبيعي فقط)
   const handleRefreshClick = () => {
-    const hasActiveFilters = !!(
-      (searchTerm && searchTerm.trim()) ||
-      (filterGrade && filterGrade !== 'all') ||
-      selectedTeacherId ||
-      studyCircleId ||
-      selectedGuardianIds.length
-    );
-    console.log('تشغيل زر التحديث. فلاتر نشطة؟', hasActiveFilters);
-    if (hasActiveFilters || userRole === 'teacher') {
-      handleSearch();
+    console.log('تنفيذ تحديث شامل: تصفير كل الفلاتر وإعادة تحميل البيانات الأصلية.');
+    // تصفير دون إعادة تحميل داخل resetFilters (triggerReload=false) ثم تحميل يدوي شامل
+    resetFilters(false);
+    if (userRole === 'teacher' && userId) {
+      // للمعلم: تحميل طلابه فقط (السلوك الأمني)
+      handleSearch(); // سيطبق teacher_id = userId تلقائياً
     } else {
+      // للمشرف/الإداري: تحميل كل الطلاب
       loadStudents();
     }
   };
@@ -1104,10 +1101,19 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   // توحيد تنسيق الجداول: تعريف ثوابت وأدوات مساعدة خارج JSX
   const TABLE_BASE_CLASS = "rounded-xl border border-green-300 shadow-md";
   const TABLE_TEXT_BASE = "text-xs"; // يمكن تخصيصه لاحقاً حسب السياق
-  const getZebraRowClass = (index: number) => `${index % 2 === 0 ? 'bg-green-50' : 'bg-white'} hover:bg-green-100 transition-colors`;
-  const getSelectableRowClass = (isSelected: boolean, index: number) => isSelected
-    ? 'bg-green-100/70 hover:bg-green-100 transition-colors'
-    : getZebraRowClass(index);
+  // توحيد ألوان الصفوف والـ hover لانسجام أفضل
+  // الأساس: صفوف متبادلة #F0FDF4 (green-50 أفتح) و #FFFFFF ثم عند المرور نستخدم درجة أغنى #DCFCE7 (green-100)
+  // عند التحديد نستخدم درجة وسطى #BBF7D0 (green-200) مع نفس لون hover لمنع القفز اللوني الحاد
+  const getZebraRowClass = (index: number) => {
+    const base = index % 2 === 0 ? 'bg-green-50' : 'bg-white';
+    return `${base} hover:bg-green-100 transition-colors`;
+  };
+  const getSelectableRowClass = (isSelected: boolean, index: number) => {
+    if (isSelected) {
+      return 'bg-green-200 hover:bg-green-200/90 transition-colors';
+    }
+    return getZebraRowClass(index);
+  };
   const getHistoryRowClass = (index: number) => getZebraRowClass(index);
 
   // ==== تنسيق موحد لشريط الفلترة العلوي (حقول المعلم / الحلقة / ولي الأمر / البحث) ====
@@ -1222,6 +1228,10 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 <TeacherCircleFilterBar
                   teachers={(teacherEntities as any[]).map(t => ({ id: t.id, name: (t.full_name || t.name || '') }))}
                   circles={(circleEntities as any[]).map(c => ({ id: c.id, name: (c.name || ''), teacher_id: (c.teacher_id || (c.teacher?.id) || '') }))}
+                  circleStudentsCountMap={circleStudentsCountMap}
+                  teacherCirclesCountMap={teacherEntities.reduce((acc, t:any) => { acc[t.id] = t.circles_count || 0; return acc; }, {} as Record<string, number>)}
+                  currentUserId={userId || undefined}
+                  autoSelectCurrentTeacher={userRole === 'teacher' || userRole === 'admin'}
                   selectedTeacherId={selectedTeacherId || null}
                   selectedCircleId={studyCircleId || null}
                   searchQuery={searchTerm}
@@ -1233,8 +1243,23 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                   teacherLabel="اختر معلماً"
                   circleLabel="اختر حلقة"
                   onTeacherChange={(id) => {
+                    // id=null => جميع المعلمين
                     handleTeacherChange(id || '');
-                    setTimeout(() => handleSearch(), 120);
+                    if (!id) {
+                      // مسح الحلقة أيضاً حتى لا يبقى فلتر آخر
+                      setStudyCircleId('');
+                      // تحميل شامل لكل الطلاب (مع مراعاة دور المعلم سيبقى مقيداً في handleSearch/loadStudents)
+                      setTimeout(() => {
+                        if (userRole === 'teacher' && userId) {
+                          // المعلم: نعيد البحث بقيود المعلم
+                          handleSearch();
+                        } else {
+                          loadStudents();
+                        }
+                      }, 80);
+                    } else {
+                      setTimeout(() => handleSearch(), 120);
+                    }
                   }}
                   onCircleChange={(id) => {
                     setStudyCircleId(id || '');

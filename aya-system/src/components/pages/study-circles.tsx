@@ -1444,7 +1444,7 @@ export function StudyCircles({ onNavigate, userRole, userId }: StudyCirclesProps
               defaultPageSize={10}
               pageSizeOptions={[5, 10, 20, 50]}
               hideSortToggle={false}
-              cardPageSize={6}
+              cardPageSize={2}
               className="rounded-lg border border-green-300 shadow bg-white"
             />
           )}
