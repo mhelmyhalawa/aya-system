@@ -1791,18 +1791,15 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <SelectTrigger
                       id="teacher"
                       dir="rtl"
-                      className={`h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs 
-                        rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.recorded_by || currentUser?.id)
-                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
+                      className={`select-trigger-base ${(formData.recorded_by || currentUser?.id) ? 'select-trigger-active' : 'select-trigger-empty'}`}
                     >
                       <SelectValue placeholder="اختر المعلم" />
                     </SelectTrigger>
-                    <SelectContent position="popper" dir="rtl" className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                    <SelectContent position="popper" dir="rtl" className="select-content-base">
                       {visibleTeachers && visibleTeachers.length > 0 ? (
                         visibleTeachers.map(teacher => (
                           <SelectItem key={teacher.id} value={teacher.id} 
-                          className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 rounded-md">
+                          className="select-item-base">
                             {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0,4)}`}
                             {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
                           </SelectItem>
@@ -1820,24 +1817,22 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <SelectTrigger
                       id="circle"
                       dir="rtl"
-                      className={`h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.circle_id)
-                        ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} ${!formData.recorded_by ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      className={`select-trigger-base ${(formData.circle_id) ? 'select-trigger-active' : 'select-trigger-empty'} ${!formData.recorded_by ? 'select-trigger-disabled' : ''}`}
                     >
                       <SelectValue placeholder="اختر الحلقة" />
                     </SelectTrigger>
-                    <SelectContent position="popper" dir="rtl" className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
+                    <SelectContent position="popper" dir="rtl" className="select-content-base">
                       {formFilteredCircles.length > 0 ? (
                         formFilteredCircles.map(circle => (
                           <SelectItem
                             key={circle.id}
                             value={circle.id}
-                            className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 rounded-md">
+                            className="select-item-base">
                             {circle.name || `حلقة ${circle.id.slice(0,4)}`}
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="no-circles" disabled>لا توجد حلقات للمعلم المحدد</SelectItem>
+                        <SelectItem value="no-circles" disabled className="select-item-base select-item-disabled">لا توجد حلقات للمعلم المحدد</SelectItem>
                       )}
                     </SelectContent>
                   </Select>

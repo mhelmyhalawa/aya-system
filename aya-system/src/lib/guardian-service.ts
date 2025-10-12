@@ -78,6 +78,23 @@ export const getAllGuardians = async (): Promise<(Guardian & { students_count: n
   }
 };
 
+// ================= كاش مبسط لنتائج أولياء الأمور ===================== //
+let __guardiansCache: { timestamp: number; data: (Guardian & { students_count: number })[] } | null = null;
+const GUARDIANS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 دقائق
+
+/**
+ * استرجاع جميع أولياء الأمور من الكاش أو من القاعدة
+ */
+export const getAllGuardiansCached = async (): Promise<(Guardian & { students_count: number })[]> => {
+  const now = Date.now();
+  if (__guardiansCache && (now - __guardiansCache.timestamp) < GUARDIANS_CACHE_TTL_MS) {
+    return __guardiansCache.data;
+  }
+  const data = await getAllGuardians();
+  __guardiansCache = { timestamp: now, data };
+  return data;
+};
+
 /**
  * إضافة ولي أمر جديد
  */

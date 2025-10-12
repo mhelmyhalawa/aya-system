@@ -1,3 +1,4 @@
+import { UnifiedSelect } from '@/components/ui/UnifiedSelect';
 import React, { useState, useEffect, useMemo } from 'react';
 import { assessmentService } from '../lib/assessment-service';
 import { getAllStudents } from '../lib/supabase-service';
@@ -13,33 +14,21 @@ import {
   getAssessmentTypeName,
   getAssessmentTypeColor,
   formatAssessmentRange,
-  formatScore,
   quranSurahs,
-  getSurahName
-} from '../types/assessment';
+  getSurahName,
+} from '@/types/assessment';
+// local util for formatting optional numeric scores to string
+const formatScore = (v: number | undefined) => (v === undefined || v === null ? '-' : `${v}`);
 import { Profile } from '../types/profile';
 import { StudyCircle } from '../types/study-circle';
 import { Plus, Pencil, Trash2, ClipboardList, RefreshCwIcon, Filter, ArrowDownUp, ArrowDownAZ, ArrowUpZA, GraduationCap, BookOpen, User, ChevronDown, Search, ChevronRight } from 'lucide-react';
+// استيراد خدمة أولياء الأمور لإضافة فلتر ولي الأمر
+import { getAllGuardians } from '@/lib/guardian-service';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { GenericTable } from '@/components/ui/generic-table';
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../components/ui/table";
-// استبدال Dialog بـ FormDialog (تم الاستغناء عن مكونات Dialog الأصلية)
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -47,11 +36,11 @@ import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from '@radix-ui/react-tabs';
-// تمت إزالة مكونات Tabs لصالح معالج خطوات بسيط (Wizard)
+import FilterBar from '@/components/filters/FilterBar';
 
 interface StudentAssessmentsProps {
-  onNavigate: (path: string) => void;
-  currentUser: Profile;
+  onNavigate?: (path: string) => void;
+  currentUser?: any;
 }
 
 const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, currentUser: propCurrentUser }) => {
@@ -64,10 +53,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [historyStudentId, setHistoryStudentId] = useState<string | null>(null);
   const [historyStudentName, setHistoryStudentName] = useState<string>('');
   const [historyItems, setHistoryItems] = useState<Assessment[]>([]);
-
-  // Memo: build a map of latest assessment per student with remaining count & list
-  const latestPerStudent = useMemo(() => {
-    if (!showLatestPerStudent) return null;
+  const groupedLatestRows = useMemo(() => {
     const byStudent: Record<string, Assessment[]> = {};
     for (const a of filteredAssessments) {
       const sid = (a as any).student_id || a.student_id || a.student?.id; // fallback chain
@@ -77,13 +63,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     }
     const rows: (Assessment & { __remainingCount: number; __remainingList: Assessment[] })[] = [];
     Object.entries(byStudent).forEach(([sid, list]) => {
-      list.sort((a, b) => {
-        // Prefer date field if exists else id desc
-        const da: any = (a as any).date || (a as any).created_at || 0;
-        const db: any = (b as any).date || (b as any).created_at || 0;
-        if (da && db && da !== db) return (da > db ? -1 : 1);
-        return (b as any).id - (a as any).id;
-      });
+      list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       const latest = list[0];
       const remaining = list.slice(1);
       rows.push(Object.assign({}, latest, { __remainingCount: remaining.length, __remainingList: remaining }));
@@ -95,7 +75,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       return an.localeCompare(bn, 'ar');
     });
     return rows;
-  }, [filteredAssessments, showLatestPerStudent]);
+  }, [filteredAssessments]);
   const [students, setStudents] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<Array<{
     id: string;
@@ -103,6 +83,12 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     role?: 'teacher' | 'admin' | 'superadmin' | string;
   }>>([]);
   const [studyCircles, setStudyCircles] = useState<StudyCircle[]>([]);
+  // بيانات أولياء الأمور
+  const [guardians, setGuardians] = useState<any[]>([]);
+  const [selectedGuardianId, setSelectedGuardianId] = useState<string>('all-guardians');
+  // فلتر طالب محدد (اختيار فردي) - مختلف عن selectedStudentIds (المحددون متعدد) للحالات السريعة
+  // لم نعد نستخدم selectedSingleStudentId بعد دعم multi-select — سنكتفي بـ selectedStudentIds
+  const [hasGuardianFilter, setHasGuardianFilter] = useState<'any' | 'with' | 'without'>('any');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all-teachers');
   const [selectedCircleId, setSelectedCircleId] = useState<string>('all-circles');
@@ -251,6 +237,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [formErrors, setFormErrors] = useState<{
     student_id?: string;
     recorded_by?: string;
+    date?: string;
+    type?: string;
     from_surah?: string;
     from_ayah?: string;
     to_surah?: string;
@@ -392,6 +380,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       filtered = filtered.filter(a => studentIdsInCircle.includes(a.student_id));
     }
 
+    // فلترة حسب ولي الأمر المحدد
+    if (selectedGuardianId !== 'all-guardians') {
+      const studentIdsWithGuardian = students
+        .filter(s => s.guardian && s.guardian.id === selectedGuardianId)
+        .map(s => s.id);
+      filtered = filtered.filter(a => studentIdsWithGuardian.includes(a.student_id));
+    }
+
     // فلترة حسب نوع التقييم
     if (filterType !== 'all') {
       filtered = filtered.filter(a => a.type === filterType);
@@ -425,7 +421,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     }
 
     setFilteredAssessments(applyListSorting(filtered));
-  }, [assessments, selectedTeacherId, selectedStudentIds, selectedCircleId, filterType, searchQuery, students, teachers, listSortDirection]);
+  }, [assessments, selectedTeacherId, selectedStudentIds, selectedCircleId, filterType, searchQuery, students, teachers, listSortDirection, selectedGuardianId, hasGuardianFilter]);
 
   // حساب الدرجة الكلية
   const calculateTotalScore = () => {
@@ -444,12 +440,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   // الحصول على المعلمين المرئيين حسب الفلاتر
   const visibleTeachers = useMemo(() => {
     return teachers.filter(teacher => {
-      // إذا كان المستخدم الحالي معلمًا، فقط أظهر هذا المعلم
+      const teacherHasCircle = studyCircles.some(c => c.teacher_id === teacher.id);
+
+      // إذا كان المستخدم الحالي معلماً أعرض نفسه فقط (حتى لو بلا حلقات حاليًا)
       if (currentUser?.role === 'teacher') {
         return teacher.id === currentUser.id;
       }
 
-      // إذا تم تحديد حلقة، أظهر فقط المعلم المسؤول عنها
+      // إذا تم تحديد حلقة، أظهر فقط المعلم المسؤول عنها (ولا نهتم بالفلتر العام)
       if (selectedCircleId !== 'all-circles') {
         const circle = studyCircles.find(c => c.id === selectedCircleId);
         if (circle) {
@@ -457,9 +455,15 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         }
       }
 
-      return true;
+      // طلب المستخدم: إظهار فقط المعلمين الذين لديهم حلقات
+      // مع استثناء أن يبقى المعلم المختار في النموذج لو كان بلا حلقات لتفادي كسر البيانات القديمة
+      if (!teacherHasCircle && teacher.id !== (formData.recorded_by || '')) {
+        return false;
+      }
+
+      return teacherHasCircle || teacher.id === formData.recorded_by;
     });
-  }, [teachers, currentUser, selectedCircleId, studyCircles]);
+  }, [teachers, currentUser, selectedCircleId, studyCircles, formData.recorded_by]);
 
   // الحصول على الطلاب المرئيين حسب الفلاتر
   const visibleStudents = useMemo(() => {
@@ -521,6 +525,13 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         }
       }
 
+      // إذا تم تحديد ولي أمر، أظهر فقط طلاب هذا الولي
+      if (selectedGuardianId !== 'all-guardians') {
+        if (!student.guardian || student.guardian.id !== selectedGuardianId) return false;
+      }
+      if (hasGuardianFilter === 'with' && !student.guardian) return false;
+      if (hasGuardianFilter === 'without' && student.guardian) return false;
+
       return true;
     });
 
@@ -532,7 +543,21 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     });
 
     return filtered;
-  }, [students, selectedTeacherId, selectedCircleId, isDialogOpen, studyCircles]);
+  }, [students, selectedTeacherId, selectedCircleId, isDialogOpen, studyCircles, selectedGuardianId, hasGuardianFilter]);
+
+  // تحميل أولياء الأمور مرة واحدة
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getAllGuardians();
+        if (!cancelled) setGuardians(data || []);
+      } catch (e) {
+        console.error('فشل تحميل أولياء الأمور', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // الحصول على الحلقات المرئية حسب الفلاتر
   const visibleStudyCircles = useMemo(() => {
@@ -653,6 +678,16 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     // التحقق من اختيار المعلم المسجل
     if (!formData.recorded_by) {
       errors.recorded_by = 'يرجى اختيار المعلم المسجل';
+    }
+
+    // التحقق من التاريخ
+    if (!formData.date) {
+      errors.date = 'يرجى تحديد التاريخ';
+    }
+
+    // التحقق من نوع التقييم
+    if (!formData.type) {
+      errors.type = 'يرجى اختيار النوع';
     }
 
     // التحقق من نطاق التقييم
@@ -1008,19 +1043,6 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                 <Filter className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">فلتر</span>
               </Button>
-              {/* زر الترتيب */}
-              <Button
-                type="button"
-                variant={listSortDirection ? 'default' : 'outline'}
-                onClick={toggleListSort}
-                title={listSortDirection === null ? 'ترتيب تصاعدي حسب اسم الطالب' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
-                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200 ${listSortDirection === null ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600' : listSortDirection === 'asc' ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500' : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
-              >
-                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
-                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
-                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">{listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}</span>
-              </Button>
               {/* زر التحديث */}
               <Button
                 variant="outline"
@@ -1046,118 +1068,193 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           </div>
           {showFilters && (
             <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 rounded-lg animate-fade-in">
-              {/* البحث */}
-              <div className="w-full md:flex-1 min-w-0 md:min-w-[180px]">
-                <Input
-                  title='🔍 بحث عن طالب أو ولي أمر أو سورة أو ملاحظات...'
-                  placeholder="🔍 بحث عن طالب أو ولي أمر أو سورة أو ملاحظات..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green focus:border-islamic-green text-sm text-gray-800 dark:text-gray-200 transition-all duration-200"
-                />
-              </div>
-              {/* اختيار المعلم - زر يفتح حوار */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                {currentUser?.role === 'teacher' ? (
-                  <div className="relative w-full h-10 px-3 rounded-xl border flex items-center gap-2 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900 border-green-400" title="المعلم">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
-                    <span className="truncate text-sm text-green-700 font-medium">{currentUser?.full_name || 'المعلم'}</span>
-                    <div className="ml-auto flex items-center gap-1"><span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span></div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsTeacherPickerOpen(true)}
-                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden ${selectedTeacher ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                    title="اختر معلماً"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
-                      <span className={`truncate text-sm ${selectedTeacher ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedTeacher ? selectedTeacher.full_name : 'اختر معلماً'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 pl-1">
-                      {selectedTeacher && (
-                        <span onClick={(e) => { e.stopPropagation(); setSelectedTeacherId('all-teachers'); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 text-green-500" />
-                    </div>
-                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                  </button>
-                )}
-              </div>
-              {/* اختيار الحلقة */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                <button
-                  type="button"
-                  disabled={selectedTeacherId === 'all-teachers' && visibleStudyCircles.length === 0}
-                  onClick={() => {
-                    if (visibleStudyCircles.length === 0) {
-                      toast({ title: 'لا توجد حلقات متاحة', description: 'لا توجد حلقات مرتبطة بالمعلم الحالي', variant: 'destructive' });
-                      return;
-                    }
-                    setIsCirclePickerOpen(true);
-                  }}
-                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                  title="اختر حلقة"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><BookOpen className="h-4 w-4" /></div>
-                    <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedCircle ? selectedCircle.name : (visibleStudyCircles.length === 0 ? 'لا توجد حلقات' : 'اختر حلقة')}</span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-1">
-                    {selectedCircle && (
-                      <span onClick={(e) => { e.stopPropagation(); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
-                    )}
-                    <ChevronDown className="h-4 w-4 text-green-500" />
-                  </div>
-                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                </button>
-              </div>
-              {/* اختيار الطلاب */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                <button
-                  type="button"
-                  disabled={visibleStudents.length === 0}
-                  onClick={() => { if (visibleStudents.length > 0) setIsStudentPickerOpen(true); }}
-                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed ${!isAllStudentsSelected ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                  title="اختر طلاباً"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><User className="h-4 w-4" /></div>
-                    <span className={`truncate text-sm ${!isAllStudentsSelected ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                      {isAllStudentsSelected ? (visibleStudents.length === 0 ? 'لا يوجد طلاب' : 'اختر طلاباً / الجميع') : (selectedStudentIds.length === 1 ? (visibleStudents.find(s => s.id === selectedStudentIds[0])?.full_name || 'طالب') : `عدد (${selectedStudentIds.length}) طالب`)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-1">
-                    {!isAllStudentsSelected && (
-                      <span onClick={(e) => { e.stopPropagation(); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
-                    )}
-                    <ChevronDown className="h-4 w-4 text-green-500" />
-                  </div>
-                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                </button>
-              </div>
-              {/* اختيار النوع */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                <div className="w-full">
-                  <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className={`w-full h-10 ps-3 pe-2 rounded-xl border text-right flex items-center gap-2 overflow-hidden text-sm transition-colors ${filterType !== 'all' ? 'border-green-500 bg-green-50/70 dark:bg-green-900/40' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'} hover:bg-green-50 hover:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-400`}>
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600 text-base">۝</div>
-                      <span className={`truncate flex-1 ${filterType !== 'all' ? 'text-green-700 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {filterType === 'all' ? 'جميع الأنواع' : assessmentTypeOptions.find(o => o.value === filterType)?.label || 'نوع'}
-                      </span>
-                    </SelectTrigger>
-                    <SelectContent dir="rtl" className="text-sm bg-white dark:bg-green-950 border border-green-200 dark:border-green-700 rounded-lg shadow-lg p-1">
-                      <SelectItem value="all" className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors">جميع الأنواع</SelectItem>
-                      {assessmentTypeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value} className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors">
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* FilterBar جديد بدل الحقل الفردي */}
+              <div className="w-full">
+                {/* NOTE: نستعمل المكون العام */}
+                <div dir="rtl">
+                  <FilterBar
+                    values={{
+                      teacher: selectedTeacherId === 'all-teachers' ? null : selectedTeacherId,
+                      circle: selectedCircleId === 'all-circles' ? null : selectedCircleId,
+                      type: filterType === 'all' ? null : filterType,
+                      guardian: selectedGuardianId === 'all-guardians' ? null : selectedGuardianId,
+                      hasGuardian: hasGuardianFilter === 'any' ? null : hasGuardianFilter,
+                      students: selectedStudentIds.length === 0 ? null : selectedStudentIds.join(','),
+                      q: searchQuery || ''
+                    }}
+                    showFieldLabels={false}
+                    onValuesChange={(vals) => {
+                      // تحديث البحث
+                      setSearchQuery(String(vals.q ?? ''));
+                      // تحديث المعلم
+                      if (vals.teacher === null) {
+                        // الرجوع للوضع العام
+                        if (selectedTeacherId !== 'all-teachers') setSelectedTeacherId('all-teachers');
+                      } else if (vals.teacher !== selectedTeacherId) {
+                        setSelectedTeacherId(String(vals.teacher));
+                      }
+                      // تحديث الحلقة
+                      if (vals.circle === null) {
+                        if (selectedCircleId !== 'all-circles') setSelectedCircleId('all-circles');
+                      } else if (vals.circle !== selectedCircleId) {
+                        setSelectedCircleId(String(vals.circle));
+                      }
+                      // نوع التقييم
+                      if (vals.type === null) {
+                        if (filterType !== 'all') setFilterType('all');
+                      } else if (vals.type !== filterType) {
+                        setFilterType(String(vals.type) as any);
+                      }
+                      // ولي الأمر
+                      if (vals.guardian === null) {
+                        if (selectedGuardianId !== 'all-guardians') setSelectedGuardianId('all-guardians');
+                      } else if (vals.guardian !== selectedGuardianId) {
+                        setSelectedGuardianId(String(vals.guardian));
+                        // إعادة ضبط قائمة الطلاب المحددين عند تغيير ولي الأمر
+                        setSelectedStudentIds([]);
+                      }
+                      // الطلاب المتعددون
+                      if (vals.students === null || vals.students === '') {
+                        if (selectedStudentIds.length > 0) setSelectedStudentIds([]);
+                      } else {
+                        const list = String(vals.students).split(',').filter(Boolean);
+                        // قارن قبل التحديث لتجنب إعادة التصيير غير الضرورية
+                        if (list.sort().join('|') !== selectedStudentIds.slice().sort().join('|')) {
+                          setSelectedStudentIds(list);
+                        }
+                      }
+                    }}
+                    fields={[
+                      {
+                        id: 'teacher',
+                        label: 'المعلم',
+                        type: 'select',
+                        showSearch: true,
+                        clearable: true,
+                        options: [
+                          { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫' },
+                          ...visibleTeachers.map(t => ({ value: t.id, label: t.full_name || '—', icon: '👨‍🏫' }))
+                        ],
+                        value: selectedTeacherId === 'all-teachers' ? null : selectedTeacherId,
+                        onChange: (val) => {
+                          if (!val || val === '__ALL__') {
+                            setSelectedTeacherId('all-teachers');
+                            setSelectedCircleId('all-circles');
+                          } else {
+                            setSelectedTeacherId(val);
+                          }
+                        }
+                      },
+                      {
+                        id: 'circle',
+                        label: 'الحلقة',
+                        type: 'select',
+                        showSearch: true,
+                        clearable: true,
+                        options: [
+                          { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋' },
+                          ...visibleStudyCircles.map(c => ({ value: c.id, label: c.name || '—', icon: '🕋' }))
+                        ],
+                        value: selectedCircleId === 'all-circles' ? null : selectedCircleId,
+                        onChange: (val) => {
+                          if (!val || val === '__ALL__') {
+                            setSelectedCircleId('all-circles');
+                          } else {
+                            setSelectedCircleId(val);
+                          }
+                        }
+                      },
+                      {
+                        id: 'guardian',
+                        label: 'ولي الأمر',
+                        type: 'select',
+                        showSearch: true,
+                        clearable: true,
+                        options: [
+                          { value: '__ALL__', label: 'جميع أولياء الأمور', icon: '👨‍👩‍👧' },
+                          ...guardians.map(g => ({ value: g.id, label: `${g.full_name || '—'}${typeof g.students_count === 'number' ? ` (${g.students_count})` : ''}`, icon: '👨‍👩‍👧' }))
+                        ],
+                        value: selectedGuardianId === 'all-guardians' ? null : selectedGuardianId,
+                        onChange: (val) => {
+                          if (!val || val === '__ALL__') {
+                            setSelectedGuardianId('all-guardians');
+                          } else {
+                            setSelectedGuardianId(val);
+                            setSelectedStudentIds([]);
+                          }
+                        }
+                      },
+                      {
+                        id: 'students',
+                        label: 'الطلاب',
+                        type: 'multi-select',
+                        enableSearch: true,
+                        clearable: true,
+                        options: (() => {
+                          let list = visibleStudents;
+                          if (selectedGuardianId !== 'all-guardians') list = list.filter(s => s.guardian && s.guardian.id === selectedGuardianId);
+                          if (hasGuardianFilter === 'with') list = list.filter(s => s.guardian);
+                          if (hasGuardianFilter === 'without') list = list.filter(s => !s.guardian);
+                          return list.map(s => ({ value: s.id, label: s.full_name || '—', icon: '👦' }));
+                        })(),
+                        value: selectedStudentIds,
+                        onChange: (vals: string[]) => {
+                          setSelectedStudentIds(vals);
+                        }
+                      },
+                      {
+                        id: 'type',
+                        label: 'النوع',
+                        type: 'select',
+                        clearable: true,
+                        options: [
+                          { value: '__ALL__', label: 'كل الأنواع', icon: '📚' },
+                          ...assessmentTypeOptions.map(o => ({
+                            value: o.value,
+                            label: o.label,
+                            icon: o.value === 'juz' ? '📘' : o.value === 'surah' ? '📖' : o.value === 'page' ? '📄' : o.value === 'range' ? '🧩' : '📚'
+                          }))
+                        ],
+                        value: filterType === 'all' ? null : filterType,
+                        onChange: (val) => {
+                          if (!val || val === '__ALL__') setFilterType('all'); else setFilterType(val as any);
+                        }
+                      },
+                      {
+                        id: 'q',
+                        label: 'بحث',
+                        type: 'text',
+                        placeholder: '🔍 بحث...',
+                        value: searchQuery,
+                        debounceMs: 400,
+                        onChange: (v) => setSearchQuery(v)
+                      }
+                    ]}
+                    actions={[{
+                      id: 'reset',
+                      label: 'إعادة تعيين',
+                      variant: 'outline',
+                      className: 'w-full sm:w-auto justify-center font-semibold text-[11px] sm:text-xs h-9 bg-white dark:bg-gray-900 border-green-300 hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200 mt-2 sm:mt-0',
+                      onClick: () => {
+                        setSelectedTeacherId(currentUser?.role === 'teacher' ? currentUser.id : 'all-teachers');
+                        setSelectedCircleId('all-circles');
+                        setSelectedGuardianId('all-guardians');
+                        setHasGuardianFilter('any');
+                        setSelectedStudentIds([]);
+                        setFilterType('all');
+                        setSearchQuery('');
+                        clearStudentSelection();
+                      }
+                    }]}
+                    enableDefaultApplyButton={false}
+                    enableDefaultResetButton={false}
+                    actionsPlacement="wrap"
+                    className="bg-transparent p-0"
+                  />
                 </div>
               </div>
+
+
             </div>
           )}
           {/* تم نقل عرض التقييمات إلى خارج الـ Card حسب الطلب */}
@@ -1201,7 +1298,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         ) : (
           (() => {
             // اختيار المصدر: آخر تقييم لكل طالب أو كل السجلات (حاليًا نعرض الأخير فقط)
-            const assessmentsSource = (showLatestPerStudent && latestPerStudent) ? latestPerStudent : filteredAssessments;
+            const assessmentsSource = (showLatestPerStudent) ? groupedLatestRows : filteredAssessments;
             const tableData = assessmentsSource.map((a, idx) => ({
               ...a,
               id: String(a.id),
@@ -1210,37 +1307,37 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             }));
             return (
               <GenericTable
-              title={(
-                <div className="w-full flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
-                        <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
-                        تقييمات الطلاب
-                      </span>
-                      <span
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-500/80 to-emerald-600/80 text-white text-[10px] sm:text-[11px] font-bold shadow border border-white/20"
-                        title={`عدد السجلات الظاهرة: ${tableData.length.toLocaleString('ar-EG')}`}
-                      >
-                        {tableData.length.toLocaleString('ar-EG')}
-                      </span>
-                      {showLatestPerStudent && tableData.length < filteredAssessments.length && (
-                        <span
-                          className="text-[10px] sm:text-[11px] text-green-600 truncate"
-                          title={`أحدث ${tableData.length.toLocaleString('ar-EG')} من إجمالي ${filteredAssessments.length.toLocaleString('ar-EG')} سجل`}
-                        >
-                          أحدث {tableData.length.toLocaleString('ar-EG')} من إجمالي {filteredAssessments.length.toLocaleString('ar-EG')}
+                title={(
+                  <div className="w-full flex flex-col gap-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                          <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+                          تقييمات الطلاب
                         </span>
-                      )}
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-500/80 to-emerald-600/80 text-white text-[10px] sm:text-[11px] font-bold shadow border border-white/20"
+                          title={`عدد السجلات الظاهرة: ${tableData.length.toLocaleString('ar-EG')}`}
+                        >
+                          {tableData.length.toLocaleString('ar-EG')}
+                        </span>
+                        {showLatestPerStudent && tableData.length < filteredAssessments.length && (
+                          <span
+                            className="text-[10px] sm:text-[11px] text-green-600 truncate"
+                            title={`أحدث ${tableData.length.toLocaleString('ar-EG')} من إجمالي ${filteredAssessments.length.toLocaleString('ar-EG')} سجل`}
+                          >
+                            أحدث {tableData.length.toLocaleString('ar-EG')} من إجمالي {filteredAssessments.length.toLocaleString('ar-EG')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
                 defaultView="table"
                 enablePagination
                 defaultPageSize={10}
                 pageSizeOptions={[10, 20, 50, 100]}
-                hideSortToggle
+                hideSortToggle={false}
                 data={tableData as any}
                 className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
                 getRowClassName={(_: any, index: number) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`}
@@ -1333,162 +1430,6 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           })()
         )}
       </div>
-
-      {/* حوار اختيار المعلم */}
-      <FormDialog
-        title={'المعلم'}
-        open={isTeacherPickerOpen}
-        onOpenChange={setIsTeacherPickerOpen}
-        onSave={() => setIsTeacherPickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="640px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder="🔍 اسم المعلم"
-                value={teacherSearchTerm}
-                onChange={(e) => setteacherSearchTerm(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          </div>
-          <GenericTable
-            title=""
-            defaultView="table"
-            enablePagination
-            defaultPageSize={4}
-            pageSizeOptions={[4, 8, 16, 48, 100]}
-            data={filteredTeachersForPicker as any}
-            getRowClassName={(item: any, index: number) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>) },
-              {
-                key: 'full_name', header: '👨‍🏫 المعلم', align: 'center', render: (item: any) => {
-                  const selected = item.id === selectedTeacherId;
-                  return (
-                    <button type="button" onClick={() => { setSelectedTeacherId(item.id); setSelectedCircleId('all-circles'); clearStudentSelection(); setIsTeacherPickerOpen(false); }} className="w-full flex items-center justify-center group px-1">
-                      <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span>
-                    </button>
-                  );
-                }
-              },
-              { key: 'circles_count', header: '📘 الحلقات', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{studyCircles.filter(c => c.teacher_id === item.id).length}</span>) },
-              {
-                key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => {
-                  const selected = item.id === selectedTeacherId;
-                  return (
-                    <div className="flex items-center justify-center">
-                      <button type="button" onClick={() => { setSelectedTeacherId(item.id); setSelectedCircleId('all-circles'); clearStudentSelection(); setIsTeacherPickerOpen(false); }} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}>✓</button>
-                    </div>
-                  );
-                }
-              }
-            ]) as any}
-            emptyMessage={'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
-      {/* حوار اختيار الطلاب */}
-      <FormDialog
-        title={'بحث وتحديد الطلاب'}
-        open={isStudentPickerOpen}
-        onOpenChange={setIsStudentPickerOpen}
-        onSave={() => setIsStudentPickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="680px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder="🔍 اسم الطالب / ولي الأمر"
-                value={studentSearchTerm}
-                onChange={(e) => setStudentSearchTerm(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={() => { const ids = filteredStudentsForPicker.map((s: any) => s.id); const allSelected = ids.every((id: string) => selectedStudentIds.includes(id)); if (allSelected) { setSelectedStudentIds(prev => prev.filter(id => !ids.includes(id))); } else { setSelectedStudentIds(prev => Array.from(new Set([...prev, ...ids]))); } }} className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-green-600 hover:bg-green-700 text-white shadow transition" title="تحديد/إلغاء تحديد المعروض">الكل</button>
-              {!isAllStudentsSelected && (
-                <button type="button" onClick={clearStudentSelection} className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-red-500 hover:bg-red-600 text-white shadow transition" title="إزالة جميع التحديد">مسح</button>
-              )}
-              <div className={`h-8 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center ${isAllStudentsSelected ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300' : 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'}`} title="عدد المحددين">{isAllStudentsSelected ? 'الجميع' : selectedStudentIds.length}</div>
-            </div>
-          </div>
-          <GenericTable
-            title=""
-            defaultView="table"
-            enablePagination
-            defaultPageSize={6}
-            pageSizeOptions={[6, 12, 24, 60]}
-            data={filteredStudentsForPicker as any}
-            getRowClassName={(item: any, index: number) => `${selectedStudentIds.includes(item.id) ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>) },
-              { key: 'full_name', header: '👦 الطالب', align: 'center', render: (item: any) => { const selected = selectedStudentIds.includes(item.id); return (<button type="button" onClick={() => toggleStudentSelection(item.id)} className="w-full flex items-center justify-center group px-1"><span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span></button>); } },
-              { key: 'guardian', header: '👪 ولي الأمر', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px]">{item.guardian?.full_name || '-'}</span>) },
-              { key: 'circle', header: '📘 الحلقة', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px]">{item.study_circle?.name || '-'}</span>) },
-              { key: 'actions', header: '⚙️ إجراءات', align: 'center', render: (item: any) => { const selected = selectedStudentIds.includes(item.id); return (<div className="flex items-center justify-center"><button type="button" onClick={() => toggleStudentSelection(item.id)} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`} title={selected ? 'إزالة من التحديد' : 'تحديد'}>✓</button></div>); } }
-            ]) as any}
-            emptyMessage={'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
-      {/* حوار اختيار الحلقة */}
-      <FormDialog
-        title={'الحلقة'}
-        open={isCirclePickerOpen}
-        onOpenChange={setIsCirclePickerOpen}
-        onSave={() => setIsCirclePickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="640px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder="🔍 اسم الحلقة"
-                value={circlePickerSearch}
-                onChange={(e) => setCirclePickerSearch(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          </div>
-          <GenericTable
-            title=""
-            defaultView="table"
-            enablePagination
-            defaultPageSize={4}
-            pageSizeOptions={[4, 8, 16, 48, 100]}
-            data={filteredCirclesForPicker as any}
-            getRowClassName={(item: any, index: number) => `${item.id === selectedCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              { key: 'row_index', header: '🔢', width: '32px', align: 'center', render: (_: any, globalIndex?: number) => (<span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>) },
-              { key: 'name', header: '📘 الحلقة', align: 'center', render: (item: any) => { const selected = item.id === selectedCircleId; return (<button type="button" onClick={() => { setSelectedCircleId(item.id); clearStudentSelection(); setIsCirclePickerOpen(false); }} className="w-full flex items-center justify-center group px-1"><span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.name}</span></button>); } },
-              { key: 'students_count', header: '👥 العدد', align: 'center', render: (item: any) => (<span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{students.filter(s => s.study_circle_id === item.id).length}</span>) },
-              { key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (item: any) => { const selected = item.id === selectedCircleId; return (<div className="flex items-center justify-center"><button type="button" onClick={() => { setSelectedCircleId(item.id); clearStudentSelection(); setIsCirclePickerOpen(false); }} className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`} title={selected ? 'محددة' : 'تحديد'}>✓</button></div>); } }
-            ]) as any}
-            emptyMessage={'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
 
       {/* حوار إضافة/تعديل تقييم باستخدام FormDialog */}
       <FormDialog
@@ -1584,113 +1525,76 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         {/* محتوى الخطوات */}
         <div className="p-3 sm:p-4 bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 max-w-full overflow-x-hidden" dir="ltr">
           {wizardStep === 0 && (
-            <div className="grid gap-3 py-2">
-              {/* المعلم/المشرف والحلقة */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="grid gap-1 order-last ">
-                  <Label htmlFor="recorded_by" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">المسجل <span className="text-red-500">*</span></Label>
-                  <Select
-                    value={formData.recorded_by || (currentUser ? currentUser.id : '')}
-                    onValueChange={handleTeacherChange}
-                  >
-                    <SelectTrigger
+            <div className="space-y-5">
+              <div className="grid gap-3 py-2">
+                {/* المعلم/المشرف والحلقة */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid gap-1 order-last ">
+                    <Label htmlFor="recorded_by" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">المسجل <span className="text-red-500">*</span></Label>
+                    <UnifiedSelect
                       id="recorded_by"
-                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(formData.recorded_by || currentUser?.id)
-                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
-                    >
-                      <SelectValue placeholder="اختر المعلم" />
-                    </SelectTrigger>
-                    <SelectContent className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
-                      {visibleTeachers.length > 0 ? (
-                        visibleTeachers.map(teacher => (
-                          <SelectItem key={teacher.id} value={teacher.id} className="text-right cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
-                            <div className="flex flex-col text-right">
-                              <span className="font-medium">{teacher.full_name ?? `المعلم ${teacher.id.slice(0, 4)}`}</span>
-                            </div>
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem disabled value="no-teachers">لا يوجد معلمين متاحين</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {formErrors.recorded_by && <p className="text-xs text-red-500 text-right">{formErrors.recorded_by}</p>}
-                </div>
-
-                <div className="grid gap-1 order-first">
-                  <Label htmlFor="circle_info" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الحلقة</Label>
-                  <Select
-                    value={selectedCircleId !== 'all-circles' ? selectedCircleId : ''}
-                    onValueChange={handleCircleChange}
-                  >
-                    <SelectTrigger
-                      id="circle_info"
-                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${(selectedCircleId !== 'all-circles')
-                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
-                    >
-                      <SelectValue placeholder="اختر الحلقة" />
-                    </SelectTrigger>
-                    <SelectContent className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
-                      {visibleStudyCircles.length > 0 ? (
-                        visibleStudyCircles.map(circle => (
-                          <SelectItem key={circle.id} value={circle.id} className="text-right cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
-                            {circle.name || `حلقة ${circle.id}`}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem disabled value="no-circles">لا توجد حلقات متاحة</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* اختيار الطالب */}
-              <div className="grid gap-1">
-                <Label htmlFor="student_id" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الطالب <span className="text-red-500">*</span></Label>
-                <Select
-                  value={formData.student_id}
-                  onValueChange={(value) => setFormData({ ...formData, student_id: value })}
-                >
-                  <SelectTrigger
-                    id="student_id"
-                    className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${formData.student_id
-                      ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
-                      : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
-                  >
-                    <SelectValue placeholder="اختر الطالب" />
-                  </SelectTrigger>
-                  <SelectContent className="text-right max-h-[200px] text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
-                    {visibleStudents.length > 0 ? (
-                      visibleStudents.map(student => (
-                        <SelectItem key={student.id} value={student.id} className="text-right cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {student.full_name}
-                              {student.guardian?.full_name && (
-                                <span> {student.guardian.full_name}</span>
-                              )}
-                            </span>
+                      size="sm"
+                      value={(formData.recorded_by || (currentUser ? currentUser.id : '')) as string}
+                      onChange={(v) => handleTeacherChange(v)}
+                      placeholder="اختر المعلم"
+                      options={visibleTeachers.length > 0 ? visibleTeachers.map(t => ({
+                        value: t.id,
+                        label: (
+                          <div className="flex flex-col text-right">
+                            <span className="font-medium">{t.full_name ?? `المعلم ${t.id.slice(0, 4)}`}</span>
                           </div>
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem disabled value="no-students">
-                        {selectedCircleId !== 'all-circles'
-                          ? 'لا يوجد طلاب في هذه الحلقة'
-                          : selectedTeacherId !== 'all-teachers'
-                            ? 'لا يوجد طلاب لهذا المعلم'
-                            : 'لا يوجد طلاب متاحين'
-                        }
-                      </SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-                {formErrors.student_id && <p className="text-xs text-red-500 text-right">{formErrors.student_id}</p>}
-              </div>
+                        )
+                      })) : []}
+                      emptyLabel="لا يوجد معلمين متاحين"
+                    />
+                    {formErrors.recorded_by && <p className="text-xs text-red-500 text-right">{formErrors.recorded_by}</p>}
+                  </div>
+                  <div className="grid gap-1 order-first">
+                    <Label htmlFor="circle_info" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الحلقة</Label>
+                    <UnifiedSelect
+                      id="circle_info"
+                      size="sm"
+                      value={(selectedCircleId !== 'all-circles' ? selectedCircleId : '') as string}
+                      onChange={(v) => handleCircleChange(v)}
+                      placeholder="اختر الحلقة"
+                      options={visibleStudyCircles.length > 0 ? visibleStudyCircles.map(c => ({
+                        value: c.id,
+                        label: c.name || `حلقة ${c.id}`
+                      })) : []}
+                      emptyLabel="لا توجد حلقات متاحة"
+                    />
+                  </div>
+                </div>
+                {/* اختيار الطالب */}
+                <div className="grid gap-1">
+                  <Label htmlFor="student_id" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">الطالب <span className="text-red-500">*</span></Label>
+                  <UnifiedSelect
+                    id="student_id"
+                    size="sm"
+                    value={(formData.student_id || '') as string}
+                    onChange={(v) => setFormData({ ...formData, student_id: v })}
+                    placeholder="اختر الطالب"
+                    options={visibleStudents.length > 0 ? visibleStudents.map(s => ({
+                      value: s.id,
+                      label: (
+                        <div className="flex flex-col">
+                          <span className="font-medium">
 
+                            {s.full_name}
+                            {s.guardian?.full_name && (<span> {s.guardian.full_name}</span>)}
+                          </span>
+                        </div>
+                      )
+                    })) : []}
+                    emptyLabel={selectedCircleId !== 'all-circles'
+                      ? 'لا يوجد طلاب في هذه الحلقة'
+                      : selectedTeacherId !== 'all-teachers'
+                        ? 'لا يوجد طلاب لهذا المعلم'
+                        : 'لا يوجد طلاب متاحين'}
+                  />
+                  {formErrors.student_id && <p className="text-xs text-red-500 text-right">{formErrors.student_id}</p>}
+                </div>
+              </div>
               {/* تاريخ التقييم ونوع الاختبار */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="grid gap-1 order-last">
@@ -1698,38 +1602,27 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   <Input
                     id="date"
                     type="date"
+                    dir="rtl"
                     className="h-9 bg-white text-right"
-                    value={formData.date}
+                    value={formData.date || ''}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]} // تحديد الحد الأدنى للتاريخ هو اليوم الحالي
                   />
+                  {formErrors.date && <p className="text-xs text-red-500 text-right">{formErrors.date}</p>}
                 </div>
-
                 <div className="grid gap-1 order-first">
-                  <Label htmlFor="type" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">نوع الاختبار <span className="text-red-500">*</span></Label>
-                  <Select
-                    value={formData.type}
-                    onValueChange={(value) => setFormData({ ...formData, type: value as AssessmentType })}
-                  >
-                    <SelectTrigger
-                      id="type"
-                      className={`h-9 text-right text-[11px] sm:text-xs rounded-lg border px-2 pr-2 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800 ${formData.type
-                        ? 'border-green-300 dark:border-green-600 bg-green-50/70 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-semibold shadow-[inset_0_0_0_1px_rgba(16,185,129,0.35)]'
-                        : 'border-gray-300 dark:border-gray-600 text-gray-500'} `}
-                    >
-                      <SelectValue placeholder="اختر النوع" />
-                    </SelectTrigger>
-                    <SelectContent className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
-                      {assessmentTypeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="type" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">نوع التقييم <span className="text-red-500">*</span></Label>
+                  <UnifiedSelect
+                    id="type"
+                    size="sm"
+                    value={formData.type as string}
+                    onChange={(v) => setFormData({ ...formData, type: v as any })}
+                    placeholder="اختر النوع"
+                    options={assessmentTypeOptions.map(o => ({ value: o.value, label: o.label }))}
+                    emptyLabel="لا توجد خيارات"
+                  />
+                  {formErrors.type && <p className="text-xs text-red-500 text-right">{formErrors.type}</p>}
                 </div>
               </div>
-
               {/* ملاحظات */}
               <div className="grid gap-1">
                 <Label htmlFor="notes" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">ملاحظات</Label>
@@ -1851,30 +1744,6 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   </Label>
                   <Input
                     id="tajweed_score"
-                    type="text"
-                    inputMode="decimal"
-                    dir="rtl"
-                    className="h-9 bg-white text-right"
-                    value={formData.tajweed_score !== undefined ? formData.tajweed_score : ''}
-                    onChange={(e) => {
-                      let val = parseFloat(e.target.value);
-                      if (isNaN(val)) val = undefined;
-                      else if (val > 100) val = 100;
-                      else if (val < 0) val = 0;
-                      setFormData({ ...formData, tajweed_score: val });
-                    }}
-                    placeholder="0 - 100"
-                  />
-                  {formErrors.tajweed_score && <p className="text-xs text-red-500 text-right">{formErrors.tajweed_score}</p>}
-                </div>
-
-                <div className="grid gap-1 order-2">
-                  <Label htmlFor="memorization_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
-                    <span>درجة الحفظ</span>
-                  </Label>
-                  <Input
-                    id="memorization_score"
-                    type="text"
                     inputMode="decimal"
                     dir="rtl"
                     className="h-9 bg-white text-right"
@@ -1961,49 +1830,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         cancelButtonText="إلغاء"
       />
 
-      {/* حوار السجلات السابقة للطالب */}
-      <FormDialog
-        title={`📚السجلات السابقة - ${historyStudentName}`}
-        open={historyDialogOpen}
-        onOpenChange={setHistoryDialogOpen}
-        onSave={() => setHistoryDialogOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        // تكبير العرض لتسهيل قراءة الأعمدة
-        maxWidth="900px"
-      >
-        <div className="py-1">
-          {historyItems.length === 0 ? (
-            <div className="text-center text-sm text-gray-500 py-6">لا توجد سجلات أخرى</div>
-          ) : (
-            <GenericTable
-              title=""
-              defaultView="table"
-              enablePagination
-              defaultPageSize={6}
-              pageSizeOptions={[6, 12, 24, 60]}
-              data={historyItems.map((a, i) => ({
-                ...a,
-                id: String(a.id),
-                __index: i + 1,
-                __display: formatAssessmentDisplay(a)
-              })) as any}
-              className="rounded-xl border border-green-300 shadow-sm text-[11px]"
-              getRowClassName={(_: any, index: number) => `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} transition-colors`}
-              hideSortToggle
-              columns={([
-                { key: '__index', header: '🔢', align: 'center', render: (r: any) => <span className='text-[10px] font-bold'>{r.__index}</span> },
-                { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
-                { key: 'type', header: '📘 النوع', align: 'right', render: (r: any) => (<Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>{r.__display.type}</Badge>) },
-                { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir='rtl'>{r.__display.range}</span> },
-                { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
-                { key: 'details', header: '📊 تفاصيل', align: 'center', render: (r: any) => { const parts: string[] = []; if (r.tajweed_score !== undefined) parts.push(`تجويد: ${formatScore(r.tajweed_score)}`); if (r.memorization_score !== undefined) parts.push(`حفظ: ${formatScore(r.memorization_score)}`); if (r.recitation_score !== undefined) parts.push(`تلاوة: ${formatScore(r.recitation_score)}`); return parts.length ? <span className='text-[10px] whitespace-pre-line'>{parts.join('\n')}</span> : <span className='text-[10px] text-gray-400'>-</span>; } }
-              ]) as any}
-              emptyMessage="لا توجد سجلات"
-            />
-          )}
-        </div>
-      </FormDialog>
+      {/* نهاية الصفحة */}
 
     </div>
   );
