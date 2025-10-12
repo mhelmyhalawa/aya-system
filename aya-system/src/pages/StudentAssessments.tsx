@@ -1210,32 +1210,32 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
             }));
             return (
               <GenericTable
-              title={(() => {
-                const filteredCount = tableData.length;
-                const totalCount = filteredAssessments.length; // إجمالي بعد الفلاتر (قد يساوي نفسه دائماً إن لم يتغير المصدر)
-                const showTotalHint = showLatestPerStudent && filteredCount < totalCount;
-                const filteredCountStr = filteredCount.toLocaleString('ar-EG');
-                const totalCountStr = totalCount.toLocaleString('ar-EG');
-                return (
-                  <div className="flex w-full items-center gap-2 min-w-0">
-                    <BookOpen className="h-4 w-4 text-yellow-300 shrink-0" />
-                    <span className="text-white font-semibold text-[13px] sm:text-sm tracking-tight break-words whitespace-normal">
-                      تقييمات الطلاب
-                    </span>
-                    <span
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-500/80 to-emerald-600/80 text-white text-[10px] sm:text-[11px] font-bold shadow border border-white/20"
-                      title={`عدد السجلات الظاهرة: ${filteredCountStr}`}
-                    >
-                      {filteredCountStr}
-                    </span>
-                    {showTotalHint && (
-                      <span className="text-[10px] sm:text-[11px] text-green-200 truncate" title={`أحدث ${filteredCountStr} من إجمالي ${totalCountStr} سجل`}>
-                        أحدث {filteredCountStr} من إجمالي {totalCountStr}
+              title={(
+                <div className="w-full flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                        <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-400" />
+                        تقييمات الطلاب
                       </span>
-                    )}
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-green-500/80 to-emerald-600/80 text-white text-[10px] sm:text-[11px] font-bold shadow border border-white/20"
+                        title={`عدد السجلات الظاهرة: ${tableData.length.toLocaleString('ar-EG')}`}
+                      >
+                        {tableData.length.toLocaleString('ar-EG')}
+                      </span>
+                      {showLatestPerStudent && tableData.length < filteredAssessments.length && (
+                        <span
+                          className="text-[10px] sm:text-[11px] text-green-600 truncate"
+                          title={`أحدث ${tableData.length.toLocaleString('ar-EG')} من إجمالي ${filteredAssessments.length.toLocaleString('ar-EG')} سجل`}
+                        >
+                          أحدث {tableData.length.toLocaleString('ar-EG')} من إجمالي {filteredAssessments.length.toLocaleString('ar-EG')}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                );
-              })()}
+                </div>
+              )}
                 defaultView="table"
                 enablePagination
                 defaultPageSize={10}
