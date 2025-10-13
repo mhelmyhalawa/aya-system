@@ -96,7 +96,17 @@ export function UnifiedSelect<T extends string = string>(props: UnifiedSelectPro
             key={opt.value}
             value={opt.value}
             disabled={opt.disabled}
-            className={cn('select-item-base', sizeItemMap[size], opt.disabled && 'select-item-disabled', itemClassName, opt.className)}
+            className={cn(
+              'select-item-base',
+              'data-[highlighted]:bg-green-900 data-[highlighted]:text-white',
+              'dark:data-[highlighted]:bg-green-700/50',
+              'data-[state=checked]:bg-green-100 dark:data-[state=checked]:bg-green-800',
+              'data-[state=checked]:text-green-800 dark:data-[state=checked]:text-green-200 data-[state=checked]:font-semibold',
+              sizeItemMap[size],
+              opt.disabled && 'select-item-disabled',
+              itemClassName,
+              opt.className
+            )}
           >
             {opt.label}
           </SelectItem>

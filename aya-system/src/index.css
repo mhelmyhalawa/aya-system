@@ -17,9 +17,10 @@ All colors MUST be HSL.
     --popover: 50 40% 98%;
     --popover-foreground: 270 30% 20%;
 
-    --primary: 270 95% 35%;
-    --primary-foreground: 50 20% 98%;
-    --primary-hover: 120 60% 40%;
+  /* Switched primary brand from purple to green */
+  --primary: 120 60% 40%;
+  --primary-foreground: 50 20% 98%;
+  --primary-hover: 120 65% 35%;
 
     --secondary: 45 95% 70%;
     --secondary-foreground: 270 30% 20%;
@@ -28,9 +29,10 @@ All colors MUST be HSL.
     --muted: 45 20% 95%;
     --muted-foreground: 270 20% 45%;
 
-    --accent: 270 80% 45%;
-    --accent-foreground: 50 20% 98%;
-    --accent-hover: 120 60% 40%;
+  /* Accent also green to eliminate purple highlight in focus states */
+  --accent: 120 60% 40%;
+  --accent-foreground: 50 20% 98%;
+  --accent-hover: 120 65% 35%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
@@ -184,6 +186,13 @@ All colors MUST be HSL.
   /* Item base */
   .select-item-base {
     @apply text-right cursor-pointer rounded-md data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/50 px-2 py-1.5 text-[11px] sm:text-xs transition-colors;
+  }
+  /* Override any legacy purple highlight (Radix may inject default focus styles). Keep order after base item. */
+  .select-item-base[data-highlighted] {
+    @apply bg-green-900 dark:bg-green-700/50 text-white;
+  }
+  .select-item-base[data-state='checked'] {
+    @apply font-semibold bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200;
   }
   .select-item-sm { @apply text-[10px] sm:text-[11px] py-1; }
   .select-item-md { @apply text-[12px] sm:text-[13px] py-2; }

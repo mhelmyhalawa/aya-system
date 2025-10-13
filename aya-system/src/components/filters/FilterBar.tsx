@@ -4,6 +4,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { ChevronDown, X, Plus, Filter as FilterIcon, RotateCcw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+// Specialized memorization type helpers (predefined small static list)
+import { memorizationTypeOptions, getMemorizationTypeColor, getMemorizationTypeName } from '@/types/memorization-record';
 
 /**
  * Generic reusable FilterBar component
@@ -26,7 +28,7 @@ export interface FilterOption {
 }
 
 // Supported field kinds (extensible)
-export type FilterFieldType = 'select' | 'async-select' | 'text' | 'custom' | 'multi-select';
+export type FilterFieldType = 'select' | 'async-select' | 'text' | 'custom' | 'multi-select' | 'memorization-type';
 
 export interface BaseFilterField {
   id: string;                 // unique identifier used in callbacks
@@ -85,7 +87,15 @@ export interface MultiSelectFilterField extends BaseFilterField {
   enableSearch?: boolean; // show internal search box
 }
 
-export type FilterField = SelectFilterField | TextFilterField | CustomFilterField | MultiSelectFilterField;
+// NEW: Specialized memorization type select (small static option set)
+export interface MemorizationTypeFilterField extends BaseFilterField {
+  type: 'memorization-type';
+  value?: string | null;
+  onChange?: (value: string | null) => void;
+  clearable?: boolean; // allow clearing to all
+}
+
+export type FilterField = SelectFilterField | TextFilterField | CustomFilterField | MultiSelectFilterField | MemorizationTypeFilterField;
 
 // Action button definitions
 export interface FilterAction {
@@ -542,12 +552,111 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     );
   };
 
+  // Specialized memorization-type renderer (fixed small list; color badges inside menu)
+  const renderMemorizationTypeField = (field: MemorizationTypeFilterField) => {
+    const selectedValue = (values[field.id] as string) ?? null;
+    const options = memorizationTypeOptions; // [{value,label}]
+    return (
+      <div key={field.id} className={cn('flex flex-col gap-1 min-w-[140px] flex-1', field.className)}>
+        {(field.showLabel === true || (field.showLabel !== false && showFieldLabels)) && field.label && (
+          <label id={labelId(field.id)} className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">
+            {field.label}
+          </label>
+        )}
+        <div className="relative group">
+          <Select
+            value={selectedValue || ''}
+            onValueChange={(val) => {
+              if (val === '__EMPTY__') {
+                handleFieldChange(field.id, null);
+                field.onChange?.(null);
+              } else {
+                handleFieldChange(field.id, val || null);
+                field.onChange?.(val || null);
+              }
+            }}
+          >
+            <SelectTrigger
+              dir="rtl"
+              className={cn(
+                'h-9 text-right truncate text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all bg-white dark:bg-gray-800 shadow-sm',
+                selectedValue
+                  ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                  : 'border-gray-300 dark:border-gray-600 text-gray-500'
+              )}
+              aria-labelledby={field.label ? labelId(field.id) : undefined}
+            >
+              <SelectValue placeholder={field.label || 'نوع الحفظ'} />
+            </SelectTrigger>
+            <SelectContent
+              position="popper"
+              dir="rtl"
+              className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-60 overflow-auto"
+            >
+              {field.clearable !== false && (
+                <SelectItem
+                  value="__EMPTY__"
+                  className={cn(
+                    'font-medium',
+                    'text-green-700 dark:text-green-200',
+                    'cursor-pointer rounded-md transition-colors',
+                    'data-[highlighted]:bg-green-900 data-[highlighted]:text-white',
+                    'dark:data-[highlighted]:bg-green-700/50',
+                    'data-[state=checked]:bg-green-100 dark:data-[state=checked]:bg-green-800',
+                    'data-[state=checked]:text-green-800 dark:data-[state=checked]:text-green-200 data-[state=checked]:font-semibold'
+                  )}
+                >
+                  -- الكل --
+                </SelectItem>
+              )}
+              {options.map(opt => {
+                const colorClasses = getMemorizationTypeColor(opt.value as any);
+                return (
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    className={cn(
+                      'cursor-pointer rounded-md transition-colors text-[11px] sm:text-xs flex items-center gap-2',
+                      'data-[highlighted]:bg-green-900 data-[highlighted]:text-white',
+                      'dark:data-[highlighted]:bg-green-700/50',
+                      'data-[state=checked]:bg-green-100 dark:data-[state=checked]:bg-green-800',
+                      'data-[state=checked]:text-green-800 dark:data-[state=checked]:text-green-200 data-[state=checked]:font-semibold'
+                    )}
+                  >
+                    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full border text-[10px] font-medium', colorClasses)}>
+                      {getMemorizationTypeName(opt.value as any)}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          {field.clearable !== false && selectedValue && (
+            <button
+              type="button"
+              onClick={() => handleFieldChange(field.id, null)}
+              className={cn(
+                'absolute top-1/2 -translate-y-1/2 z-10',
+                'left-6',
+                'p-0.5 rounded-md text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-red-300 dark:focus:ring-red-700'
+              )}
+              aria-label="مسح الحقل"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const fieldRenderers: Record<FilterFieldType, (f: any) => React.ReactNode> = {
     'select': renderSelectField,
     'async-select': renderSelectField,
     'text': renderTextField,
     'custom': renderCustomField,
     'multi-select': renderMultiSelectField,
+    'memorization-type': renderMemorizationTypeField,
   };
 
   const visibleFields = fields.filter(f => !f.hidden);

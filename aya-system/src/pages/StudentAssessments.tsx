@@ -26,6 +26,7 @@ import { Plus, Pencil, Trash2, ClipboardList, RefreshCwIcon, Filter, ArrowDownUp
 import { getAllGuardians } from '@/lib/guardian-service';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { GenericTable } from '@/components/ui/generic-table';
+// ...existing imports...
 import { DeleteConfirmationDialog } from '@/components/ui/delete-confirmation-dialog';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -105,6 +106,19 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
   const [isTeacherPickerOpen, setIsTeacherPickerOpen] = useState(false);
   const [isStudentPickerOpen, setIsStudentPickerOpen] = useState(false);
   const [isCirclePickerOpen, setIsCirclePickerOpen] = useState(false);
+  // تحويل السجلات السابقة إلى صفوف جدول بعد توفر الطلاب والمعلمين (نتأكد من الترتيب)
+  const historyTableRows = useMemo(() => {
+    if (!historyItems || historyItems.length === 0) return [] as any[];
+    return historyItems.map((a, idx) => {
+      const display = formatAssessmentDisplay(a as any);
+      return {
+        ...a,
+        id: String(a.id),
+        __index: idx + 1,
+        __display: display
+      };
+    });
+  }, [historyItems, students, teachers]);
   const [teacherSearchTerm, setteacherSearchTerm] = useState('');
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [circlePickerSearch, setCirclePickerSearch] = useState('');
@@ -578,17 +592,46 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     // إذا كان المعلم المحدد في الفلتر مختلفًا، قم بتحديثه
     if (selectedTeacherId !== teacherId && teacherId !== 'all-teachers') {
       setSelectedTeacherId(teacherId);
-
-      // إذا كان هناك حلقة واحدة فقط لهذا المعلم، حددها تلقائيًا
       const teacherCircles = studyCircles.filter(c => c.teacher_id === teacherId);
       if (teacherCircles.length === 1) {
+        // اختيار تلقائي للحلقة الوحيدة
         handleCircleChange(teacherCircles[0].id);
       } else if (teacherCircles.length === 0) {
-        // إذا لم يكن هناك حلقات لهذا المعلم، أعد تعيين الحلقة المحددة
+        // لا حلقات => إعادة تعيين الحلقة
         setSelectedCircleId('all-circles');
+      } else {
+        // عدة حلقات: تأكد أن الحلقة الحالية تابعة للمعلم وإلا صفّرها
+        const currentStillValid = teacherCircles.some(c => c.id === selectedCircleId);
+        if (!currentStillValid) setSelectedCircleId('all-circles');
+      }
+    } else if (teacherId === 'all-teachers') {
+      // عند الرجوع لكل المعلمين، إذا كانت الحلقة الحالية مرتبطة بمعلم محدد لا يتطابق مع الاختيار الجديد قم بتصفيرها
+      if (selectedCircleId !== 'all-circles') {
+        const circle = studyCircles.find(c => c.id === selectedCircleId);
+        if (circle && circle.teacher_id) {
+          // السماح بالإبقاء لكنها تضل محسوبة ضمن الكل، لا تغيير إلا إذا أردنا إعادة الضبط
+          // إذا أردنا إعادة الضبط دائماً قم بإلغاء التعليق التالي:
+          // setSelectedCircleId('all-circles');
+        }
       }
     }
+
+    // تحقق من صلاحية الطالب الحالي بعد تغيير المعلم
+    setFormData(prev => {
+      if (!prev.student_id) return prev;
+      const st = students.find(s => s.id === prev.student_id);
+      if (!st) return { ...prev, student_id: undefined };
+      if (teacherId !== 'all-teachers') {
+        const stTeacherId = st.study_circle?.teacher_id;
+        if (stTeacherId && stTeacherId !== teacherId) return { ...prev, student_id: undefined };
+      }
+      if (selectedCircleId !== 'all-circles') {
+        if (st.study_circle?.id !== selectedCircleId) return { ...prev, student_id: undefined };
+      }
+      return prev;
+    });
   };
+  // نهاية handleTeacherChange
 
   // التعامل مع تغيير الحلقة المحددة في الفورم
   const handleCircleChange = (circleId: string) => {
@@ -602,7 +645,68 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         setFormData(prev => ({ ...prev, recorded_by: circle.teacher_id }));
       }
     }
+    // تحقق من صلاحية الطالب الحالي بعد تغيير الحلقة
+    setFormData(prev => {
+      if (!prev.student_id) return prev;
+      const st = students.find(s => s.id === prev.student_id);
+      if (!st) return { ...prev, student_id: undefined };
+      if (circleId !== 'all-circles' && st.study_circle?.id !== circleId) return { ...prev, student_id: undefined };
+      if (selectedTeacherId !== 'all-teachers') {
+        const stTeacherId = st.study_circle?.teacher_id;
+        if (stTeacherId && stTeacherId !== selectedTeacherId) return { ...prev, student_id: undefined };
+      }
+      return prev;
+    });
   };
+
+  // عند اختيار طالب في النموذج: عيّن الحلقة والمعلم (إن توفرت) تلقائياً
+  const handleStudentSelect = (studentId: string) => {
+    setFormData(prev => ({ ...prev, student_id: studentId }));
+    const st = students.find(s => s.id === studentId);
+    if (st) {
+      if (st.study_circle_id) {
+        // لا تغيّر اختيار المستخدم للحلقة يدوياً إلا إذا كانت (الكل) أو لا تتطابق
+        if (selectedCircleId === 'all-circles' || selectedCircleId !== st.study_circle_id) {
+          setSelectedCircleId(st.study_circle_id);
+        }
+      }
+      // ضبط المعلم المرتبط بالحـلقة إن وجد
+      const circle = st.study_circle_id ? studyCircles.find(c => c.id === st.study_circle_id) : undefined;
+      const teacherId = circle?.teacher_id || st.teacher_id;
+      if (teacherId && teacherId !== 'all-teachers' && teacherId !== selectedTeacherId) {
+        setSelectedTeacherId(teacherId);
+        setFormData(prev => ({ ...prev, recorded_by: teacherId }));
+      }
+    }
+  };
+
+  // تأثير لضمان تماسك الاختيارات (معلم ← حلقة ← طالب) عند فتح أو أثناء الحوار
+  useEffect(() => {
+    if (!isDialogOpen) return; // نتجنب التعديل خارج سياق الحوار
+
+    // تحقق من توافق الحلقة الحالية مع المعلم المحدد
+    if (selectedTeacherId !== 'all-teachers' && selectedCircleId !== 'all-circles') {
+      const circle = studyCircles.find(c => c.id === selectedCircleId);
+      if (circle && circle.teacher_id !== selectedTeacherId) {
+        setSelectedCircleId('all-circles');
+      }
+    }
+
+    // تحقق من صلاحية الطالب الحالي
+    setFormData(prev => {
+      if (!prev.student_id) return prev;
+      const st = students.find(s => s.id === prev.student_id);
+      if (!st) return { ...prev, student_id: undefined };
+      if (selectedTeacherId !== 'all-teachers') {
+        const stTeacherId = st.study_circle?.teacher_id;
+        if (stTeacherId && stTeacherId !== selectedTeacherId) return { ...prev, student_id: undefined };
+      }
+      if (selectedCircleId !== 'all-circles') {
+        if (st.study_circle?.id !== selectedCircleId) return { ...prev, student_id: undefined };
+      }
+      return prev;
+    });
+  }, [selectedTeacherId, selectedCircleId, studyCircles, students, isDialogOpen]);
 
   // التعامل مع تغيير السورة في نطاق التقييم
   const handleSurahChange = (field: 'from_surah' | 'to_surah', value: number) => {
@@ -662,6 +766,17 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
       notes: assessment.notes || '',
       recorded_by: assessment.recorded_by
     });
+    // تحديد الحلقة والمعلم المرتبطين بالتقييم (إن وُجدت معلومات الطالب/الحلقة محمّلة)
+    const studentRef = students.find(s => s.id === assessment.student_id);
+    if (studentRef?.study_circle_id) {
+      setSelectedCircleId(studentRef.study_circle_id);
+    }
+    // حاول استخراج المعلم من الحلقة أو من assessment.recorded_by
+    const circleRef = studentRef?.study_circle_id ? studyCircles.find(c => c.id === studentRef.study_circle_id) : undefined;
+    const inferredTeacher = circleRef?.teacher_id || assessment.recorded_by;
+    if (inferredTeacher && inferredTeacher !== selectedTeacherId) {
+      setSelectedTeacherId(inferredTeacher);
+    }
     setFormErrors({});
     setIsDialogOpen(true);
   };
@@ -848,8 +963,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
     }
   };
 
-  // تكوين نص عرض التقييم
-  const formatAssessmentDisplay = (assessment: Assessment) => {
+  // تكوين نص عرض التقييم (تعريف كـ function declaration لضمان الرفع hoisting)
+  function formatAssessmentDisplay(assessment: Assessment) {
     // إذا كان لدينا student في assessment (من استعلام الـ join) نستخدمه
     const studentFromAssessment = assessment.student;
     // وإلا نبحث في قائمة الطلاب
@@ -885,7 +1000,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
         calendar: 'gregory'
       })
     };
-  };
+  }
 
   // تعطيل الصفحة إذا لم يكن جدول التقييمات موجودًا
   if (!tableExists) {
@@ -1356,7 +1471,6 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   ...(activeTab !== 'my-records' ? [
                     { key: 'teacher', header: '👨‍🏫 المعلم', align: 'right', render: (r: any) => r.__display.teacher || 'غير معروف' }
                   ] : []),
-                  { key: 'circle', header: '𑁍 الحلقة', align: 'right', render: (r: any) => r.student?.study_circle ? (r.student.study_circle.name || `حلقة ${r.student.study_circle.id}`) : 'غير محدد' },
                   { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
                   {
                     key: 'type', header: '📖 النوع', align: 'right', render: (r: any) => (
@@ -1399,7 +1513,8 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                       return <span className="text-[10px] leading-4 whitespace-pre-line text-gray-600">{parts.join('\n')}</span>;
                     }
                   },
-                  {
+                  // إظهار عمود الإجراءات فقط إذا كان المستخدم superadmin أو admin أو (معلم ومالك السجل)
+                  ...((currentUser?.role === 'superadmin' || currentUser?.role === 'admin') ? [{
                     key: 'actions', header: '⚙️ الإجراءات', align: 'center', render: (r: any) => (
                       <div className="flex justify-center items-center gap-1">
                         <Button
@@ -1422,7 +1537,34 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                         </Button>
                       </div>
                     )
-                  }
+                  }] : (currentUser?.role === 'superadmin' ? [{
+                    key: 'actions', header: '⚙️', align: 'center', render: (r: any) => {
+                      const owns = r.recorded_by === currentUser.id || r.student?.study_circle?.teacher_id === currentUser.id;
+                      if (!owns) return <span className="text-[10px] text-gray-300">—</span>;
+                      return (
+                        <div className="flex justify-center items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEditAssessment(r)}
+                            className="h-8 w-8 p-0 hover:bg-green-100 dark:hover:bg-green-700 rounded-lg"
+                            title="تعديل"
+                          >
+                            <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteAssessment(r)}
+                            className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-700 rounded-lg"
+                            title="حذف"
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                          </Button>
+                        </div>
+                      );
+                    }
+                  }] : []))
                 ]) as any}
                 emptyMessage="لا توجد تقييمات"
               />
@@ -1541,7 +1683,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                         value: t.id,
                         label: (
                           <div className="flex flex-col text-right">
-                            <span className="font-medium">{t.full_name ?? `المعلم ${t.id.slice(0, 4)}`}</span>
+                            <span className="font-medium">👨‍🏫 {t.full_name ?? `المعلم ${t.id.slice(0, 4)}`}</span>
                           </div>
                         )
                       })) : []}
@@ -1559,7 +1701,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                       placeholder="اختر الحلقة"
                       options={visibleStudyCircles.length > 0 ? visibleStudyCircles.map(c => ({
                         value: c.id,
-                        label: c.name || `حلقة ${c.id}`
+                        label: `🕋 ${c.name || `حلقة ${c.id}`}`
                       })) : []}
                       emptyLabel="لا توجد حلقات متاحة"
                     />
@@ -1572,15 +1714,14 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                     id="student_id"
                     size="sm"
                     value={(formData.student_id || '') as string}
-                    onChange={(v) => setFormData({ ...formData, student_id: v })}
+                    onChange={(v) => handleStudentSelect(v)}
                     placeholder="اختر الطالب"
                     options={visibleStudents.length > 0 ? visibleStudents.map(s => ({
                       value: s.id,
                       label: (
                         <div className="flex flex-col">
                           <span className="font-medium">
-
-                            {s.full_name}
+                            👦 {s.full_name}
                             {s.guardian?.full_name && (<span> {s.guardian.full_name}</span>)}
                           </span>
                         </div>
@@ -1617,7 +1758,15 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                     value={formData.type as string}
                     onChange={(v) => setFormData({ ...formData, type: v as any })}
                     placeholder="اختر النوع"
-                    options={assessmentTypeOptions.map(o => ({ value: o.value, label: o.label }))}
+                    options={assessmentTypeOptions.map(o => ({
+                      value: o.value,
+                      label: (
+                        <span className="flex items-center gap-1">
+                          <span>📘</span>
+                          <span>{o.label}</span>
+                        </span>
+                      )
+                    }))}
                     emptyLabel="لا توجد خيارات"
                   />
                   {formErrors.type && <p className="text-xs text-red-500 text-right">{formErrors.type}</p>}
@@ -1671,7 +1820,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                     <SelectContent className="text-right max-h-[200px] text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                       {quranSurahs.map(surah => (
                         <SelectItem key={surah.number} value={surah.number.toString()} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
-                          {surah.name} ({surah.number})
+                          📖 {surah.name} ({surah.number})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1699,7 +1848,7 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                     <SelectContent className="text-right max-h-[200px] text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900">
                       {quranSurahs.map(surah => (
                         <SelectItem key={surah.number} value={surah.number.toString()} className="cursor-pointer data-[highlighted]:bg-green-900 dark:data-[highlighted]:bg-green-700/40 rounded-md">
-                          {surah.name} ({surah.number})
+                          📖 {surah.name} ({surah.number})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1738,12 +1887,13 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           {wizardStep === 2 && (
             <div className="grid gap-3 py-2">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="grid gap-1 order-3">
-                  <Label htmlFor="tajweed_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
-                    <span>درجة التجويد</span>
+                {/* درجة الحفظ */}
+                <div className="grid gap-1 order-1">
+                  <Label htmlFor="memorization_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
+                    <span>درجة الحفظ</span>
                   </Label>
                   <Input
-                    id="tajweed_score"
+                    id="memorization_score"
                     inputMode="decimal"
                     dir="rtl"
                     className="h-9 bg-white text-right"
@@ -1759,8 +1909,30 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                   />
                   {formErrors.memorization_score && <p className="text-xs text-red-500 text-right">{formErrors.memorization_score}</p>}
                 </div>
-
-                <div className="grid gap-1 order-1">
+                {/* درجة التجويد */}
+                <div className="grid gap-1 order-2">
+                  <Label htmlFor="tajweed_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
+                    <span>درجة التجويد</span>
+                  </Label>
+                  <Input
+                    id="tajweed_score"
+                    inputMode="decimal"
+                    dir="rtl"
+                    className="h-9 bg-white text-right"
+                    value={formData.tajweed_score !== undefined ? formData.tajweed_score : ''}
+                    onChange={(e) => {
+                      let val = parseFloat(e.target.value);
+                      if (isNaN(val)) val = undefined;
+                      else if (val > 100) val = 100;
+                      else if (val < 0) val = 0;
+                      setFormData({ ...formData, tajweed_score: val });
+                    }}
+                    placeholder="0 - 100"
+                  />
+                  {formErrors.tajweed_score && <p className="text-xs text-red-500 text-right">{formErrors.tajweed_score}</p>}
+                </div>
+                {/* درجة التلاوة */}
+                <div className="grid gap-1 order-3">
                   <Label htmlFor="recitation_score" className="text-xs font-medium text-gray-700 flex flex-row-reverse items-center gap-1">
                     <span>درجة التلاوة</span>
                   </Label>
@@ -1802,6 +1974,103 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
           )}
         </div>
       </FormDialog>
+
+      {/* حوار السجلات السابقة باستخدام FormDialog + GenericTable */}
+
+      <FormDialog
+        title={`📚 السجلات السابقة ${historyStudentName ? ' - ' + historyStudentName : ''}`}
+        open={historyDialogOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setHistoryDialogOpen(false);
+          } else {
+            setHistoryDialogOpen(true);
+          }
+        }}
+        mode="edit" /* عرض فقط */
+        hideCancelButton={false}
+        onSave={() => setHistoryDialogOpen(false)}
+        showSaveButton={false}
+        maxWidth="820px"
+        mobileFullScreen
+        mobileStickyHeader
+        mobileInlineActions
+        compactFooterSpacing
+      >
+        <GenericTable
+          title={null as any}
+          data={historyTableRows as any}
+          defaultView="table"
+          enablePagination
+          defaultPageSize={10}
+          pageSizeOptions={[10, 20, 50]}
+          className="overflow-hidden rounded-xl border border-green-300 shadow-md text-xs"
+          getRowClassName={(_: any, index: number) =>
+            `${index % 2 === 0 ? 'bg-green-50 hover:bg-green-100' : 'bg-white hover:bg-green-50'} cursor-pointer transition-colors`
+          }
+          columns={([
+            { key: '__index', header: '#', align: 'center', render: (r: any) => <span className="text-[11px] font-bold text-gray-600">{r.__index}</span> },
+            { key: 'date', header: '📅 التاريخ', align: 'right', render: (r: any) => r.__display.date },
+            {
+              key: 'type',
+              header: '📖 النوع',
+              align: 'right',
+              render: (r: any) => (
+                <Badge className={`px-2 py-1 rounded-lg bg-${r.__display.typeColor}-100 text-${r.__display.typeColor}-800 border-${r.__display.typeColor}-200`}>
+                  {r.__display.type}
+                </Badge>
+              )
+            },
+            { key: 'range', header: '🔖 النطاق', align: 'right', render: (r: any) => <span dir="rtl">{r.__display.range}</span> },
+            { key: 'score', header: '🏆 الدرجة', align: 'right', render: (r: any) => r.__display.score },
+            {
+              key: 'details',
+              header: '📊 تفاصيل',
+              align: 'right',
+              render: (r: any) => {
+                const parts: string[] = [];
+                if (r.tajweed_score !== undefined) parts.push(`تجويد: ${formatScore(r.tajweed_score)}`);
+                if (r.memorization_score !== undefined) parts.push(`حفظ: ${formatScore(r.memorization_score)}`);
+                if (r.recitation_score !== undefined) parts.push(`تلاوة: ${formatScore(r.recitation_score)}`);
+                return parts.length === 0
+                  ? <span className="text-[10px] text-gray-400">-</span>
+                  : <span className="text-[10px] leading-4 whitespace-pre-line text-gray-600">{parts.join('\n')}</span>;
+              }
+            },
+            ...(currentUser?.role === 'superadmin'
+              ? [{
+                  key: 'actions',
+                  header: '⚙️',
+                  align: 'center',
+                  render: (r: any) => (
+                    <div className="flex justify-center items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => { setHistoryDialogOpen(false); handleEditAssessment(r); }}
+                        className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-700 rounded-lg"
+                        title="تعديل"
+                      >
+                        <Pencil className="h-4 w-4 text-green-600 dark:text-green-300" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => { setHistoryDialogOpen(false); handleDeleteAssessment(r); }}
+                        className="h-7 w-7 p-0 hover:bg-red-100 dark:hover:bg-red-700 rounded-lg"
+                        title="حذف"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-500 dark:text-red-300" />
+                      </Button>
+                    </div>
+                  )
+                }]
+              : [])
+          ]) as any}
+          emptyMessage="لا توجد سجلات سابقة"
+        />
+      </FormDialog>
+
 
       {/* مربع حوار تأكيد الحذف */}
       <DeleteConfirmationDialog
