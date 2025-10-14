@@ -57,6 +57,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { User, BookOpen, Music, GraduationCap, ChevronDown, Search } from 'lucide-react';
 import { FormDialog } from '@/components/ui/form-dialog';
 import { GenericTable } from '@/components/ui/generic-table';
+import FilterBar from '@/components/filters/FilterBar';
 
 interface MemorizationRecordsProps {
   onNavigate: (path: string) => void;
@@ -1278,26 +1279,6 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                 <Filter className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">فلتر</span>
               </Button>
-              {/* زر الترتيب الخارجي */}
-              <Button
-                type="button"
-                variant={listSortDirection ? 'default' : 'outline'}
-                onClick={toggleListSort}
-                title={listSortDirection === null ? 'ترتيب تصاعدي حسب اسم الطالب' : listSortDirection === 'asc' ? 'ترتيب تنازلي' : 'إلغاء الترتيب'}
-                className={`flex items-center gap-1.5 rounded-2xl px-3 py-1.5 text-xs font-semibold h-8 shadow-md hover:scale-105 transition-transform duration-200
-                  ${listSortDirection === null
-                    ? 'bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600'
-                    : listSortDirection === 'asc'
-                      ? 'bg-yellow-500 hover:bg-yellow-600 text-white dark:bg-yellow-600 dark:hover:bg-yellow-500'
-                      : 'bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600'}`}
-              >
-                {listSortDirection === null && <ArrowDownUp className="h-3.5 w-3.5" />}
-                {listSortDirection === 'asc' && <ArrowDownAZ className="h-3.5 w-3.5" />}
-                {listSortDirection === 'desc' && <ArrowUpZA className="h-3.5 w-3.5" />}
-                <span className="hidden sm:inline">
-                  {listSortDirection === null ? 'ترتيب' : listSortDirection === 'asc' ? 'تصاعدي' : 'تنازلي'}
-                </span>
-              </Button>
               {/* زر التحديث */}
               <Button
                 variant="outline"
@@ -1335,169 +1316,140 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
             <div className="flex flex-col md:flex-row justify-between items-center gap-2 mb-2 bg-white 
                     dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 
                     rounded-lg animate-fade-in">
-
-              <div className="w-full md:flex-1 min-w-0 md:min-w-[180px]">
-                <Input
-                  title='🔍 بحث عن طالب أو ولي أمر أو سورة أو ملاحظات...'
-                  placeholder="🔍 بحث عن طالب أو ولي أمر أو سورة أو ملاحظات..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full rounded-xl border border-green-300 bg-green-50 shadow-sm focus:ring-2 focus:ring-islamic-green focus:border-islamic-green text-sm text-gray-800 dark:text-gray-200 transition-all duration-200"
-                />
-              </div>
-              {/* اختيار المعلم - زر يفتح حوار */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                {userRole === 'teacher' ? (
-                  <div className="relative w-full h-10 px-3 rounded-xl border flex items-center gap-2 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900 border-green-400" title="المعلم">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
-                    <span className="truncate text-sm text-green-700 font-medium">{currentUser?.full_name || 'المعلم'}</span>
-                    <div className="ml-auto flex items-center gap-1"><span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span><span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">{teacherStudyCircles.length}</span></div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsTeacherPickerOpen(true)}
-                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden
-                    ${selectedTeacher ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                    hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                    title="اختر معلماً"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><GraduationCap className="h-4 w-4" /></div>
-                      <span className={`truncate text-sm ${selectedTeacher ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedTeacher ? selectedTeacher.full_name : 'اختر معلماً'}</span>
-                    </div>
-                    <div className="flex items-center gap-2 pl-1">
-                      {selectedTeacher && (
-                        <span onClick={(e) => { e.stopPropagation(); setSelectedTeacherId('all-teachers'); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 text-green-500" />
-                    </div>
-                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                  </button>
-                )}
-              </div>
-
-              {/* اختيار الحلقة - زر يفتح حوار */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                {userRole === 'teacher' && teacherStudyCircles.length === 1 ? (
-                  <div className="relative w-full h-10 px-3 rounded-xl border border-green-300 dark:border-green-700 bg-white dark:bg-green-950 flex items-center gap-2">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><BookOpen className="h-4 w-4" /></div>
-                    <span className="truncate text-sm text-green-700 font-medium">{teacherStudyCircles[0]?.name || 'حلقة'}</span>
-                    <div className="ml-auto flex items-center gap-1"><span className="text-[10px] px-2 py-1 rounded-full bg-green-600 text-white">ثابت</span><span className="text-[10px] px-2 py-1 rounded-full bg-blue-600 text-white" title="عدد الحلقات">1</span></div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={selectedTeacherId === 'all-teachers' && visibleStudyCircles.length === 0}
-                    onClick={() => {
-                      if (visibleStudyCircles.length === 0) {
-                        toast({ title: 'لا توجد حلقات متاحة', description: 'لا توجد حلقات مرتبطة بالمعلم الحالي', variant: 'destructive' });
-                        return;
-                      }
-                      setIsCirclePickerOpen(true);
-                    }}
-                    className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
-                    ${selectedCircle ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                    hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                    title="اختر حلقة"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><BookOpen className="h-4 w-4" /></div>
-                      <span className={`truncate text-sm ${selectedCircle ? 'text-green-700 font-medium' : 'text-gray-500'}`}>{selectedCircle ? selectedCircle.name : (visibleStudyCircles.length === 0 ? 'لا توجد حلقات' : 'اختر حلقة')}</span>
-                    </div>
-                    <div className="flex items-center gap-2 pl-1">
-                      {selectedCircle && (
-                        <span onClick={(e) => { e.stopPropagation(); setSelectedCircleId('all-circles'); clearStudentSelection(); }} className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors">ازالة</span>
-                      )}
-                      <ChevronDown className="h-4 w-4 text-green-500" />
-                    </div>
-                    <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                  </button>
-                )}
-              </div>
-
-              {/* اختيار الطالب - زر يفتح حوار */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                <button
-                  type="button"
-                  disabled={visibleStudents.length === 0}
-                  onClick={() => {
-                    if (visibleStudents.length === 0) return;
-                    setIsStudentPickerOpen(true);
+              {/* FilterBar unified filters */}
+              <div className="w-full" dir="rtl">
+                <FilterBar
+                  values={{
+                    teacher: selectedTeacherId === 'all-teachers' ? null : selectedTeacherId,
+                    circle: selectedCircleId === 'all-circles' ? null : selectedCircleId,
+                    type: filterType === 'all' ? null : filterType,
+                    students: selectedStudentIds.length === 0 ? null : selectedStudentIds.join(','),
+                    q: searchQuery || ''
                   }}
-                  className={`group relative w-full h-10 px-3 rounded-xl border text-right transition-all duration-200 flex items-center justify-between overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed
-                  ${!isAllStudentsSelected ? 'border-green-400 bg-gradient-to-br from-white to-green-50/60 dark:from-green-900/40 dark:to-green-900' : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                  hover:border-green-400 hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-500/50`}
-                  title="اختر طالباً"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600"><User className="h-4 w-4" /></div>
-                    <span className={`truncate text-sm ${!isAllStudentsSelected ? 'text-green-700 font-medium' : 'text-gray-500'}`}>
-                      {isAllStudentsSelected
-                        ? (visibleStudents.length === 0 ? 'لا يوجد طلاب' : 'اختر طلاباً / جميع الطلاب')
-                        : selectedStudentIds.length === 1
-                          ? (visibleStudents.find(s => s.id === selectedStudentIds[0])?.full_name || 'طالب')
-                          : `عدد (${selectedStudentIds.length}) طالب`
+                  showFieldLabels={false}
+                  onValuesChange={(vals) => {
+                    // بحث
+                    setSearchQuery(String(vals.q ?? ''));
+                    // معلم
+                    if (vals.teacher === null) {
+                      if (selectedTeacherId !== 'all-teachers') setSelectedTeacherId('all-teachers');
+                    } else if (vals.teacher !== selectedTeacherId) {
+                      setSelectedTeacherId(String(vals.teacher));
+                      // إعادة ضبط الحلقة عند تغيير المعلم
+                      setSelectedCircleId('all-circles');
+                    }
+                    // حلقة
+                    if (vals.circle === null) {
+                      if (selectedCircleId !== 'all-circles') setSelectedCircleId('all-circles');
+                    } else if (vals.circle !== selectedCircleId) {
+                      setSelectedCircleId(String(vals.circle));
+                    }
+                    // نوع الحفظ
+                    if (vals.type === null) {
+                      if (filterType !== 'all') setFilterType('all');
+                    } else if (vals.type !== filterType) {
+                      setFilterType(String(vals.type));
+                    }
+                    // طلاب متعددون
+                    if (vals.students === null || vals.students === '') {
+                      if (selectedStudentIds.length > 0) setSelectedStudentIds([]);
+                    } else {
+                      const list = String(vals.students).split(',').filter(Boolean);
+                      if (list.sort().join('|') !== selectedStudentIds.slice().sort().join('|')) {
+                        setSelectedStudentIds(list);
                       }
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-1">
-                    {!isAllStudentsSelected && (
-                      <span
-                        onClick={(e) => { e.stopPropagation(); clearStudentSelection(); }}
-                        className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                      >ازالة</span>
-                    )}
-                    <ChevronDown className="h-4 w-4 text-green-500" />
-                  </div>
-                  <span className="pointer-events-none absolute inset-0 rounded-xl border border-transparent group-hover:border-green-300/60" />
-                </button>
-              </div>
-
-              {/* اختيار النوع */}
-              <div className="flex-1 min-w-[160px] flex flex-col gap-1 relative">
-                {/* نسخة مُبسطة محسّنة بدون تدرجات مزعجة أو ألوان أرجوانية */}
-                <div className="w-full">
-                  <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger
-                      className={`w-full h-10 ps-3 pe-2 rounded-xl border text-right flex items-center gap-2 overflow-hidden text-sm transition-colors
-                      ${filterType !== 'all'
-                        ? 'border-green-500 bg-green-50/70 dark:bg-green-900/40'
-                        : 'border-green-300 dark:border-green-700 bg-white dark:bg-green-950'}
-                      hover:bg-green-50 hover:border-green-400 focus:outline-none focus:ring-2 focus:ring-green-400`}
-                    >
-                      {/* أيقونة القسم (يمين) */}
-                      <div className="h-7 w-7 shrink-0 rounded-lg bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600 text-base">۝</div>
-                      {/* النص */}
-                      <span className={`truncate flex-1 ${filterType !== 'all' ? 'text-green-700 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                        {filterType === 'all'
-                          ? 'جميع الأنواع'
-                          : memorizationTypeOptions.find(o => o.value === filterType)?.label || 'نوع'}
-                      </span>
-                      {/* السهم (يسار) */}
-                    </SelectTrigger>
-                    <SelectContent
-                      dir="rtl"
-                      className="text-sm bg-white dark:bg-green-950 border border-green-200 dark:border-green-700 rounded-lg shadow-lg p-1"
-                    >
-                      <SelectItem
-                        value="all"
-                        className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors"
-                      >
-                        جميع الأنواع
-                      </SelectItem>
-                      {memorizationTypeOptions.map(option => (
-                        <SelectItem
-                          key={option.value}
-                          value={option.value}
-                          className="text-right text-[12px] cursor-pointer rounded-md px-2 py-1.5 data-[highlighted]:bg-green-100 data-[highlighted]:text-green-800 focus:bg-green-100 focus:text-green-800 transition-colors"
-                        >
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    }
+                  }}
+                  fields={[
+                    {
+                      id: 'teacher',
+                      label: 'المعلم',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫' },
+                        ...visibleTeachers.map(t => ({ value: t.id, label: t.full_name || '—', icon: '👨‍🏫' }))
+                      ],
+                      value: selectedTeacherId === 'all-teachers' ? null : selectedTeacherId,
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') {
+                          setSelectedTeacherId('all-teachers');
+                          setSelectedCircleId('all-circles');
+                        } else {
+                          setSelectedTeacherId(val);
+                          setSelectedCircleId('all-circles');
+                        }
+                      }
+                    },
+                    {
+                      id: 'circle',
+                      label: 'الحلقة',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋' },
+                        ...visibleStudyCircles.map(c => ({ value: c.id, label: c.name || '—', icon: '🕋' }))
+                      ],
+                      value: selectedCircleId === 'all-circles' ? null : selectedCircleId,
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') setSelectedCircleId('all-circles'); else setSelectedCircleId(val);
+                      }
+                    },
+                    {
+                      id: 'students',
+                      label: 'الطلاب',
+                      type: 'multi-select',
+                      enableSearch: true,
+                      clearable: true,
+                      options: (() => {
+                        let list = visibleStudents;
+                        // (يمكن إضافة فلاتر إضافية هنا لاحقاً)
+                        return list.map(s => ({ value: s.id, label: s.full_name || '—', icon: '👦' }));
+                      })(),
+                      value: selectedStudentIds,
+                      onChange: (vals: string[]) => setSelectedStudentIds(vals)
+                    },
+                    {
+                      id: 'type',
+                      label: 'نوع الحفظ',
+                      type: 'memorization-type',
+                      clearable: true,
+                      value: filterType === 'all' ? null : filterType,
+                      onChange: (val) => {
+                        if (!val) setFilterType('all'); else setFilterType(val);
+                      }
+                    },
+                    {
+                      id: 'q',
+                      label: 'بحث',
+                      type: 'text',
+                      placeholder: '🔍 بحث...',
+                      value: searchQuery,
+                      debounceMs: 400,
+                      onChange: (v) => setSearchQuery(v)
+                    }
+                  ]}
+                  actions={[{
+                    id: 'reset',
+                    label: 'إعادة تعيين',
+                    variant: 'outline',
+                    className: 'w-full sm:w-auto justify-center font-semibold text-[11px] sm:text-xs h-9 bg-white dark:bg-gray-900 border-green-300 hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200 mt-2 sm:mt-0',
+                    onClick: () => {
+                      setSelectedTeacherId(currentUser?.role === 'teacher' ? currentUser.id : 'all-teachers');
+                      setSelectedCircleId('all-circles');
+                      setSelectedStudentIds([]);
+                      setFilterType('all');
+                      setSearchQuery('');
+                      clearStudentSelection();
+                    }
+                  }]}
+                  enableDefaultApplyButton={false}
+                  enableDefaultResetButton={false}
+                  actionsPlacement="wrap"
+                  className="bg-transparent p-0"
+                />
               </div>
             </div>
           )}
@@ -1541,10 +1493,22 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
               id: record.id.toString(),
               __index: idx + 1, // رقم تسلسلي
             })) as any}
+            title={(
+              <div className="w-full flex flex-col gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                       <NotebookPenIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                      سجلات الحفظ والمراجعة
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             enablePagination
             defaultPageSize={5}
             pageSizeOptions={[5, 10, 20, 50]}
-            hideSortToggle
+            hideSortToggle={false}
             columns={[
               {
                 key: '__index',
@@ -1798,9 +1762,9 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                     <SelectContent position="popper" dir="rtl" className="select-content-base">
                       {visibleTeachers && visibleTeachers.length > 0 ? (
                         visibleTeachers.map(teacher => (
-                          <SelectItem key={teacher.id} value={teacher.id} 
-                          className="select-item-base">
-                            {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0,4)}`}
+                          <SelectItem key={teacher.id} value={teacher.id}
+                            className="select-item-base">
+                            {teacher.full_name || teacher.display_name || `معلم ${teacher.id.slice(0, 4)}`}
                             {teacher.role && (teacher.role === 'teacher' ? ' (معلم)' : ` (${teacher.role === 'admin' ? 'مشرف' : teacher.role})`)}
                           </SelectItem>
                         ))
@@ -1828,7 +1792,7 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                             key={circle.id}
                             value={circle.id}
                             className="select-item-base">
-                            {circle.name || `حلقة ${circle.id.slice(0,4)}`}
+                            {circle.name || `حلقة ${circle.id.slice(0, 4)}`}
                           </SelectItem>
                         ))
                       ) : (
@@ -1973,385 +1937,6 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
         deleteButtonText="نعم، احذف السجل"
         cancelButtonText="إلغاء"
       />
-
-      {/* حوار اختيار المعلم */}
-      <FormDialog
-        title={'المعلم'}
-        open={isTeacherPickerOpen}
-        onOpenChange={setIsTeacherPickerOpen}
-        onSave={() => setIsTeacherPickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="640px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          {/* شريط أدوات مصغر للمعلمين */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder="🔍 اسم المعلم"
-                value={teacherSearchTerm}
-                onChange={(e) => setteacherSearchTerm(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          </div>
-
-          <GenericTable
-            title=""
-            defaultView="table"
-            enablePagination
-            defaultPageSize={4}
-            pageSizeOptions={[4, 8, 16, 48, 100]}
-            data={filteredTeachersForPicker}
-            getRowClassName={(item: any, index: number) => `${item.id === selectedTeacherId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              {
-                key: 'row_index',
-                header: '🔢',
-                width: '32px',
-                align: 'center' as const,
-                render: (_: any, globalIndex?: number) => (
-                  <span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>
-                )
-              },
-              {
-                key: 'full_name',
-                header: '👨‍🏫 المعلم',
-                align: 'center' as const,
-                render: (item: any) => {
-                  const selected = item.id === selectedTeacherId;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedTeacherId(item.id);
-                        setSelectedCircleId('all-circles');
-                        clearStudentSelection();
-                        setIsTeacherPickerOpen(false);
-                      }}
-                      className="w-full flex items-center justify-center group px-1"
-                    >
-                      <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.full_name}</span>
-                    </button>
-                  );
-                }
-              },
-              {
-                key: 'circles_count',
-                header: '📘 الحلقات',
-                align: 'center' as const,
-                render: (item: any) => (
-                  <span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{teacherCirclesCountMap[item.id] ?? 0}</span>
-                )
-              },
-              {
-                key: 'actions',
-                header: `⚙️ الإجراءات`,
-                align: 'center' as const,
-                render: (item: any) => {
-                  const selected = item.id === selectedTeacherId;
-                  return (
-                    <div className="flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedTeacherId(item.id);
-                          setSelectedCircleId('all-circles');
-                          clearStudentSelection();
-                          setIsTeacherPickerOpen(false);
-                        }}
-                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
-                        title={selected ? 'محدد' : 'تحديد'}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  );
-                }
-              }
-            ]) as any}
-            emptyMessage={'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
-      {/* حوار اختيار الطالب (منقول لأسفل بعد تعريف الحالات) */}
-      <FormDialog
-        title={'بحث وتحديد الطلاب'}
-        open={isStudentPickerOpen}
-        onOpenChange={setIsStudentPickerOpen}
-        onSave={() => setIsStudentPickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="680px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          {/* شريط أدوات مصغر لاختيار الطلاب */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder="🔍 اسم الطالب / ولي الأمر"
-                value={studentSearchTerm}
-                onChange={(e) => setStudentSearchTerm(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => {
-                  // تحديد جميع الظاهرين أو إلغاء الكل إذا كانوا كلهم محددين
-                  const ids = filteredStudentsForPicker.map((s: any) => s.id);
-                  const allSelected = ids.every((id: string) => selectedStudentIds.includes(id));
-                  if (allSelected) {
-                    // إزالة فقط الظاهرين
-                    setSelectedStudentIds(prev => prev.filter(id => !ids.includes(id)));
-                  } else {
-                    // دمج مع الحاليين
-                    setSelectedStudentIds(prev => Array.from(new Set([...prev, ...ids])));
-                  }
-                }}
-                className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-green-600 hover:bg-green-700 text-white shadow transition"
-                title="تحديد/إلغاء تحديد المعروض"
-              >
-                الكل
-              </button>
-              {!isAllStudentsSelected && (
-                <button
-                  type="button"
-                  onClick={clearStudentSelection}
-                  className="h-8 px-2 rounded-lg text-[10px] font-semibold bg-red-500 hover:bg-red-600 text-white shadow transition"
-                  title="إزالة جميع التحديد"
-                >
-                  مسح
-                </button>
-              )}
-              <div
-                className={`h-8 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center
-                ${isAllStudentsSelected
-                    ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                    : 'bg-green-100 text-green-700 dark:bg-green-800 dark:text-green-100'}`}
-                title="عدد المحددين"
-              >
-                {isAllStudentsSelected ? 'الجميع' : selectedStudentIds.length}
-              </div>
-            </div>
-          </div>
-
-          <GenericTable
-            title=""
-            defaultView="table"
-            enablePagination
-            defaultPageSize={6}
-            pageSizeOptions={[6, 12, 24, 60]}
-            data={filteredStudentsForPicker}
-            getRowClassName={(item: any, index: number) =>
-              `${selectedStudentIds.includes(item.id)
-                ? 'bg-green-100/70 hover:bg-green-100'
-                : index % 2 === 0
-                  ? 'bg-white hover:bg-green-50'
-                  : 'bg-green-50 hover:bg-green-100'
-              } cursor-pointer transition-colors`
-            }
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              {
-                key: 'row_index',
-                header: '🔢',
-                width: '32px',
-                align: 'center' as const,
-                render: (_: any, globalIndex?: number) => (
-                  <span className="text-[10px] font-medium block text-center">
-                    {(globalIndex ?? 0) + 1}
-                  </span>
-                )
-              },
-              {
-                key: 'full_name',
-                header: '👦 الطالب',
-                align: 'center' as const,
-                render: (item: any) => {
-                  const selected = selectedStudentIds.includes(item.id);
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => { toggleStudentSelection(item.id); }}
-                      className="w-full flex items-center justify-center group px-1"
-                    >
-                      <span
-                        className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}
-                      >
-                        {item.full_name}
-                      </span>
-                    </button>
-                  );
-                }
-              },
-              {
-                key: 'guardian',
-                header: '👪 ولي الأمر',
-                align: 'center' as const,
-                render: (item: any) => (
-                  <span className="block w-full text-center text-[10px] sm:text-[11px]">
-                    {item.guardian?.full_name || '-'}
-                  </span>
-                )
-              },
-              {
-                key: 'circle',
-                header: '𑁍 الحلقة',
-                align: 'center' as const,
-                render: (item: any) => (
-                  <span className="block w-full text-center text-[10px] sm:text-[11px]">
-                    {item.study_circle?.name || '-'}
-                  </span>
-                )
-              },
-              {
-                key: 'actions',
-                header: '⚙️ إجراءات',
-                align: 'center' as const,
-                render: (item: any) => {
-                  const selected = selectedStudentIds.includes(item.id);
-                  return (
-                    <div className="flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => { toggleStudentSelection(item.id); }}
-                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm
-              ${selected
-                            ? 'bg-green-600 border-green-600 text-white hover:bg-green-600'
-                            : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
-                        title={selected ? 'إزالة من التحديد' : 'تحديد'}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  );
-                }
-              }
-            ]) as any}
-            emptyMessage={'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
-
-      {/* حوار اختيار الحلقة */}
-      <FormDialog
-        title={'الحلقة'}
-        open={isCirclePickerOpen}
-        onOpenChange={setIsCirclePickerOpen}
-        onSave={() => setIsCirclePickerOpen(false)}
-        mode="edit"
-        showSaveButton={false}
-        maxWidth="640px"
-      >
-        <div className="flex flex-col gap-3 py-1">
-          {/* شريط أدوات مصغر للحلقات */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />
-              <Input
-                placeholder="🔍 اسم الحلقة"
-                value={circlePickerSearch}
-                onChange={(e) => setCirclePickerSearch(e.target.value)}
-                className="pr-8 h-8 text-[11px] rounded-lg bg-white dark:bg-green-950 border-green-300 dark:border-green-700 focus:ring-1 focus:ring-green-500"
-              />
-            </div>
-          </div>
-
-          <GenericTable
-            title=""
-            defaultView="table"
-            enablePagination
-            defaultPageSize={4}
-            pageSizeOptions={[4, 8, 16, 48, 100]}
-            data={filteredCirclesForPicker}
-            getRowClassName={(item: any, index: number) => `${item.id === selectedCircleId ? 'bg-green-100/70 hover:bg-green-100' : index % 2 === 0 ? 'bg-white hover:bg-green-50' : 'bg-green-50 hover:bg-green-100'} cursor-pointer transition-colors`}
-            hideSortToggle
-            className="rounded-xl border border-green-300 shadow-sm text-[10px] sm:text-[11px]"
-            columns={([
-              {
-                key: 'row_index',
-                header: '🔢',
-                width: '32px',
-                align: 'center' as const,
-                render: (_: any, globalIndex?: number) => (
-                  <span className="text-[10px] font-medium block text-center">{(globalIndex ?? 0) + 1}</span>
-                )
-              },
-              {
-                key: 'name',
-                header: '𑁍 الحلقة',
-                align: 'center' as const,
-                render: (item: any) => {
-                  const selected = item.id === selectedCircleId;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCircleId(item.id);
-                        clearStudentSelection();
-                        setIsCirclePickerOpen(false);
-                      }}
-                      className="w-full flex items-center justify-center group px-1"
-                    >
-                      <span className={`truncate text-center text-[10px] sm:text-[11px] font-medium group-hover:text-green-700 ${selected ? 'text-green-700' : 'text-gray-700'}`}>{item.name}</span>
-                    </button>
-                  );
-                }
-              },
-              {
-                key: 'students_count',
-                header: '👥 العدد',
-                align: 'center' as const,
-                render: (item: any) => (
-                  <span className="block w-full text-center text-[10px] sm:text-[11px] font-semibold text-green-700">{circleStudentsCountMap[item.id] ?? 0}</span>
-                )
-              },
-              {
-                key: 'max_students',
-                header: '👥 الحد',
-                align: 'center' as const,
-                render: (item: any) => (
-                  <span className="block w-full text-center text-[10px] sm:text-[11px]">{(item.max_students ?? item.capacity) || '-'}</span>
-                )
-              },
-              {
-                key: 'actions',
-                header: `⚙️ الإجراءات`,
-                align: 'center' as const,
-                render: (item: any) => {
-                  const selected = item.id === selectedCircleId;
-                  return (
-                    <div className="flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCircleId(item.id);
-                          clearStudentSelection();
-                          setIsCirclePickerOpen(false);
-                        }}
-                        className={`w-6 h-6 flex items-center justify-center rounded-full border text-[10px] font-bold transition-colors shadow-sm ${selected ? 'bg-green-600 border-green-600 text-white hover:bg-green-600' : 'bg-white border-green-300 text-green-600 hover:bg-green-50'}`}
-                        title={selected ? 'محددة' : 'تحديد'}
-                      >
-                        ✓
-                      </button>
-                    </div>
-                  );
-                }
-              }
-            ]) as any}
-            emptyMessage={'لا يوجد بيانات'}
-          />
-        </div>
-      </FormDialog>
 
       {/* حوار عرض جميع سجلات الطالب */}
       <Dialog open={isStudentRecordsDialogOpen} onOpenChange={setIsStudentRecordsDialogOpen}>
