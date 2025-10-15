@@ -1368,10 +1368,16 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       showSearch: true,
                       clearable: true,
                       options: [
-                        { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫' },
-                        ...visibleTeachers.map(t => ({ value: t.id, label: t.full_name || '—', icon: '👨‍🏫' }))
+                        { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫', meta: { count: visibleTeachers.length } },
+                        ...visibleTeachers.map(t => ({
+                          value: t.id,
+                          label: t.full_name || '—',
+                          icon: '👨‍🏫',
+                          meta: { count: studyCircles.filter(c => c.teacher_id === t.id).length }
+                        }))
                       ],
                       value: selectedTeacherId === 'all-teachers' ? null : selectedTeacherId,
+                      showCountsFromMetaKey: 'count',
                       onChange: (val) => {
                         if (!val || val === '__ALL__') {
                           setSelectedTeacherId('all-teachers');
@@ -1389,10 +1395,16 @@ const MemorizationRecords: React.FC<MemorizationRecordsProps> = ({ onNavigate, c
                       showSearch: true,
                       clearable: true,
                       options: [
-                        { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋' },
-                        ...visibleStudyCircles.map(c => ({ value: c.id, label: c.name || '—', icon: '🕋' }))
+                        { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋', meta: { count: visibleStudyCircles.length } },
+                        ...visibleStudyCircles.map(c => ({
+                          value: c.id,
+                          label: c.name || '—',
+                          icon: '🕋',
+                          meta: { count: (c as any).students_count ?? students.filter(s => (s.study_circle && s.study_circle.id === c.id) || s.study_circle_id === c.id).length }
+                        }))
                       ],
                       value: selectedCircleId === 'all-circles' ? null : selectedCircleId,
+                      showCountsFromMetaKey: 'count',
                       onChange: (val) => {
                         if (!val || val === '__ALL__') setSelectedCircleId('all-circles'); else setSelectedCircleId(val);
                       }

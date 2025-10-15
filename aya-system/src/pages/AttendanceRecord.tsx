@@ -58,8 +58,7 @@ import {
   upsertAttendance
 } from "@/lib/attendance-service";
 import { getStudentsCountInCircles } from "@/lib/student-count-service";
-import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
-import { TeacherCircleFilterBar } from '@/components/filters/TeacherCircleFilterBar';
+import { FilterBar, FilterField, FilterOption } from '@/components/filters/FilterBar';
 import { GenericTable, Column } from '@/components/ui/generic-table';
 import { cn } from '@/lib/utils';
 // ================== تعريف الأنواع الداخلية ==================
@@ -495,6 +494,111 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
     );
   }, [circlesAfterTeacher, searchTerm]);
 
+  // إعداد قيم FilterBar الموحدة
+  const filterBarValues = useMemo(() => ({
+    teacher: selectedTeacherId || null,
+    circle: selectedCircle || null,
+    search: searchTerm || '',
+    session: selectedSession?.id ? String(selectedSession.id) : null
+  }), [selectedTeacherId, selectedCircle, searchTerm, selectedSession]);
+
+  const teacherOptions: FilterOption[] = useMemo(() => {
+    const base = teachersForFilter.map(t => ({
+      value: t.id,
+      label: t.name,
+      meta: { circles: t.circles_count }
+    }));
+    return base;
+  }, [teachersForFilter]);
+
+  const circleOptions: FilterOption[] = useMemo(() => {
+    return circlesAfterTeacher.map(c => ({
+      value: c.id,
+      label: c.name,
+      meta: { students: studentsCount[c.id] || 0 }
+    }));
+  }, [circlesAfterTeacher, studentsCount]);
+
+  const filterFields: FilterField[] = useMemo(() => [
+    {
+      id: 'teacher',
+      label: 'المعلم',
+      type: 'select',
+      showSearch: true,
+      clearable: true,
+      options: [
+        ...teachersForFilter.map(t => ({ value: t.id, label: t.name || '—', icon: '👨‍🏫', meta: { count: t.circles_count } }))
+      ],
+      value: selectedTeacherId || null,
+      showCountsFromMetaKey: 'count',
+      onChange: (val) => {
+        if (!val) {
+          // منع الفراغ: اختيار أول معلم متاح
+          const first = teachersForFilter[0];
+          if (first) {
+            setSelectedTeacherId(first.id);
+            // إعادة ضبط الجلسة
+            setSelectedSession(null);
+            const firstCircle = baseCircles.find(c => c.teacher?.id === first.id);
+            if (firstCircle) setSelectedCircle(firstCircle.id);
+          }
+          return;
+        }
+        setSelectedTeacherId(val);
+        setSelectedSession(null); // إعادة ضبط الجلسة عند تغيير المعلم
+        const firstCircle = baseCircles.find(c => c.teacher?.id === val);
+        if (firstCircle) setSelectedCircle(firstCircle.id);
+      }
+    },
+    {
+      id: 'circle',
+      label: 'الحلقة',
+      type: 'select',
+      showSearch: true,
+      clearable: true,
+      options: [
+        ...circlesAfterTeacher.map(c => ({ value: c.id, label: c.name || '—', icon: '🕋', meta: { count: studentsCount[c.id] || 0 } }))
+      ],
+      value: selectedCircle || null,
+      showCountsFromMetaKey: 'count',
+      onChange: (val) => {
+        if (!val) {
+          // منع الفراغ: اختيار أول حلقة للقائمة الحالية
+          const first = circlesAfterTeacher[0];
+          if (first) {
+            handleCircleChange(first.id);
+            setSelectedSession(null); // إعادة ضبط الجلسة عند إعادة التعيين
+          }
+          return;
+        }
+        handleCircleChange(val);
+        setSelectedSession(null); // إعادة ضبط الجلسة عند تغيير الحلقة
+      }
+    },
+    {
+      id: 'session',
+      type: 'session-select',
+      label: 'الجلسة',
+      value: selectedSession?.id ? String(selectedSession.id) : null,
+      sessions: circleSessions.map(s => ({
+        id: String(s.id),
+        dateLabel: formatDateDisplay(s.session_date),
+        isToday: (new Date(s.session_date)).toDateString() === (new Date()).toDateString()
+      })),
+      onChange: (val: string | null) => {
+        const ses = circleSessions.find(cs => String(cs.id) === val);
+        setSelectedSession(ses || null);
+      },
+      collapsible: false,
+      useShadSelect: true
+    }
+  ], [teachersForFilter, circlesAfterTeacher, selectedTeacherId, selectedCircle, searchTerm, baseCircles, studentsCount, circleSessions, selectedSession]);
+
+  // إجراءات شريط الفلترة (حالياً لا توجد أزرار إضافية ولكن نُعرّفها كمصفوفة ثابتة لتفادي useMemo داخل JSX الشرطي)
+  const filterActions = useMemo(() => ([]), []);
+
+  // سيتم تعريف filterActions بعد تعريف handleResetSelections لتجنب استخدام قبل التصريح
+
   // إذا تغيّرت الفلترة وأصبحت الحلقة المختارة خارج النطاق، اختر أول حلقة متاحة
   useEffect(() => {
     if (selectedCircle && !filteredCircles.some(c => c.id === selectedCircle)) {
@@ -893,7 +997,6 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
           {/* شريط التحكم بالفلاتر (الأزرار) */}
           <div className={`flex flex-col md:flex-row justify-end items-center gap-2 mb-2 rounded-md p-1.5 shadow-sm border transition-colors duration-200 ${hasChanges ? 'bg-amber-50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-600' : 'bg-white dark:bg-gray-900 border-green-200 dark:border-green-700'}`}>
             <div className="flex flex-wrap gap-2 items-center ">
-              {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
               <Button
                 variant={showFilters ? 'default' : 'outline'}
                 className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
@@ -918,66 +1021,18 @@ export function AttendanceRecord({ onNavigate, currentUser }: AttendanceRecordPr
 
           {showFilters && (
             <div className="mb-3 mt-1">
-              <TeacherCircleFilterBar
-                teachers={teachersForFilter}
-                circles={filteredCircles.map(c => ({ id: c.id, name: c.name, teacher_id: c.teacher?.id }))}
-                selectedTeacherId={selectedTeacherId}
-                selectedCircleId={selectedCircle || null}
-                hideFieldLabels={true}
-                showSessionSelect
-                sessions={circleSessions.map(s => {
-                  const d = new Date(s.session_date); const t = new Date();
-                  d.setHours(0, 0, 0, 0); t.setHours(0, 0, 0, 0);
-                  return { id: String(s.id), dateLabel: formatDateDisplay(s.session_date), isToday: d.getTime() === t.getTime() };
-                })}
-                selectedSessionId={selectedSession ? String(selectedSession.id) : null}
-                onSessionChange={(id) => {
-                  const found = circleSessions.find(s => String(s.id) === id);
-                  if (found) handleSessionChange(found);
+              <FilterBar
+                fields={filterFields}
+                values={filterBarValues}
+                onValuesChange={(vals) => {
+                  // التعامل مع التحديث الجماعي لو احتجنا مستقبلاً
+                  setSearchTerm(String(vals.search || ''));
                 }}
-                searchQuery={searchTerm}
-                onSearchChange={(val) => setSearchTerm(val)}
-                onTeacherChange={(id) => {
-                  if (id === null) {
-                    userClearedTeacherRef.current = true; // تفعيل منع إعادة التحديد التلقائي
-                  } else {
-                    userClearedTeacherRef.current = false;
-                  }
-                  setSelectedTeacherId(id);
-                  if (!id) {
-                    const stillValid = selectedCircle && baseCircles.some(c => c.id === selectedCircle);
-                    if (!stillValid) {
-                      setSelectedCircle('');
-                      setSelectedSession(null);
-                      setCircleSessions([]);
-                    }
-                  } else {
-                    const teacherFirst = baseCircles.find(c => c.teacher?.id === id);
-                    if (!teacherFirst) {
-                      setSelectedCircle('');
-                      setSelectedSession(null);
-                      setCircleSessions([]);
-                    } else if (teacherFirst.id !== selectedCircle) {
-                      setSelectedCircle(teacherFirst.id);
-                    }
-                  }
-                }}
-                onCircleChange={(id) => {
-                  if (!id) {
-                    // جميع الحلقات => نفرغ الاختيار ونزيل الجلسات
-                    setSelectedCircle('');
-                    setSelectedSession(null);
-                    setCircleSessions([]);
-                    return;
-                  }
-                  handleCircleChange(id);
-                }}
-                useInlineSelects
-                useShadSelect
-                teacherLabel="اختر معلماً"
-                circleLabel="اختر حلقة"
-                sessionLabel="اختر جلسة"
-                searchPlaceholder="بحث..."
+                actions={filterActions}
+                showFieldLabels={false}
+                dense
+                stackedOnMobile
+                actionsPlacement="end"
               />
             </div>
           )}

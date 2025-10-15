@@ -10,7 +10,6 @@ import { Home } from "@/components/pages/home";
 import { Login } from "@/components/pages/login";
 import { ParentInquiry } from "@/components/pages/parent-inquiry";
 import { DatabaseManagementPage } from "@/pages/DatabaseManagement";
-import { SupabaseTestPage } from "@/pages/SupabaseTest";
 import { UserManagementPage } from "@/pages/UserManagement";
 import { GuardiansList } from "@/pages/GuardiansList";
 import { StudentsPage } from "@/pages/Students";
@@ -185,11 +184,7 @@ const App = () => {
       case '/study-circle-schedules':
         return (userRole === 'superadmin' || userRole === 'admin' || userRole === 'teacher') ? 
           <StudyCircleSchedulesPage onNavigate={handleNavigate} userRole={userRole as 'superadmin' | 'admin' | 'teacher'} userId={currentUser?.id} /> : 
-          <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;
-      case '/supabase-test':
-        return (userRole === 'superadmin' || userRole === 'admin') ? 
-          <SupabaseTestPage onNavigate={handleNavigate} /> : 
-          <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;
+          <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;    
       case '/profile':
         return currentUser ? 
           <ProfilePage onNavigate={handleNavigate} currentUser={currentUser} /> : 

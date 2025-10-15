@@ -1,9 +1,10 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { ChevronDown, X, Plus, Filter as FilterIcon, RotateCcw } from 'lucide-react';
+import { ChevronDown, X, Plus, Filter as FilterIcon, RotateCcw, Users } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { CalendarDays, ChevronDown as CollapseChevron } from 'lucide-react';
 // Specialized memorization type helpers (predefined small static list)
 import { memorizationTypeOptions, getMemorizationTypeColor, getMemorizationTypeName } from '@/types/memorization-record';
 
@@ -28,7 +29,7 @@ export interface FilterOption {
 }
 
 // Supported field kinds (extensible)
-export type FilterFieldType = 'select' | 'async-select' | 'text' | 'custom' | 'multi-select' | 'memorization-type';
+export type FilterFieldType = 'select' | 'async-select' | 'text' | 'custom' | 'multi-select' | 'memorization-type' | 'session-select';
 
 export interface BaseFilterField {
   id: string;                 // unique identifier used in callbacks
@@ -45,7 +46,7 @@ export interface SelectFilterField extends BaseFilterField {
   type: 'select' | 'async-select';
   placeholder?: string;
   // Options for synchronous select
-  options?: FilterOption[]; 
+  options?: FilterOption[];
   // Async loader for options (for async-select) returns full list each call. Can depend on other active filter values.
   loadOptions?: (context: { values: Record<string, Primitive> }) => Promise<FilterOption[]>;
   // Current selected value (controlled)
@@ -95,7 +96,34 @@ export interface MemorizationTypeFilterField extends BaseFilterField {
   clearable?: boolean; // allow clearing to all
 }
 
-export type FilterField = SelectFilterField | TextFilterField | CustomFilterField | MultiSelectFilterField | MemorizationTypeFilterField;
+// NEW: Session select (loaded only when opened on demand)
+export interface SessionSelectItem {
+  id: string;
+  dateLabel: string; // localized date label
+  isToday?: boolean;
+  meta?: Record<string, Primitive>;
+}
+
+export interface SessionSelectFilterField extends BaseFilterField {
+  type: 'session-select';
+  // external value
+  value?: string | null;
+  onChange?: (value: string | null) => void;
+  // loader only executed when user first opens the dropdown (on demand)
+  loadSessions?: () => Promise<SessionSelectItem[]>;
+  // optionally pass preloaded list
+  sessions?: SessionSelectItem[];
+  disabled?: boolean;
+  placeholder?: string;
+  collapsible?: boolean; // show collapse toggle (like original block)
+  useShadSelect?: boolean; // allow fallback to native select
+  inline?: boolean; // treat similar to inline select styling
+  hideFieldLabels?: boolean; // override global
+  label?: string; // override base for clarity
+  showTodayBadge?: boolean; // default true
+}
+
+export type FilterField = SelectFilterField | TextFilterField | CustomFilterField | MultiSelectFilterField | MemorizationTypeFilterField | SessionSelectFilterField;
 
 // Action button definitions
 export interface FilterAction {
@@ -337,8 +365,35 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     <span className="truncate flex items-center gap-1">
                       {opt.label}
                       {field.showCountsFromMetaKey && typeof opt.meta?.[field.showCountsFromMetaKey] === 'number' && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm">
+                        <span
+                          title={
+                            field.id === 'teacher'
+                              ? 'عدد الحلقات للمعلم'
+                              : field.id === 'circle'
+                                ? 'عدد الطلاب في الحلقة'
+                                : field.id === 'guardian'
+                                  ? 'عدد الطلاب المرتبطين بولي الأمر'
+                                  : 'العدد'
+                          }
+                          className={cn(
+                            'inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shadow-sm',
+                            field.id === 'teacher' && 'bg-emerald-600 text-white',
+                            field.id === 'circle' && 'bg-blue-600 text-white',
+                            field.id === 'guardian' && 'bg-amber-600 text-white',
+                            field.id !== 'teacher' && field.id !== 'circle' && field.id !== 'guardian' && 'bg-emerald-600 text-white',
+                            // توحيد لون شارة "جميع" إلى أزرق (Blue) لكل الحقول
+                            opt.value === '__ALL__' && 'bg-red-500 ring-1 ring-red-300/70 shadow-sm hover:bg-red-500/90 text-white transition-colors duration-150',
+                          )}
+                        >
+                          {/* number first then icon */}
                           {opt.meta?.[field.showCountsFromMetaKey] as number}
+                          {field.id === 'teacher'
+                            ? <span className="text-[11px] leading-none">🕋</span>
+                            : field.id === 'circle'
+                              ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                              : field.id === 'guardian'
+                                ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                                : <Users className="w-3 h-3" />}
                         </span>
                       )}
                     </span>
@@ -522,19 +577,47 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               {field.options
                 .filter(opt => !field.enableSearch || query.trim() === '' || opt.label.toLowerCase().includes(query.toLowerCase()))
                 .map(opt => {
-                const checked = selected.includes(opt.value);
-                return (
-                  <label key={opt.value} className={cn('flex items-center gap-2 rounded-md px-2 py-1 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/30', checked && 'bg-emerald-100 dark:bg-emerald-900/40')}> 
-                    <Checkbox checked={checked} onCheckedChange={() => toggle(opt.value)} className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600" />
-                    <span className="flex-1 truncate flex items-center gap-1">
-                      {opt.label}
-                      {field.showCountsFromMetaKey && typeof opt.meta?.[field.showCountsFromMetaKey] === 'number' && (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-600 text-white shadow-sm">{opt.meta?.[field.showCountsFromMetaKey] as number}</span>
-                      )}
-                    </span>
-                  </label>
-                );
-              })}
+                  const checked = selected.includes(opt.value);
+                  return (
+                    <label key={opt.value} className={cn('flex items-center gap-2 rounded-md px-2 py-1 cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/30', checked && 'bg-emerald-100 dark:bg-emerald-900/40')}>
+                      <Checkbox checked={checked} onCheckedChange={() => toggle(opt.value)} className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600" />
+                      <span className="flex-1 truncate flex items-center gap-1">
+                        {opt.label}
+                        {field.showCountsFromMetaKey && typeof opt.meta?.[field.showCountsFromMetaKey] === 'number' && (
+                          <span
+                            title={
+                              field.id === 'teacher'
+                                ? 'عدد الحلقات للمعلم'
+                                : field.id === 'circle'
+                                  ? 'عدد الطلاب في الحلقة'
+                                  : field.id === 'guardian'
+                                    ? 'عدد الطلاب المرتبطين بولي الأمر'
+                                    : 'العدد'
+                            }
+                            className={cn(
+                              'inline-flex items-center gap-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full shadow-sm',
+                              field.id === 'teacher' && 'bg-emerald-600 text-white',
+                              field.id === 'circle' && 'bg-blue-600 text-white',
+                              field.id === 'guardian' && 'bg-amber-600 text-white',
+                              field.id !== 'teacher' && field.id !== 'circle' && field.id !== 'guardian' && 'bg-emerald-600 text-white',
+                              // توحيد خيار الجميع إلى أصفر
+                              opt.value === '__ALL__' && 'bg-amber-500 ring-1 ring-amber-300/70 shadow-sm hover:bg-amber-500/90'
+                            )}
+                          >
+                            {opt.meta?.[field.showCountsFromMetaKey] as number}
+                            {field.id === 'teacher'
+                              ? <span className="text-[11px] leading-none">🕋</span>
+                              : field.id === 'circle'
+                                ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                                : field.id === 'guardian'
+                                  ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                                  : <Users className="w-3 h-3" />}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
             </div>
             {selectedLabels.length > 0 && (
               <div className="mt-2 pt-2 border-t border-dashed border-emerald-200 dark:border-emerald-800 text-[10px] flex flex-wrap gap-1">
@@ -650,6 +733,133 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     );
   };
 
+  // Session select (on-demand load when first opened)
+  const sessionLoadState = React.useRef<Record<string, { loaded: boolean; loading: boolean; sessions: SessionSelectItem[] }>>({});
+  const [, forceSessionsRender] = React.useState(0);
+  const renderSessionSelectField = (field: SessionSelectFilterField) => {
+    const st = sessionLoadState.current[field.id] || { loaded: false, loading: false, sessions: field.sessions || [] };
+    sessionLoadState.current[field.id] = st; // ensure ref
+    // keep external sessions prop in sync if provided each render (allow controlled refresh)
+    if (field.sessions && field.sessions !== st.sessions && !st.loading) {
+      st.sessions = field.sessions;
+      st.loaded = true;
+    }
+    const selectedValue = (values[field.id] as string) ?? null;
+    const [open, setOpen] = React.useState(false);
+    const [collapsed, setCollapsed] = React.useState(false);
+    const label = field.label || 'الجلسة';
+    const placeholder = field.placeholder || (st.sessions.length === 0 && st.loaded ? 'لا توجد جلسات' : 'اختر جلسة');
+
+    const triggerLoad = async () => {
+      if (!st.loaded && !st.loading && field.loadSessions) {
+        st.loading = true; forceSessionsRender(x => x + 1);
+        try {
+          const data = await field.loadSessions();
+          st.sessions = data || [];
+          st.loaded = true;
+        } finally {
+          st.loading = false; forceSessionsRender(x => x + 1);
+        }
+      }
+    };
+
+    // when dropdown opens first time, load
+    React.useEffect(() => {
+      if (open) triggerLoad();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [open]);
+
+    const onChange = (val: string | null) => {
+      handleFieldChange(field.id, val);
+      field.onChange?.(val);
+    };
+
+    const sessions = st.sessions;
+    const disabled = field.disabled || (st.loaded && sessions.length === 0);
+    const showTodayBadge = field.showTodayBadge !== false;
+
+    return (
+      <div key={field.id} className={cn('flex flex-col gap-1 min-w-[160px] flex-1', field.className)}>
+        {(field.showLabel === true || (field.showLabel !== false && showFieldLabels && !field.hideFieldLabels)) && (
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] sm:text-xs font-medium text-green-700 dark:text-green-300 pr-1">{label}</label>
+            {field.collapsible && (
+              <button
+                type="button"
+                onClick={() => setCollapsed(c => !c)}
+                aria-expanded={!collapsed}
+                aria-label={collapsed ? 'فتح حقل الجلسة' : 'طي حقل الجلسة'}
+                className={cn('h-6 w-6 inline-flex items-center justify-center rounded-full border border-emerald-300 text-emerald-700 hover:bg-emerald-50 transition', collapsed && 'rotate-180')}
+              >
+                <CollapseChevron className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        )}
+        <div className={cn('transition-all duration-300 ease-in-out origin-top', collapsed ? 'max-h-0 opacity-0 overflow-hidden' : 'max-h-40 opacity-100')} aria-hidden={collapsed}>
+          {field.useShadSelect !== false ? (
+            <Select
+              open={open}
+              onOpenChange={(o) => { setOpen(o); if (o) triggerLoad(); }}
+              disabled={disabled}
+              value={selectedValue || ''}
+              onValueChange={(val) => onChange(val || null)}
+            >
+              <SelectTrigger
+                dir="rtl"
+                className={cn(
+                  'h-9 text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-md border px-2 pr-2 transition-all focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white dark:bg-gray-800 shadow-sm',
+                  selectedValue
+                    ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-500',
+                  disabled && 'opacity-60 cursor-not-allowed'
+                )}
+              >
+                <SelectValue placeholder={st.loading ? 'جار التحميل...' : placeholder} />
+              </SelectTrigger>
+              <SelectContent
+                position="popper"
+                dir="rtl"
+                className="text-right text-[11px] sm:text-xs rounded-lg border border-green-200 dark:border-green-700 shadow-md bg-white dark:bg-gray-900 max-h-64 overflow-auto"
+              >
+                {st.loading && <SelectItem disabled value="__loading__">جار التحميل...</SelectItem>}
+                {!st.loading && sessions.length === 0 && <SelectItem value="__none__" disabled>لا توجد جلسات</SelectItem>}
+                {sessions.map(s => (
+                  <SelectItem
+                    key={s.id}
+                    value={s.id}
+                    className="cursor-pointer rounded-[4px] px-2 py-1.5 transition-colors data-[highlighted]:bg-green-800 data-[highlighted]:text-white dark:data-[highlighted]:bg-green-700 data-[state=checked]:bg-green-700 data-[state=checked]:text-white flex items-center justify-between gap-2"
+                  >
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-emerald-200 to-emerald-100 dark:from-emerald-800 dark:to-emerald-700 shadow-sm ring-1 ring-emerald-300/50 dark:ring-emerald-600/40">
+                        <CalendarDays className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-200" />
+                      </span>
+                      <span className="truncate">{s.dateLabel}</span>
+                      {showTodayBadge && s.isToday && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-600 text-white">اليوم</span>}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <select
+              disabled={disabled}
+              value={selectedValue || ''}
+              onChange={(e) => onChange(e.target.value || null)}
+              onClick={() => triggerLoad()}
+              className={cn('h-9 w-full text-right truncate max-w-full min-w-0 text-[11px] sm:text-xs rounded-lg border px-2 pr-8 transition-all focus:outline-none focus:ring-2 focus:ring-green-500/40 focus:border-green-500 bg-white dark:bg-gray-800', selectedValue ? 'border-green-400 dark:border-green-500 bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-semibold' : 'border-gray-300 dark:border-gray-600 text-gray-500', disabled && 'opacity-60 cursor-not-allowed', 'appearance-none')}
+            >
+              <option value="">{st.loading ? 'جار التحميل...' : placeholder}</option>
+              {sessions.map(s => (
+                <option key={s.id} value={s.id}>{s.dateLabel}{s.isToday ? ' (اليوم)' : ''}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const fieldRenderers: Record<FilterFieldType, (f: any) => React.ReactNode> = {
     'select': renderSelectField,
     'async-select': renderSelectField,
@@ -657,6 +867,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     'custom': renderCustomField,
     'multi-select': renderMultiSelectField,
     'memorization-type': renderMemorizationTypeField,
+    'session-select': renderSessionSelectField,
   };
 
   const visibleFields = fields.filter(f => !f.hidden);
@@ -676,21 +887,21 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       {mergedActions.map(a => (
         <button
           key={a.id}
-            type="button"
-            onClick={() => a.onClick?.(values)}
-            disabled={a.disabled}
-            title={a.tooltip || a.label}
-            className={cn(
-              'h-9 px-3 rounded-md text-[11px] sm:text-xs font-medium inline-flex items-center gap-1 transition border shadow-sm',
-              a.variant === 'primary' && 'bg-green-600 hover:bg-green-700 text-white border-green-600',
-              a.variant === 'secondary' && 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100 dark:border-green-700',
-              a.variant === 'outline' && 'bg-white dark:bg-gray-900 text-green-700 dark:text-green-200 border-green-300 hover:bg-green-50 dark:hover:bg-green-800',
-              a.variant === 'ghost' && 'bg-transparent border-transparent hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200',
-              a.variant === 'danger' && 'bg-red-600 hover:bg-red-700 text-white border-red-600',
-              !a.variant && 'bg-green-600 hover:bg-green-700 text-white border-green-600',
-              a.disabled && 'opacity-60 cursor-not-allowed',
-              a.className
-            )}
+          type="button"
+          onClick={() => a.onClick?.(values)}
+          disabled={a.disabled}
+          title={a.tooltip || a.label}
+          className={cn(
+            'h-9 px-3 rounded-md text-[11px] sm:text-xs font-medium inline-flex items-center gap-1 transition border shadow-sm',
+            a.variant === 'primary' && 'bg-green-600 hover:bg-green-700 text-white border-green-600',
+            a.variant === 'secondary' && 'bg-green-100 hover:bg-green-200 text-green-800 border-green-300 dark:bg-green-800 dark:hover:bg-green-700 dark:text-green-100 dark:border-green-700',
+            a.variant === 'outline' && 'bg-white dark:bg-gray-900 text-green-700 dark:text-green-200 border-green-300 hover:bg-green-50 dark:hover:bg-green-800',
+            a.variant === 'ghost' && 'bg-transparent border-transparent hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200',
+            a.variant === 'danger' && 'bg-red-600 hover:bg-red-700 text-white border-red-600',
+            !a.variant && 'bg-green-600 hover:bg-green-700 text-white border-green-600',
+            a.disabled && 'opacity-60 cursor-not-allowed',
+            a.className
+          )}
         >
           {a.icon && <span className="shrink-0">{a.icon}</span>}
           <span>{a.label}</span>

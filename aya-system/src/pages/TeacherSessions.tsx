@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,9 @@ import {
 import { getStudyCirclesByTeacherId, getAllStudyCircles } from "@/lib/study-circle-service";
 import { getSessionsByCircleId, createSession, updateSession, deleteSession } from "@/lib/circle-session-service";
 import { getteachers } from "@/lib/profile-service";
+import { getAllStudents as getAllStudentsApi } from '@/lib/supabase-service';
+import { Student } from '@/types/student';
+import FilterBar from '@/components/filters/FilterBar';
 import { Badge } from "@/components/ui/badge";
 import { format, isAfter, parseISO, startOfToday, addDays } from "date-fns";
 import { arSA } from "date-fns/locale";
@@ -46,8 +49,6 @@ import { GenericTable } from "@/components/ui/generic-table";
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { CircleSession } from "@/types/circle-session";
 import { getLabels } from '@/lib/labels';
-// إزالة قائمة البطاقات القديمة (تم استبدالها بشريط TeacherCircleFilterBar)
-import { TeacherCircleFilterBar } from '@/components/filters/TeacherCircleFilterBar';
 
 type TeacherSessionsProps = {
   onNavigate: (page: string) => void;
@@ -90,12 +91,18 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
   const [selectedCircle, setSelectedCircle] = useState<string | null>(null);
   const [circleSessions, setCircleSessions] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
+  // جميع الطلاب (لاستخدامهم في حساب عدد الطلاب لكل حلقة)
+  const [allStudentsForCounts, setAllStudentsForCounts] = useState<Student[]>([]);
+  const [loadingStudentCounts, setLoadingStudentCounts] = useState(false);
   // فلترة جديدة مشابهة لصفحة الجداول
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const { toast } = useToast();
 
   // بحث الحلقات
   const [searchTerm, setSearchTerm] = useState("");
+  // نطاق تاريخ اختياري لتصفية الجلسات (من/إلى)
+  const [sessionDateFrom, setSessionDateFrom] = useState<string | null>(null);
+  const [sessionDateTo, setSessionDateTo] = useState<string | null>(null);
   const labels = getLabels('ar');
   const tsLabels = labels.teacherSessionsLabels;
   const scsLabels = labels.studyCircleSchedulesLabels; // reuse pagination labels
@@ -168,15 +175,14 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
   // تصفية الحلقات حسب المعلم والبحث
   const filteredCircles = circles.filter(circle => {
     if (teacherId && circle.teacher_id !== teacherId) return false;
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    return (
-      (circle.name || '').toLowerCase().includes(term) ||
-      (circle.teacher?.full_name || '').toLowerCase().includes(term)
-    );
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      if (!((circle.name || '').toLowerCase().includes(term) || (circle.teacher?.full_name || '').toLowerCase().includes(term))) {
+        return false;
+      }
+    }
+    return true;
   });
-
-  // تمت إزالة ترقيم صفحات الحلقات بعد اعتماد شريط الفلترة الموحد (TeacherCircleFilterBar)
 
   // حالة نموذج إضافة/تعديل الجلسة
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -233,6 +239,9 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
         const teachersData = await getteachers();
         setTeachers(teachersData);
 
+  // تحميل الطلاب لحساب أعدادهم لكل حلقة
+  loadStudentsForCounts(circlesData);
+
         // (إلغاء التحديد التلقائي للحلقة هنا - سيتم لاحقاً عبر تأثير موحد إذا كانت حلقة واحدة فقط)
       } catch (error) {
         console.error("Error loading initial data:", error);
@@ -248,6 +257,34 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
     loadData();
   }, [currentUser, toast]);
+
+  // تحميل الطلاب (مع تقييد نطاق المعلم لو كان الدور معلم فقط)
+  const loadStudentsForCounts = async (circlesRef?: any[]) => {
+    setLoadingStudentCounts(true);
+    try {
+      const list = await getAllStudentsApi();
+      let usable: Student[] = list || [];
+      if (currentUser?.role === 'teacher') {
+        const allowedCircleIds = (circlesRef || circles).filter(c => c.teacher_id === currentUser.id).map(c => c.id);
+        usable = usable.filter(st => allowedCircleIds.includes(st.study_circle_id || (st as any).study_circle?.id));
+      }
+      setAllStudentsForCounts(usable);
+    } catch (e) {
+      console.warn('⚠️ فشل تحميل الطلاب لأغراض العد فقط', e);
+    } finally {
+      setLoadingStudentCounts(false);
+    }
+  };
+
+  // خريطة عدد الطلاب لكل حلقة
+  const circleStudentsCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    allStudentsForCounts.forEach(st => {
+      const cid = st.study_circle_id || (st as any).study_circle?.id;
+      if (cid) map[cid] = (map[cid] || 0) + 1;
+    });
+    return map;
+  }, [allStudentsForCounts]);
 
   // جلب جلسات الحلقة عند اختيار حلقة
   useEffect(() => {
@@ -547,7 +584,6 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
 
             <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-1 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
               <div className="flex gap-2 items-center ">
-                {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
                 <Button
                   variant={showFilters ? 'default' : 'outline'}
                   className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
@@ -571,26 +607,110 @@ export function TeacherSessions({ onNavigate, currentUser }: TeacherSessionsProp
             </div>
 
             {showFilters && (
-              <TeacherCircleFilterBar
-                useInlineSelects
-                useShadSelect
-                teachers={aggregatedTeachers.map(t => ({ id: t.id, name: t.name, circles_count: t.circles_count }))}
-                circles={filteredCircles.map(c => ({ id: c.id, name: c.name }))}
-                selectedTeacherId={teacherId}
-                selectedCircleId={selectedCircle}
-                searchQuery={searchTerm}
-                onSearchChange={setSearchTerm}
-                hideFieldLabels={true}
-                onTeacherChange={(id) => { setTeacherId(id); setSelectedCircle(null); }}
-                onCircleChange={(id) => setSelectedCircle(id)}
-                onClearTeacher={() => { setTeacherId(null); setSelectedCircle(null); }}
-                onClearCircle={() => setSelectedCircle(null)}
-                showAddButton={!!selectedCircle}
-                requireCircleBeforeAdd
-                onAddClick={handleAddSession}
-                addButtonLabel={tsLabels.addSessionButton}
-                addButtonTooltip={tsLabels.addSessionButton}
-              />
+              <div className="mb-2 bg-white dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 rounded-lg animate-fade-in" dir="rtl">
+                <FilterBar
+                  values={{
+                    teacher: teacherId,
+                    circle: selectedCircle,
+                    q: searchTerm || ''
+                  }}
+                  showFieldLabels={false}
+                  onValuesChange={(vals) => {
+                    // بحث عام (يؤثر على قائمة الحلقات فقط حالياً)
+                    setSearchTerm(String(vals.q ?? ''));
+                    // تغيير المعلم
+                    if (vals.teacher === null || vals.teacher === '__ALL__') {
+                      if (teacherId) setTeacherId(null);
+                      // عند إلغاء اختيار المعلم يرجى إلغاء اختيار الحلقة إذا لم تكن الوحيدة
+                      if (selectedCircle) {
+                        const stillValid = circles.find(c => c.id === selectedCircle && (!teacherId || c.teacher_id === teacherId));
+                        if (!stillValid) setSelectedCircle(null);
+                      }
+                    } else if (vals.teacher !== teacherId) {
+                      setTeacherId(String(vals.teacher));
+                    }
+                    // تغيير الحلقة
+                    if (vals.circle === null || vals.circle === '__ALL__') {
+                      if (selectedCircle) setSelectedCircle(null);
+                    } else if (vals.circle !== selectedCircle) {
+                      setSelectedCircle(String(vals.circle));
+                    }
+                  }}
+                  fields={[
+                    {
+                      id: 'teacher',
+                      label: 'المعلم',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫', meta: { count: circles.length } },
+                        ...aggregatedTeachers.map(t => ({
+                          value: t.id,
+                          label: t.name || '—',
+                          icon: '👨‍🏫',
+                          meta: { count: t.circles_count }
+                        }))
+                      ],
+                      value: teacherId,
+                      showCountsFromMetaKey: 'count',
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') {
+                          setTeacherId(null);
+                          setSelectedCircle(null);
+                        } else {
+                          setTeacherId(val);
+                        }
+                      }
+                    },
+                    {
+                      id: 'circle',
+                      label: 'الحلقة',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋', meta: { count: filteredCircles.reduce((sum, c) => sum + (circleStudentsCountMap[c.id] || 0), 0) } },
+                        ...filteredCircles.map(c => ({
+                          value: c.id,
+                          label: c.name || '—',
+                          icon: '🕋',
+                          meta: { count: circleStudentsCountMap[c.id] || 0 }
+                        }))
+                      ],
+                      value: selectedCircle,
+                      showCountsFromMetaKey: 'count',
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') setSelectedCircle(null); else setSelectedCircle(val);
+                      }
+                    },
+                    {
+                      id: 'q',
+                      label: 'بحث',
+                      type: 'text',
+                      placeholder: '🔍 بحث عن حلقة أو معلم...',
+                      value: searchTerm,
+                      debounceMs: 350,
+                      onChange: (v) => setSearchTerm(v)
+                    }
+                  ]}
+                  actions={[{
+                    id: 'reset',
+                    label: 'إعادة تعيين',
+                    variant: 'outline',
+                    className: 'w-full sm:w-auto justify-center font-semibold text-[11px] sm:text-xs h-9 bg-white dark:bg-gray-900 border-green-300 hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200 mt-2 sm:mt-0',
+                    onClick: () => {
+                      setTeacherId(null);
+                      setSelectedCircle(null);
+                      setSearchTerm('');
+                    }
+                  }]}
+                  enableDefaultApplyButton={false}
+                  enableDefaultResetButton={false}
+                  actionsPlacement="wrap"
+                  className="bg-transparent p-0"
+                />
+              </div>
             )}
           </CardContent>
         )}

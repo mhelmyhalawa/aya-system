@@ -9,14 +9,16 @@ import { FormDialog, FormRow } from "@/components/ui/form-dialog";
 import { Badge } from "@/components/ui/badge"; // يستخدم داخل جداول الحوارات
 import { StudyCircle } from "@/types/study-circle";
 import { StudyCircleSchedule, StudyCircleScheduleCreate, StudyCircleScheduleUpdate, weekdayOptions, getWeekdayName, formatTime } from "@/types/study-circle-schedule";
+import { Student } from '@/types/student';
+import { getAllStudents as getAllStudentsApi } from '@/lib/supabase-service';
 import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getStudyCircleSchedules, createStudyCircleSchedule, updateStudyCircleSchedule, deleteStudyCircleSchedule } from "@/lib/study-circle-schedule-service";
 import { Calendar, Clock, Plus, Pencil, Trash2, Info, MapPin, X, BookOpen, Filter, RefreshCwIcon, ChevronDown, ChevronUp } from "lucide-react";
+import FilterBar from '@/components/filters/FilterBar';
 import { checkAuthStatus } from '@/lib/auth-service';
 import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog";
 import { getLabels } from '@/lib/labels';
 import { GenericTable } from '@/components/ui/generic-table';
-import TeacherCircleFilterBar from '@/components/filters/TeacherCircleFilterBar';
 
 const { studyCircleSchedulesLabels: scsLabels } = getLabels('ar');
 
@@ -34,12 +36,17 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
   const [search, setSearch] = useState("");
   const [teacherId, setTeacherId] = useState<string | null>(null);
   const [circleId, setCircleId] = useState<string | null>(null);
+  // فلتر اليوم (للبحث مع اليوم كما طلب المستخدم)
+  const [weekdayFilter, setWeekdayFilter] = useState<string | null>(null);
   const [selectedCircle, setSelectedCircle] = useState<StudyCircle | null>(null);
   // لم نعد نستخدم حوارات اختيار المعلم/الحلقة بعد التحويل إلى قوائم مباشرة
 
   // State for circle schedules
   const [circleSchedules, setCircleSchedules] = useState<StudyCircleSchedule[]>([]);
   const [loadingSchedules, setLoadingSchedules] = useState(false);
+  // طلاب (لأغراض العد فقط في شارة الفلاتر)
+  const [allStudentsForCounts, setAllStudentsForCounts] = useState<Student[]>([]);
+  const [loadingStudentCounts, setLoadingStudentCounts] = useState(false);
 
   // Add schedule dialog state
   const [openAddScheduleDialog, setOpenAddScheduleDialog] = useState(false);
@@ -113,6 +120,8 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       }
 
       setAllCircles(circles);
+      // بعد تحميل الحلقات نحمل الطلاب لحساب أعدادهم لكل حلقة (لإظهار العدد مباشرة في شريط الفلترة)
+      loadStudentsForCounts(circles);
 
       // اختيار الحلقة سيتم الآن عبر تأثير موحد لاحق (circleId) عندما يكون هناك حلقة واحدة فقط
     } catch (error) {
@@ -124,6 +133,25 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // تحميل الطلاب مرة واحدة لاستخدامهم في حساب أعداد الطلاب لكل حلقة
+  const loadStudentsForCounts = async (circlesRef?: StudyCircle[]) => {
+    setLoadingStudentCounts(true);
+    try {
+      const list = await getAllStudentsApi();
+      let usable = list || [];
+      // لو المستخدم معلم؛ أظهر فقط طلاب حلقاته حفاظاً على النطاق
+      if (userRole === 'teacher' && userId) {
+        const allowedCircleIds = (circlesRef || allCircles).filter(c => c.teacher?.id === userId).map(c => c.id);
+        usable = usable.filter(st => allowedCircleIds.includes(st.study_circle_id || st.study_circle?.id));
+      }
+      setAllStudentsForCounts(usable);
+    } catch (e) {
+      console.warn('⚠️ فشل تحميل الطلاب لأغراض العد فقط', e);
+    } finally {
+      setLoadingStudentCounts(false);
     }
   };
 
@@ -202,6 +230,16 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     });
   }, [allCircles, teacherId, search]);
 
+  // خريطة عدد الطلاب لكل حلقة
+  const circleStudentsCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    allStudentsForCounts.forEach(st => {
+      const cid = st.study_circle_id || st.study_circle?.id;
+      if (cid) map[cid] = (map[cid] || 0) + 1;
+    });
+    return map;
+  }, [allStudentsForCounts]);
+
   // تحديث الحلقة المختارة عند تغير circleId
   useEffect(() => {
     if (circleId) {
@@ -229,6 +267,13 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
   const sortedSchedules = [...circleSchedules].sort(
     (a, b) => a.weekday - b.weekday || a.start_time.localeCompare(b.start_time)
   );
+
+  // تطبيق فلتر اليوم (إن وُجد)
+  const filteredSchedulesByWeekday = useMemo(() => {
+    if (!weekdayFilter || weekdayFilter === '__ALL__') return sortedSchedules;
+    const w = parseInt(weekdayFilter, 10);
+    return sortedSchedules.filter(s => s.weekday === w);
+  }, [sortedSchedules, weekdayFilter]);
 
   // Add schedule
   const handleAddSchedule = () => {
@@ -567,7 +612,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     } : null
   ].filter(Boolean);
 
-  const tableSchedules = sortedSchedules.map((s, idx) => ({ ...s, row_index: idx + 1, id: s.id ?? `sch-${idx}`, __conflict: conflictIds.has(s.id) }));
+  const tableSchedules = filteredSchedulesByWeekday.map((s, idx) => ({ ...s, row_index: idx + 1, id: s.id ?? `sch-${idx}`, __conflict: conflictIds.has(s.id) }));
 
   // تبويبات (جميع السجلات / سجلاتي)
   const [showFilters, setShowFilters] = useState(true);
@@ -641,6 +686,7 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
     setTeacherId(null);
     setCircleId(null);
     setSearch('');
+    setWeekdayFilter(null);
   };
 
   return (
@@ -682,7 +728,6 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
           <CardContent className="space-y-0 sm:space-y-0 px-2 sm:px-3 pt-2 pb-3 transition-all duration-300">
             <div className="flex flex-col md:flex-row justify-end items-center gap-2 mb-1 rounded-md bg-white dark:bg-gray-900 p-1.5 shadow-sm border border-green-200 dark:border-green-700">
               <div className="flex gap-2 items-center ">
-                {/* زر الفلتر لإظهار/إخفاء شريط TeacherCircleFilterBar */}
                 <Button
                   variant={showFilters ? 'default' : 'outline'}
                   className={`flex items-center gap-1.5 rounded-xl ${showFilters ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-green-600 hover:bg-green-700 text-white'} dark:bg-green-700 dark:hover:bg-green-600 shadow-sm transition-colors px-2.5 py-1 text-[11px] font-medium h-8`}
@@ -705,28 +750,130 @@ export function StudyCircleSchedulesPage({ onNavigate, userRole, userId }: Study
               </div>
             </div>
             {showFilters && (
-              <TeacherCircleFilterBar
-                useInlineSelects
-                useShadSelect
-                teachers={effectiveTeachers}
-                circles={filteredCircles.map(c => ({ id: c.id, name: c.name }))}
-                selectedTeacherId={teacherId}
-                selectedCircleId={circleId}
-                searchQuery={search}
-                onSearchChange={setSearch}
-                onTeacherChange={(id) => { setTeacherId(id); setCircleId(null); }}
-                onCircleChange={(id) => setCircleId(id)}
-                onClearTeacher={() => { setTeacherId(null); setCircleId(null); }}
-                onClearCircle={() => setCircleId(null)}
-                showAddButton={canEditSchedules}
-                onAddClick={handleAddSchedule}
-                addButtonLabel={scsLabels.scheduleAdd}
-                addButtonTooltip={"إضافة موعد جديد"}
-                showExportButton={userRole === 'superadmin'}
-                onExportClick={() => {/* TODO: export logic */ }}
-                exportButtonLabel="تصدير"
-                requireCircleBeforeAdd
-              />
+              <div className="mb-2 bg-white dark:bg-gray-900 p-2 md:p-2 shadow-md border border-green-200 dark:border-green-700 rounded-lg animate-fade-in" dir="rtl">
+                <FilterBar
+                  values={{
+                    teacher: teacherId,
+                    circle: circleId,
+                    weekday: weekdayFilter || '',
+                    q: search || ''
+                  }}
+                  showFieldLabels={false}
+                  onValuesChange={(vals) => {
+                    // بحث
+                    setSearch(String(vals.q ?? ''));
+                    // يوم
+                    if (vals.weekday === null || vals.weekday === '__ALL__' || vals.weekday === '') {
+                      if (weekdayFilter) setWeekdayFilter(null);
+                    } else if (vals.weekday !== weekdayFilter) {
+                      setWeekdayFilter(String(vals.weekday));
+                    }
+                    // معلم
+                    if (vals.teacher === null || vals.teacher === '__ALL__') {
+                      if (teacherId) setTeacherId(null);
+                      // إذا تم مسح المعلم وتوجد حلقة حالية لا تنتمي لأي معلم محدد (حالة نادرة) نتركها
+                      // لكن لو تم اختيار حلقة غير متسقة مع الفلتر الجديد يمكن إفراغها (اعتماداً على السياسة)
+                    } else if (vals.teacher !== teacherId) {
+                      setTeacherId(String(vals.teacher));
+                    }
+                    // حلقة
+                    if (vals.circle === null || vals.circle === '__ALL__') {
+                      if (circleId) setCircleId(null);
+                    } else if (vals.circle !== circleId) {
+                      setCircleId(String(vals.circle));
+                    }
+                  }}
+                  fields={[
+                    {
+                      id: 'teacher',
+                      label: 'المعلم',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫', meta: { count: allCircles.length } },
+                        ...teachers.map(t => ({
+                          value: t.id,
+                          label: t.name || '—',
+                          icon: '👨‍🏫',
+                          meta: { count: t.circles_count }
+                        }))
+                      ],
+                      value: teacherId,
+                      showCountsFromMetaKey: 'count',
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') {
+                          setTeacherId(null);
+                          setCircleId(null);
+                        } else {
+                          setTeacherId(val);
+                        }
+                      }
+                    },
+                    {
+                      id: 'circle',
+                      label: 'الحلقة',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋', meta: { count: filteredCircles.reduce((sum, c) => sum + (circleStudentsCountMap[c.id] || 0), 0) } },
+                        ...filteredCircles.map(c => ({
+                          value: c.id,
+                          label: c.name || '—',
+                          icon: '🕋',
+                          meta: { count: circleStudentsCountMap[c.id] || 0 }
+                        }))
+                      ],
+                      value: circleId,
+                      showCountsFromMetaKey: 'count',
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') setCircleId(null); else setCircleId(val);
+                      }
+                    },
+                    {
+                      id: 'weekday',
+                      label: 'اليوم',
+                      type: 'select',
+                      showSearch: true,
+                      clearable: true,
+                      options: [
+                        { value: '__ALL__', label: 'جميع الأيام', icon: '🗓️' },
+                        ...weekdayOptions.map(w => ({ value: String(w.value), label: w.label, icon: '🗓️' }))
+                      ],
+                      value: weekdayFilter || '__ALL__',
+                      onChange: (val) => {
+                        if (!val || val === '__ALL__') setWeekdayFilter(null); else setWeekdayFilter(val);
+                      }
+                    },
+                    {
+                      id: 'q',
+                      label: 'بحث',
+                      type: 'text',
+                      placeholder: '🔍 بحث عن حلقة أو معلم...',
+                      value: search,
+                      debounceMs: 350,
+                      onChange: (v) => setSearch(v)
+                    }
+                  ]}
+                  actions={[{
+                    id: 'reset',
+                    label: 'إعادة تعيين',
+                    variant: 'outline',
+                    className: 'w-full sm:w-auto justify-center font-semibold text-[11px] sm:text-xs h-9 bg-white dark:bg-gray-900 border-green-300 hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200 mt-2 sm:mt-0',
+                    onClick: () => {
+                      setTeacherId(null);
+                      setCircleId(null);
+                      setSearch('');
+                      setWeekdayFilter(null);
+                    }
+                  }]}
+                  enableDefaultApplyButton={false}
+                  enableDefaultResetButton={false}
+                  actionsPlacement="wrap"
+                  className="bg-transparent p-0"
+                />
+              </div>
             )}
             <div>
             </div>

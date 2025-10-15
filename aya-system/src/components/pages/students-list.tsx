@@ -43,7 +43,10 @@ import { searchStudents as searchStudentsApi, getAllStudents as getAllStudentsAp
 import { exportStudentsToJson } from "@/lib/database-service";
 import { getteacherHistoryForStudent } from "@/lib/teacher-history-service";
 // مكون شريط فلترة المعلم والحلقة الموحد
-import { TeacherCircleFilterBar, type BasicEntity } from '@/components/filters/TeacherCircleFilterBar';
+// استيراد شريط الفلترة الموحد الجديد
+import FilterBar from '@/components/filters/FilterBar';
+// تعريف محلي لنوع الكيان الأساسي المستخدم مع بناء قائمة المعلمين / الحلقات
+type BasicEntity = { id: string; name?: string; circles_count?: number; teacher_id?: string };
 
 interface StudentsListProps { onNavigate: (path: string) => void; userRole?: UserRole; userId?: string | null; }
 
@@ -84,7 +87,6 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   const [formStudyCircleId, setFormStudyCircleId] = useState<string>("");
   const [isLoadingStudyCircles, setIsLoadingStudyCircles] = useState<boolean>(false);
 
-  // تحويل بيانات المعلمين إلى BasicEntity لاستخدامها في TeacherCircleFilterBar
   const teacherEntities: BasicEntity[] = useMemo(() => {
     // احسب عدد الحلقات لكل معلم ثم احتفظ فقط بمن لديه حلقات
     return teachers.map(t => ({
@@ -934,6 +936,16 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
     return map;
   }, [students]);
 
+  // خريطة عدد الطلاب لكل ولي أمر (تعتمد على القائمة الحالية بعد البحث)
+  const guardianStudentsCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    students.forEach(st => {
+      const gid = (st as any).guardian?.id || st.guardian_id || st.guardian?.phone_number;
+      if (gid) map[gid] = (map[gid] || 0) + 1;
+    });
+    return map;
+  }, [students]);
+
   const toggleGuardianSelection = (g: Guardian) => {
     const key = g.id || g.phone_number;
     if (!key) return;
@@ -1222,97 +1234,157 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             </div>
           </div>
           {showFilters && (
-            <div className="mt-2 mb-2 w-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3 grid grid-cols-1 md:grid-cols-12 gap-3" dir="rtl">
-              {/* 1. المعلّم + الحلقة (أولاً للتسلسل المنطقي) */}
-              <div className="col-span-1 md:col-span-6 order-1 mb-2 md:mb-0">
-                <TeacherCircleFilterBar
-                  teachers={(teacherEntities as any[]).map(t => ({ id: t.id, name: (t.full_name || t.name || '') }))}
-                  circles={(circleEntities as any[]).map(c => ({ id: c.id, name: (c.name || ''), teacher_id: (c.teacher_id || (c.teacher?.id) || '') }))}
-                  circleStudentsCountMap={circleStudentsCountMap}
-                  teacherCirclesCountMap={teacherEntities.reduce((acc, t:any) => { acc[t.id] = t.circles_count || 0; return acc; }, {} as Record<string, number>)}
-                  currentUserId={userId || undefined}
-                  autoSelectCurrentTeacher={userRole === 'teacher' || userRole === 'admin'}
-                  selectedTeacherId={selectedTeacherId || null}
-                  selectedCircleId={studyCircleId || null}
-                  searchQuery={searchTerm}
-                  onSearchChange={(val) => setSearchTerm(val)}
-                  useInlineSelects
-                  useShadSelect
-                  hideFieldLabels={true}
-                  mobileStackedLayout={true}
-                  teacherLabel="اختر معلماً"
-                  circleLabel="اختر حلقة"
-                  onTeacherChange={(id) => {
-                    // id=null => جميع المعلمين
-                    handleTeacherChange(id || '');
-                    if (!id) {
-                      // مسح الحلقة أيضاً حتى لا يبقى فلتر آخر
+            <div className="mt-2 mb-2 w-full bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-3" dir="rtl">
+              <FilterBar
+                values={{
+                  teacher: selectedTeacherId === 'all' || selectedTeacherId === '' ? null : selectedTeacherId,
+                  circle: studyCircleId === 'all' || studyCircleId === '' ? null : studyCircleId,
+                  guardian: selectedGuardianIds.length === 1 ? selectedGuardianIds[0] : null,
+                  grade: filterGrade === 'all' ? null : filterGrade,
+                  q: searchTerm || ''
+                }}
+                showFieldLabels={false}
+                onValuesChange={(vals) => {
+                  const newQ = String(vals.q ?? '');
+                  if (newQ !== searchTerm) setSearchTerm(newQ);
+                  // المعلم
+                  if (vals.teacher === null || vals.teacher === '__ALL__') {
+                    if (selectedTeacherId) {
+                      setSelectedTeacherId('');
                       setStudyCircleId('');
-                      // تحميل شامل لكل الطلاب (مع مراعاة دور المعلم سيبقى مقيداً في handleSearch/loadStudents)
-                      setTimeout(() => {
-                        if (userRole === 'teacher' && userId) {
-                          // المعلم: نعيد البحث بقيود المعلم
-                          handleSearch();
-                        } else {
-                          loadStudents();
-                        }
-                      }, 80);
-                    } else {
-                      setTimeout(() => handleSearch(), 120);
                     }
-                  }}
-                  onCircleChange={(id) => {
-                    setStudyCircleId(id || '');
-                    setTimeout(() => handleSearch(), 100);
-                  }}
-                  disabled={isTeacherCirclesLoading || isLoadingStudyCircles}
-                />
-              </div>
-              {/* 2. ولي الأمر */}
-              <div className="col-span-1 md:col-span-3 order-2 flex items-center mb-2 md:mb-0">
-                <button
-                  type="button"
-                  aria-haspopup="dialog"
-                  onClick={() => setIsGuardianPickerOpen(true)}
-                  className={`h-10 w-full ${guardianButtonBase} ${selectedGuardianIds.length ? guardianButtonSelected : guardianButtonUnselected}`}
-                  title={guardiansLabels.guardian}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="h-6 w-6 shrink-0 rounded-md bg-green-100 dark:bg-green-800 flex items-center justify-center text-green-600">
-                      🤵
-                    </div>
-                    <span className={`truncate text-sm ${selectedGuardianIds.length ? 'text-green-700 font-medium' : filterFieldPlaceholder}`}>
-                      {selectedGuardianIds.length === 0 && (guardiansLabels.guardian || 'اختر ولياً')}
-                      {selectedGuardianIds.length === 1 && selectedGuardians[0]?.full_name}
-                      {selectedGuardianIds.length > 1 && `${selectedGuardianIds.length} أولياء محددون`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-1">
-                    {selectedGuardianIds.length > 0 && (
-                      <span
-                        onClick={(e) => clearAllGuardians(e)}
-                        className="cursor-pointer text-[10px] leading-none px-2 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
-                      >
-                        مسح
-                      </span>
-                    )}
-                    <ChevronDown className={`h-4 w-4 text-green-500 transition-transform duration-200 ${isGuardianPickerOpen ? 'rotate-180' : ''}`} />
-                  </div>
-                </button>
-              </div>
-              {/* 3. البحث */}
-              <div className="col-span-1 md:col-span-3 order-3 flex items-center">
-                <div className="relative flex items-center w-full">
-                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-green-400" />
-                  <Input
-                    placeholder={studentsLabels.searchPlaceholder}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`h-[42px] ${filterFieldBase} ${filterFieldUnselected} pr-10 text-[11px] sm:text-xs`}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  />
-                </div>
-              </div>
+                  } else if (vals.teacher !== selectedTeacherId) {
+                    handleTeacherChange(String(vals.teacher));
+                  }
+                  // الحلقة
+                  if (vals.circle === null || vals.circle === '__ALL__') {
+                    if (studyCircleId) setStudyCircleId('');
+                  } else if (vals.circle !== studyCircleId) {
+                    setStudyCircleId(String(vals.circle));
+                  }
+                  // ولي الأمر (هنا مفرد 
+                  if (vals.guardian === null || vals.guardian === '__ALL__') {
+                    if (selectedGuardianIds.length) setSelectedGuardianIds([]);
+                  } else if (!selectedGuardianIds.includes(String(vals.guardian))) {
+                    setSelectedGuardianIds([String(vals.guardian)]);
+                  }
+                  // الصف الدراسي
+                  if (vals.grade === null || vals.grade === '__ALL__') {
+                    if (filterGrade && filterGrade !== 'all') setFilterGrade('all');
+                  } else if (vals.grade !== filterGrade) {
+                    setFilterGrade(String(vals.grade));
+                  }
+                  setTimeout(() => handleSearch(), 120);
+                }}
+                fields={[
+                  {
+                    id: 'teacher',
+                    label: 'المعلم',
+                    type: 'select',
+                    showSearch: true,
+                    clearable: true,
+                    options: [
+                      { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫', meta: { count: studyCircles.length } },
+                      ...teachers.map(t => ({
+                        value: t.id,
+                        label: t.full_name || '—',
+                        icon: '👨‍🏫',
+                        meta: { count: teacherCirclesCountMap[t.id] || 0 }
+                      }))
+                    ],
+                    value: selectedTeacherId || null,
+                    showCountsFromMetaKey: 'count',
+                    onChange: (val) => {
+                      if (!val || val === '__ALL__') {
+                        setSelectedTeacherId('');
+                        setStudyCircleId('');
+                      } else {
+                        handleTeacherChange(val);
+                      }
+                    }
+                  },
+                  {
+                    id: 'circle',
+                    label: 'الحلقة',
+                    type: 'select',
+                    showSearch: true,
+                    clearable: true,
+                    options: [
+                      { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋', meta: { count: allCirclesForSelection.length } },
+                      ...allCirclesForSelection.map(c => ({
+                        value: c.id,
+                        label: c.name || '—',
+                        icon: '🕋',
+                        meta: { count: circleStudentsCountMap[c.id] || 0 }
+                      }))
+                    ],
+                    value: studyCircleId || null,
+                    showCountsFromMetaKey: 'count',
+                    onChange: (val) => {
+                      if (!val || val === '__ALL__') setStudyCircleId(''); else setStudyCircleId(val);
+                    }
+                  },
+                  {
+                    id: 'guardian',
+                    label: 'ولي الأمر',
+                    type: 'select',
+                    showSearch: true,
+                    clearable: true,
+                    options: [
+                      { value: '__ALL__', label: 'جميع أولياء الأمور', icon: '🤵', meta: { count: students.filter(s => s.guardian).length } },
+                      ...guardians.map(g => ({
+                        value: g.id || g.phone_number || '',
+                        label: g.full_name || '—',
+                        icon: '🤵',
+                        meta: { count: guardianStudentsCountMap[g.id || g.phone_number || ''] || 0 }
+                      }))
+                    ],
+                    value: selectedGuardianIds.length === 1 ? selectedGuardianIds[0] : null,
+                    showCountsFromMetaKey: 'count',
+                    onChange: (val) => {
+                      if (!val || val === '__ALL__') setSelectedGuardianIds([]); else setSelectedGuardianIds([val]);
+                    }
+                  },
+                  {
+                    id: 'grade',
+                    label: 'الصف',
+                    type: 'select',
+                    clearable: true,
+                    options: [
+                      { value: '__ALL__', label: 'كل الصفوف', icon: '🏷️' },
+                      ...studentsLabels.gradeOptions.map((g: any) => ({ value: g.value, label: g.label, icon: '🏷️' }))
+                    ],
+                    value: filterGrade === 'all' ? null : filterGrade,
+                    onChange: (val) => {
+                      if (!val || val === '__ALL__') setFilterGrade('all'); else setFilterGrade(val);
+                    }
+                  },
+                  {
+                    id: 'q',
+                    label: 'بحث',
+                    type: 'text',
+                    placeholder: '🔍 بحث باسم الطالب أو الهاتف أو ولي الأمر...',
+                    value: searchTerm,
+                    debounceMs: 400,
+                    onChange: (v) => setSearchTerm(v)
+                  }
+                ]}
+                actions={[{
+                  id: 'reset',
+                  label: 'إعادة تعيين',
+                  variant: 'outline',
+                  className: 'w-full sm:w-auto justify-center font-semibold text-[11px] sm:text-xs h-9 bg-white dark:bg-gray-900 border-green-300 hover:bg-green-50 dark:hover:bg-green-800 text-green-700 dark:text-green-200 mt-2 sm:mt-0',
+                  onClick: () => {
+                    resetFilters(false);
+                    setSelectedGuardianIds([]);
+                    setTimeout(() => handleSearch(), 50);
+                  }
+                }]}
+                enableDefaultApplyButton={false}
+                enableDefaultResetButton={false}
+                actionsPlacement="wrap"
+                className="bg-transparent p-0"
+              />
             </div>
           )}
           {/* تمت إزالة واجهة الفلاتر النشطة بناء على طلب المستخدم */}

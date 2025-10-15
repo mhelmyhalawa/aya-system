@@ -1247,10 +1247,17 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                         showSearch: true,
                         clearable: true,
                         options: [
-                          { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫' },
-                          ...visibleTeachers.map(t => ({ value: t.id, label: t.full_name || '—', icon: '👨‍🏫' }))
+                          // جميع المعلمين: العدد = إجمالي الحلقات (كما طلبت)
+                          { value: '__ALL__', label: 'جميع المعلمين', icon: '👨‍🏫', meta: { count: studyCircles.length } },
+                          ...visibleTeachers.map(t => ({
+                            value: t.id,
+                            label: t.full_name || '—',
+                            icon: '👨‍🏫',
+                            meta: { count: studyCircles.filter(c => c.teacher_id === t.id).length }
+                          }))
                         ],
                         value: selectedTeacherId === 'all-teachers' ? null : selectedTeacherId,
+                        showCountsFromMetaKey: 'count',
                         onChange: (val) => {
                           if (!val || val === '__ALL__') {
                             setSelectedTeacherId('all-teachers');
@@ -1267,10 +1274,17 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                         showSearch: true,
                         clearable: true,
                         options: [
-                          { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋' },
-                          ...visibleStudyCircles.map(c => ({ value: c.id, label: c.name || '—', icon: '🕋' }))
+                          // جميع الحلقات: العدد = إجمالي الطلاب الظاهرين (children)
+                          { value: '__ALL__', label: 'جميع الحلقات', icon: '🕋', meta: { count: visibleStudents.length } },
+                          ...visibleStudyCircles.map(c => ({
+                            value: c.id,
+                            label: c.name || '—',
+                            icon: '🕋',
+                            meta: { count: students.filter(s => (s.study_circle && s.study_circle.id === c.id) || s.study_circle_id === c.id).length }
+                          }))
                         ],
                         value: selectedCircleId === 'all-circles' ? null : selectedCircleId,
+                        showCountsFromMetaKey: 'count',
                         onChange: (val) => {
                           if (!val || val === '__ALL__') {
                             setSelectedCircleId('all-circles');
@@ -1286,10 +1300,17 @@ const StudentAssessments: React.FC<StudentAssessmentsProps> = ({ onNavigate, cur
                         showSearch: true,
                         clearable: true,
                         options: [
-                          { value: '__ALL__', label: 'جميع أولياء الأمور', icon: '👨‍👩‍👧' },
-                          ...guardians.map(g => ({ value: g.id, label: `${g.full_name || '—'}${typeof g.students_count === 'number' ? ` (${g.students_count})` : ''}`, icon: '👨‍👩‍👧' }))
+                          // جميع أولياء الأمور: العدد = إجمالي الطلاب الذين لديهم ولي أمر
+                          { value: '__ALL__', label: 'جميع أولياء الأمور', icon: '👨‍👩‍👧', meta: { count: students.filter(s => s.guardian).length } },
+                          ...guardians.map(g => ({
+                            value: g.id,
+                            label: g.full_name || '—',
+                            icon: '👨‍👩‍👧',
+                            meta: { count: (g as any).students_count ?? students.filter(s => s.guardian && s.guardian.id === g.id).length }
+                          }))
                         ],
                         value: selectedGuardianId === 'all-guardians' ? null : selectedGuardianId,
+                        showCountsFromMetaKey: 'count',
                         onChange: (val) => {
                           if (!val || val === '__ALL__') {
                             setSelectedGuardianId('all-guardians');
