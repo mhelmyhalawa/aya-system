@@ -384,212 +384,212 @@ function ProfileForm({ currentUser }: ProfileFormProps) {
         {/* حاوية متحركة لمحتوى البطاقة */}
         <div className={`grid transition-all duration-300 ease-out overflow-hidden ${profileCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
           <div className="overflow-hidden">
-        <CardContent className="pt-1 pb-3 px-2 sm:px-2">
-          <form id="profile-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 px-3 sm:px-4 py-4 sm:py-5">
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="full_name" className="text-xs sm:text-sm">الاسم الكامل</Label>
-                  <div className="relative">
-                    <UserIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="full_name"
-                      name="full_name"
-                      value={formData.full_name}
-                      onChange={handleChange}
-                      disabled={!isEditing}
-                      required
-                      className={`pr-9 h-10 text-sm sm:text-base transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} `}
-                    />
+            <CardContent className="pt-1 pb-3 px-2 sm:px-2">
+              <form id="profile-form" onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 px-3 sm:px-4 py-4 sm:py-5">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="full_name" className="text-xs sm:text-sm">الاسم الكامل</Label>
+                      <div className="relative">
+                        <UserIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          id="full_name"
+                          name="full_name"
+                          value={formData.full_name}
+                          onChange={handleChange}
+                          disabled={!isEditing}
+                          required
+                          className={`pr-9 h-10 text-sm sm:text-base transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} `}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-xs sm:text-sm">اسم المستخدم</Label>
+                      <div className="relative">
+                        <AtSign className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          id="username"
+                          name="username"
+                          value={formData.username}
+                          onChange={handleChange}
+                          disabled={!isEditing}
+                          required
+                          className={`pr-9 h-10 text-sm sm:text-base transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} `}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="role" className="text-xs sm:text-sm">الدور</Label>
+                      <div className="relative">
+                        <Shield className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          id="role"
+                          value={
+                            currentUser.role === 'superadmin' ? 'مسؤول رئيسي' :
+                              currentUser.role === 'admin' ? 'مسؤول' :
+                                currentUser.role === 'teacher' ? 'معلم' : 'غير معروف'
+                          }
+                          disabled
+                          className="bg-muted/40 pr-9 h-10 text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2 xl:col-span-1 md:col-span-2">
+                      <Label htmlFor="last_login" className="text-xs sm:text-sm">آخر تسجيل دخول</Label>
+                      <div className="relative">
+                        <LoginIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                        <Input
+                          id="last_login"
+                          value={lastLoginFormatted}
+                          disabled
+                          className="bg-muted/40 pr-9 h-10 text-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="text-xs sm:text-sm">اسم المستخدم</Label>
-                  <div className="relative">
-                    <AtSign className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="username"
-                      name="username"
-                      value={formData.username}
-                      onChange={handleChange}
-                      disabled={!isEditing}
-                      required
-                      className={`pr-9 h-10 text-sm sm:text-base transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} `}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role" className="text-xs sm:text-sm">الدور</Label>
-                  <div className="relative">
-                    <Shield className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="role"
-                      value={
-                        currentUser.role === 'superadmin' ? 'مسؤول رئيسي' :
-                          currentUser.role === 'admin' ? 'مسؤول' :
-                            currentUser.role === 'teacher' ? 'معلم' : 'غير معروف'
-                      }
-                      disabled
-                      className="bg-muted/40 pr-9 h-10 text-sm"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2 xl:col-span-1 md:col-span-2">
-                  <Label htmlFor="last_login" className="text-xs sm:text-sm">آخر تسجيل دخول</Label>
-                  <div className="relative">
-                    <LoginIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="last_login"
-                      value={lastLoginFormatted}
-                      disabled
-                      className="bg-muted/40 pr-9 h-10 text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="h-px bg-gradient-to-l from-transparent via-green-300/40 dark:via-green-700/40 to-transparent my-3" />
+                  <div className="h-px bg-gradient-to-l from-transparent via-green-300/40 dark:via-green-700/40 to-transparent my-3" />
 
-              {isEditing && (
-                <>
-                  <div className="h-px bg-gradient-to-l from-transparent via-yellow-400/40 dark:via-yellow-600/40 to-transparent my-4" />
-                  <div className="mt-4 sm:mt-6">
-                    <button
-                      type="button"
-                      onClick={() => setShowPasswordSection(v => !v)}
-                      className="group w-full flex items-center justify-between rounded-lg border border-yellow-300/50 dark:border-yellow-400/30 bg-yellow-50/60 dark:bg-yellow-950/10 px-4 py-3 text-right transition hover:bg-yellow-100/70 dark:hover:bg-yellow-900/30"
-                    >
-                      <span className="flex items-center gap-2 text-sm sm:text-base font-medium text-yellow-800 dark:text-yellow-100">
-                        <Lock className="h-4 w-4 text-yellow-600 dark:text-yellow-300" />
-                        تغيير كلمة المرور (اختياري)
-                        {(formData.password || formData.confirmPassword) && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-800 dark:text-yellow-200 border border-yellow-400/40">مدخل جزئياً</span>
-                        )}
-                      </span>
-                      <span className="text-xs text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
-                        {showPasswordSection ? 'إخفاء' : 'إظهار'}
-                        <svg className={`h-4 w-4 transition-transform ${showPasswordSection ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                      </span>
-                    </button>
-                    <div className={`grid transition-all duration-300 ease-out overflow-hidden ${showPasswordSection ? 'grid-rows-[1fr] mt-4' : 'grid-rows-[0fr]'}`}>
-                      <div className="overflow-hidden">
-                        <div className="rounded-xl border border-yellow-300/40 dark:border-yellow-400/30 bg-yellow-50/70 dark:bg-yellow-950/20 p-4 sm:p-5 shadow-inner">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                            <div className="space-y-2">
-                              <Label htmlFor="password" className="text-xs sm:text-sm">كلمة المرور الجديدة</Label>
-                              <div className="relative">
-                                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                                <Input
-                                  id="password"
-                                  name="password"
-                                  type="password"
-                                  value={formData.password}
-                                  onChange={handleChange}
-                                  autoComplete="new-password"
-                                  placeholder="••••••••"
-                                  className={`pr-9 transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} ${passwordMismatch && formData.password ? 'border-red-400 focus-visible:ring-red-500' : ''}`}
-                                />
-                              </div>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">اتركه فارغًا إذا لا ترغب في التغيير. يُفضل كلمة قوية.</p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">تأكيد كلمة المرور</Label>
-                              <div className="relative">
-                                <CheckSquare className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                                <Input
-                                  id="confirmPassword"
-                                  name="confirmPassword"
-                                  type="password"
-                                  value={formData.confirmPassword}
-                                  onChange={handleChange}
-                                  autoComplete="new-password"
-                                  placeholder="••••••••"
-                                  className={`pr-9 transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} ${passwordMismatch && formData.confirmPassword ? 'border-red-400 focus-visible:ring-red-500' : ''}`}
-                                />
-                              </div>
-                              {passwordMismatch && formData.confirmPassword && (
-                                <div className="flex items-start gap-1 text-[11px] sm:text-xs text-red-600 dark:text-red-400 mt-1 animate-in fade-in">
-                                  <svg className="h-3.5 w-3.5 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                  <span>كلمتا المرور غير متطابقتين</span>
+                  {isEditing && (
+                    <>
+                      <div className="h-px bg-gradient-to-l from-transparent via-yellow-400/40 dark:via-yellow-600/40 to-transparent my-4" />
+                      <div className="mt-4 sm:mt-6">
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordSection(v => !v)}
+                          className="group w-full flex items-center justify-between rounded-lg border border-yellow-300/50 dark:border-yellow-400/30 bg-yellow-50/60 dark:bg-yellow-950/10 px-4 py-3 text-right transition hover:bg-yellow-100/70 dark:hover:bg-yellow-900/30"
+                        >
+                          <span className="flex items-center gap-2 text-sm sm:text-base font-medium text-yellow-800 dark:text-yellow-100">
+                            <Lock className="h-4 w-4 text-yellow-600 dark:text-yellow-300" />
+                            تغيير كلمة المرور (اختياري)
+                            {(formData.password || formData.confirmPassword) && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-800 dark:text-yellow-200 border border-yellow-400/40">مدخل جزئياً</span>
+                            )}
+                          </span>
+                          <span className="text-xs text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
+                            {showPasswordSection ? 'إخفاء' : 'إظهار'}
+                            <svg className={`h-4 w-4 transition-transform ${showPasswordSection ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          </span>
+                        </button>
+                        <div className={`grid transition-all duration-300 ease-out overflow-hidden ${showPasswordSection ? 'grid-rows-[1fr] mt-4' : 'grid-rows-[0fr]'}`}>
+                          <div className="overflow-hidden">
+                            <div className="rounded-xl border border-yellow-300/40 dark:border-yellow-400/30 bg-yellow-50/70 dark:bg-yellow-950/20 p-4 sm:p-5 shadow-inner">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                                <div className="space-y-2">
+                                  <Label htmlFor="password" className="text-xs sm:text-sm">كلمة المرور الجديدة</Label>
+                                  <div className="relative">
+                                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                    <Input
+                                      id="password"
+                                      name="password"
+                                      type="password"
+                                      value={formData.password}
+                                      onChange={handleChange}
+                                      autoComplete="new-password"
+                                      placeholder="••••••••"
+                                      className={`pr-9 transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} ${passwordMismatch && formData.password ? 'border-red-400 focus-visible:ring-red-500' : ''}`}
+                                    />
+                                  </div>
+                                  <p className="text-[10px] sm:text-xs text-muted-foreground leading-relaxed">اتركه فارغًا إذا لا ترغب في التغيير. يُفضل كلمة قوية.</p>
                                 </div>
-                              )}
+                                <div className="space-y-2">
+                                  <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">تأكيد كلمة المرور</Label>
+                                  <div className="relative">
+                                    <CheckSquare className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                                    <Input
+                                      id="confirmPassword"
+                                      name="confirmPassword"
+                                      type="password"
+                                      value={formData.confirmPassword}
+                                      onChange={handleChange}
+                                      autoComplete="new-password"
+                                      placeholder="••••••••"
+                                      className={`pr-9 transition-colors ${isEditing ? 'bg-white/90 border-green-300 focus-visible:ring-islamic-green shadow-sm' : 'bg-muted/40'} ${passwordMismatch && formData.confirmPassword ? 'border-red-400 focus-visible:ring-red-500' : ''}`}
+                                    />
+                                  </div>
+                                  {passwordMismatch && formData.confirmPassword && (
+                                    <div className="flex items-start gap-1 text-[11px] sm:text-xs text-red-600 dark:text-red-400 mt-1 animate-in fade-in">
+                                      <svg className="h-3.5 w-3.5 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                      <span>كلمتا المرور غير متطابقتين</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
+                    </>
+                  )}
+                </div>
+                {/* Cancel confirmation dialog */}
+                {showCancelConfirm && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 max-w-xs w-full flex flex-col items-center gap-4">
+                      <div className="text-lg font-bold text-red-700 dark:text-red-300 flex items-center gap-2">
+                        <X className="h-5 w-5" />
+                        تجاهل التعديلات؟
+                      </div>
+                      <div className="text-sm text-muted-foreground text-center">هناك تغييرات لم تحفظ بعد. هل تريد بالتأكيد إلغاء التعديل؟</div>
+                      <div className="flex gap-3 mt-2">
+                        <Button variant="outline" onClick={handleDismissCancel}>متابعة التعديل</Button>
+                        <Button variant="destructive" onClick={handleConfirmCancel}>إلغاء التعديل</Button>
+                      </div>
                     </div>
                   </div>
-                </>
-              )}
-            </div>
-            {/* Cancel confirmation dialog */}
-            {showCancelConfirm && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg p-6 max-w-xs w-full flex flex-col items-center gap-4">
-                  <div className="text-lg font-bold text-red-700 dark:text-red-300 flex items-center gap-2">
-                    <X className="h-5 w-5" />
-                    تجاهل التعديلات؟
-                  </div>
-                  <div className="text-sm text-muted-foreground text-center">هناك تغييرات لم تحفظ بعد. هل تريد بالتأكيد إلغاء التعديل؟</div>
-                  <div className="flex gap-3 mt-2">
-                    <Button variant="outline" onClick={handleDismissCancel}>متابعة التعديل</Button>
-                    <Button variant="destructive" onClick={handleConfirmCancel}>إلغاء التعديل</Button>
-                  </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* Saved indicator (kept outside new footer for overlay) */}
-            {showSaved && (
-              <div className="fixed bottom-20 right-0 left-0 z-50 flex justify-center pointer-events-none">
-                <div className="bg-green-600 text-white rounded-full px-5 py-2 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-6">
-                  <Save className="h-4 w-4" />
-                  تم الحفظ بنجاح
+                {/* Saved indicator (kept outside new footer for overlay) */}
+                {showSaved && (
+                  <div className="fixed bottom-20 right-0 left-0 z-50 flex justify-center pointer-events-none">
+                    <div className="bg-green-600 text-white rounded-full px-5 py-2 shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-6">
+                      <Save className="h-4 w-4" />
+                      تم الحفظ بنجاح
+                    </div>
+                  </div>
+                )}
+              </form>
+            </CardContent>
+            <CardFooter className="flex justify-end pt-2 sm:pt-3 pb-3 gap-3 border-t border-green-200/60 dark:border-green-700/40 bg-gradient-to-l from-green-50/60 to-white dark:from-green-900/10 dark:to-transparent rounded-b-2xl flex-wrap">
+              {isEditing ? (
+                <div className="flex w-full sm:w-auto justify-center sm:justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    className="w-full sm:w-auto min-w-[110px] flex items-center gap-2"
+                    aria-label="إلغاء"
+                  >
+                    <X className="h-4 w-4" />
+                    <span className="hidden sm:inline">إلغاء</span>
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="profile-form"
+                    disabled={isLoading || !isDirty}
+                    className="w-full sm:w-auto min-w-[140px] font-semibold flex items-center gap-2"
+                    aria-label="حفظ"
+                  >
+                    <Save className="h-4 w-4" />
+                    <span className="hidden sm:inline">{isLoading ? "جارٍ الحفظ..." : isDirty ? "حفظ التغييرات" : "لا تغييرات"}</span>
+                    <span className="sm:hidden">{isLoading ? "جاري..." : isDirty ? "حفظ" : ""}</span>
+                  </Button>
                 </div>
-              </div>
-            )}
-          </form>
-        </CardContent>
-        <CardFooter className="flex justify-end pt-2 sm:pt-3 pb-3 gap-3 border-t border-green-200/60 dark:border-green-700/40 bg-gradient-to-l from-green-50/60 to-white dark:from-green-900/10 dark:to-transparent rounded-b-2xl flex-wrap">
-          {isEditing ? (
-            <div className="flex w-full sm:w-auto justify-center sm:justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancelEdit}
-                className="w-full sm:w-auto min-w-[110px] flex items-center gap-2"
-                aria-label="إلغاء"
-              >
-                <X className="h-4 w-4" />
-                <span className="hidden sm:inline">إلغاء</span>
-              </Button>
-              <Button
-                type="submit"
-                form="profile-form"
-                disabled={isLoading || !isDirty}
-                className="w-full sm:w-auto min-w-[140px] font-semibold flex items-center gap-2"
-                aria-label="حفظ"
-              >
-                <Save className="h-4 w-4" />
-                <span className="hidden sm:inline">{isLoading ? "جارٍ الحفظ..." : isDirty ? "حفظ التغييرات" : "لا تغييرات"}</span>
-                <span className="sm:hidden">{isLoading ? "جاري..." : isDirty ? "حفظ" : ""}</span>
-              </Button>
-            </div>
-          ) : (
-            <div className="flex w-full sm:w-auto justify-center sm:justify-end">
-              <Button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="w-full sm:w-auto min-w-[140px] flex items-center gap-2"
-                aria-label="تعديل"
-                title="تعديل البيانات"
-              >
-                <Pencil className="h-4 w-4" />
-                <span className="hidden sm:inline">تعديل البيانات</span>
-                <span className="sm:hidden">تعديل</span>
-              </Button>
-            </div>
-          )}
-        </CardFooter>
+              ) : (
+                <div className="flex w-full sm:w-auto justify-center sm:justify-end">
+                  <Button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="w-full sm:w-auto min-w-[140px] flex items-center gap-2"
+                    aria-label="تعديل"
+                    title="تعديل البيانات"
+                  >
+                    <Pencil className="h-4 w-4" />
+                    <span className="hidden sm:inline">تعديل البيانات</span>
+                    <span className="sm:hidden">تعديل</span>
+                  </Button>
+                </div>
+              )}
+            </CardFooter>
           </div>
         </div>
       </Card>
@@ -602,8 +602,7 @@ function ProfileForm({ currentUser }: ProfileFormProps) {
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center flex-wrap gap-2">
                   <CardTitle className="text-lg md:text-xl font-extrabold text-green-50 flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-yellow-300" />
-                    حلقاتي
+                    🕋 حلقاتي
                   </CardTitle>
                   {/* Badges + small action buttons (filter/refresh) */}
                   <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
@@ -639,7 +638,7 @@ function ProfileForm({ currentUser }: ProfileFormProps) {
                       }}
                       aria-label={circlesCollapsed ? 'تحديث الأعداد' : 'تحديث البيانات'}
                       title={circlesCollapsed ? 'تحديث الأعداد' : 'تحديث البيانات'}
-                      className={`h-7 w-7 inline-flex items-center justify-center rounded-full border border-white/30 text-white transition-all shadow-sm hover:bg-white/20 bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${ (refreshingCounts || refreshingFull) ? 'animate-spin pointer-events-none' : ''}`}
+                      className={`h-7 w-7 inline-flex items-center justify-center rounded-full border border-white/30 text-white transition-all shadow-sm hover:bg-white/20 bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 ${(refreshingCounts || refreshingFull) ? 'animate-spin pointer-events-none' : ''}`}
                       disabled={refreshingCounts || refreshingFull}
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
@@ -663,102 +662,104 @@ function ProfileForm({ currentUser }: ProfileFormProps) {
               </div>
             </div>
           </CardHeader>
-          <div className={`grid transition-all duration-300 ease-out overflow-hidden ${circlesCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}> 
+          <div className={`grid transition-all duration-300 ease-out overflow-hidden ${circlesCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}>
             <div className="overflow-hidden">
-          <CardContent className="pt-4 pb-5 px-3 sm:px-4">
-            {/* شريط البحث عن الحلقات (يظهر مع زر الفلتر) */}
-            {userCircles.length > 0 && (
-              <div className={`transition-all duration-300 ${showCircleSearch ? 'opacity-100 max-h-32 mb-4' : 'opacity-0 max-h-0 mb-0 pointer-events-none'} overflow-hidden`}> 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      placeholder="بحث عن حلقة بالاسم..."
-                      value={circleSearch}
-                      onChange={e => setCircleSearch(e.target.value)}
-                      className="w-full rounded-lg border border-green-300/60 dark:border-green-700/60 bg-white/70 dark:bg-green-950/30 backdrop-blur-sm px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/60 placeholder:text-green-900/40 dark:placeholder:text-green-100/30 shadow-sm"
-                      aria-label="بحث عن حلقة"
-                    />
-                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-700/60 dark:text-green-200/50 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
-                    {circleSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setCircleSearch("")}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-md hover:bg-white/50 dark:hover:bg-green-900/40 text-green-800/70 dark:text-green-100/70 transition"
-                        aria-label="مسح البحث"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            {loadingCircles ? (
-              <div className="flex items-center justify-center py-10">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green" />
-                  <span className="text-sm text-muted-foreground">جاري التحميل...</span>
-                </div>
-              </div>
-            ) : userCircles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 bg-muted/30 rounded-xl border border-dashed border-muted-foreground/30">
-                <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="font-medium text-lg mb-2">لا توجد حلقات</h3>
-                <p className="text-muted-foreground text-center text-sm">لم يتم تسجيل أي حلقات باسمك بعد</p>
-              </div>
-            ) : filteredCircles.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 bg-green-50/60 dark:bg-green-950/20 rounded-xl border border-dashed border-green-300/40 dark:border-green-700/40">
-                <svg className="h-12 w-12 text-green-600 dark:text-green-300 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 11h4m-2-2v4m10 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <h3 className="font-medium text-lg mb-2">لا نتائج</h3>
-                <p className="text-muted-foreground text-center text-sm">لا توجد حلقات تطابق البحث الحالي</p>
-                <button
-                  onClick={() => setCircleSearch("")}
-                  className="mt-4 text-xs px-3 py-1.5 rounded-full bg-green-600 text-white hover:bg-green-700 transition"
-                >مسح البحث</button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
-                {filteredCircles.map(circle => {
-                  const schedules = (circleSchedules[circle.id] || []) as StudyCircleSchedule[];
-                  return (
-                    <div key={circle.id} className="group rounded-xl border border-green-300/60 dark:border-green-800/60 bg-white/80 dark:bg-green-950/30 backdrop-blur-sm shadow-sm hover:shadow-md transition-all overflow-hidden">
-                        <GenericTable
-                          data={schedules}
-                          columns={scheduleColumns}
-                          defaultCollapsed={schedules.length === 0}
-                          title={
-                            <div className="w-full flex flex-col gap-1">
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-white font-semibold text-[13px] sm:text-sm tracking-tight break-words whitespace-normal" title={circle.name}>حلقة {circle.name}</span>
-                                <span className="text-[10px] sm:text-xs text-white/70 mt-0.5 flex items-center gap-3">
-                                  <span className="inline-flex items-center gap-1">
-                                    <Users className="h-3 w-3 text-white/70" />
-                                    {circle.max_students ? `${circle.max_students} طالب` : '0'}
-                                  </span>
-                                  <span className="inline-flex items-center gap-1">
-                                    <Clock className="h-3 w-3 text-white/70" />
-                                    {schedules.length} موعد
-                                  </span>
-                                </span>
-                              </div>
-                            </div>
-                          }
-                          className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
-                          defaultView="table"
-                          hideSortToggle={false}
-                          enablePagination={true}
-                          defaultPageSize={5}
-                          pageSizeOptions={[5, 10, 15, 30, 50]}
-                          getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
-                          emptyMessage="لا توجد مواعيد محددة لهذه الحلقة"
+              <CardContent className="pt-4 pb-5 px-3 sm:px-4">
+                {/* شريط البحث عن الحلقات (يظهر مع زر الفلتر) */}
+                {userCircles.length > 0 && (
+                  <div className={`transition-all duration-300 ${showCircleSearch ? 'opacity-100 max-h-32 mb-4' : 'opacity-0 max-h-0 mb-0 pointer-events-none'} overflow-hidden`}>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          placeholder="بحث عن حلقة بالاسم..."
+                          value={circleSearch}
+                          onChange={e => setCircleSearch(e.target.value)}
+                          className="w-full rounded-lg border border-green-300/60 dark:border-green-700/60 bg-white/70 dark:bg-green-950/30 backdrop-blur-sm px-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/60 placeholder:text-green-900/40 dark:placeholder:text-green-100/30 shadow-sm"
+                          aria-label="بحث عن حلقة"
                         />
+                        <svg className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-700/60 dark:text-green-200/50 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" /></svg>
+                        {circleSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setCircleSearch("")}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 h-6 w-6 inline-flex items-center justify-center rounded-md hover:bg-white/50 dark:hover:bg-green-900/40 text-green-800/70 dark:text-green-100/70 transition"
+                            aria-label="مسح البحث"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
+                  </div>
+                )}
+                {loadingCircles ? (
+                  <div className="flex items-center justify-center py-10">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-islamic-green" />
+                      <span className="text-sm text-muted-foreground">جاري التحميل...</span>
+                    </div>
+                  </div>
+                ) : userCircles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 bg-muted/30 rounded-xl border border-dashed border-muted-foreground/30">
+                    <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="font-medium text-lg mb-2">لا توجد حلقات</h3>
+                    <p className="text-muted-foreground text-center text-sm">لم يتم تسجيل أي حلقات باسمك بعد</p>
+                  </div>
+                ) : filteredCircles.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 bg-green-50/60 dark:bg-green-950/20 rounded-xl border border-dashed border-green-300/40 dark:border-green-700/40">
+                    <svg className="h-12 w-12 text-green-600 dark:text-green-300 mb-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 11h4m-2-2v4m10 1a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <h3 className="font-medium text-lg mb-2">لا نتائج</h3>
+                    <p className="text-muted-foreground text-center text-sm">لا توجد حلقات تطابق البحث الحالي</p>
+                    <button
+                      onClick={() => setCircleSearch("")}
+                      className="mt-4 text-xs px-3 py-1.5 rounded-full bg-green-600 text-white hover:bg-green-700 transition"
+                    >مسح البحث</button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-1 gap-2">
+                    {filteredCircles.map(circle => {
+                      const schedules = (circleSchedules[circle.id] || []) as StudyCircleSchedule[];
+                      return (
+                        <div key={circle.id} className="group rounded-xl border border-green-300/60 dark:border-green-800/60 bg-white/80 dark:bg-green-950/30 backdrop-blur-sm shadow-sm hover:shadow-md transition-all overflow-hidden">
+                          <GenericTable
+                            data={schedules}
+                            columns={scheduleColumns}
+                            defaultCollapsed={schedules.length === 0}
+                            title={(
+                              <div className="w-full flex flex-col gap-1.5">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">                                      
+                                      🕋 {circle.name}
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                      <Users className="h-3 w-3 text-green-700/70" />
+                                      {circle.max_students ? `${circle.max_students} طالب` : '0'}
+                                    </span>
+                                    <span className="flex items-center gap-1 text-[12.5px] font-bold text-emerald-800">
+                                      <Clock className="h-3 w-3 text-green-700/70" />
+                                      {schedules.length} موعد
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            className="overflow-hidden rounded-lg text-xs sm:text-sm border border-green-300 dark:border-green-700 shadow-sm w-full"
+                            defaultView="table"
+                            hideSortToggle={false}
+                            enablePagination={true}
+                            defaultPageSize={5}
+                            pageSizeOptions={[5, 10, 15, 30, 50]}
+                            getRowClassName={(_, index) => `${index % 2 === 0 ? 'bg-green-50/40 dark:bg-green-900/20' : 'bg-white dark:bg-gray-900'} hover:bg-green-100 dark:hover:bg-green-800/40 transition-colors`}
+                            emptyMessage="لا توجد مواعيد محددة لهذه الحلقة"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
             </div>
           </div>
         </Card>

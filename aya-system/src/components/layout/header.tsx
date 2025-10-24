@@ -75,21 +75,7 @@ export function Header({ currentPath, onNavigate, userRole, currentUser, onLogou
           </div>
 
           {/* 2. معلومات المستخدم */}
-          {userRole && currentUser && (
-            <div className="hidden md:flex items-center gap-2 bg-green-800/30 border border-green-700/40 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl cursor-pointer hover:bg-green-700/50 hover:border-green-600/60 transition-all duration-300 shadow-md"
-              onClick={() => onNavigate("/profile")}
-              title="عرض وتعديل بياناتي الشخصية"
-            >
-              <UserCheck className="h-3 w-3 sm:h-4 sm:w-4 text-green-300" />
-              <span className="text-xs sm:text-sm text-green-100">
-                مرحباً <span className="font-semibold">{currentUser.full_name}</span>
-                {" | "}
-                <span className="text-green-300/80">
-                  {getRoleInArabic(userRole)}
-                </span>
-              </span>
-            </div>
-          )}
+
 
           {/* 3. الأزرار والأيقونات */}
           <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
@@ -108,16 +94,30 @@ export function Header({ currentPath, onNavigate, userRole, currentUser, onLogou
               </Button>
             )}
 
-            {/* أزرار التنقل */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onNavigate("/")}
-                className="text-green-100 hover:bg-green-800/50 rounded-xl transition-all duration-300 h-8 w-8 sm:h-9 sm:w-9"
-                title="الصفحة الرئيسية"
+            {/* أزرار التنقل + معلومات المستخدم (المعلومات على يمين زر Home) */}
+            <div className="flex items-center gap-0 sm:gap-1">
+              {userRole && currentUser && (
+              <div
+                className="hidden md:flex items-center bg-green-800/30 border border-green-700/40 px-2 py-1 rounded-xl cursor-pointer hover:bg-green-700/50 hover:border-green-600/60 transition-all duration-300 shadow-md"
+                onClick={() => onNavigate("/profile")}
+                title="عرض وتعديل بياناتي الشخصية"
               >
-                <Home className="h-4 w-4 sm:h-5 sm:w-5" />
+                <UserCheck className="h-3 w-3 text-green-300 ml-1" />
+                <span className="text-xs text-green-100 whitespace-nowrap">
+                مرحباً <span className="font-semibold">{currentUser.full_name}</span>{" | "}
+                <span className="text-green-300/80">{getRoleInArabic(userRole)}</span>
+                </span>
+              </div>
+              )}
+
+              <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onNavigate("/")}
+              className="text-green-100 hover:bg-green-800/50 rounded-xl transition-all duration-300 h-8 w-8 sm:h-9 sm:w-9"
+              title="الصفحة الرئيسية"
+              >
+              <Home className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
 
               <Button
