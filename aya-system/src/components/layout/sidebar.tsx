@@ -211,6 +211,11 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
           icon: <Users className="h-5 w-5" />,
           label: "بيانات المستخدمين",
           path: "/user-management"
+        },
+        {
+          icon: <BookOpen className="h-5 w-5" />,
+          label: "صور البانر",
+          path: "/drive-images"
         }
       ]
     }

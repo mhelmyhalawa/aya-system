@@ -22,6 +22,7 @@ import { AttendanceRecord } from "@/pages/AttendanceRecord";
 import MemorizationRecords from "@/pages/MemorizationRecords";
 import StudentAssessments from "@/pages/StudentAssessments";
 import { Profile } from "@/types/profile";
+import DriveImagesManagement from "@/pages/DriveImagesManagement";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -212,6 +213,10 @@ const App = () => {
           <ErrorBoundary>
             <StudentAssessments onNavigate={handleNavigate} currentUser={currentUser} />
           </ErrorBoundary> : 
+          <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;
+      case '/drive-images':
+        return (userRole === 'admin' || userRole === 'superadmin') && currentUser ?
+          <DriveImagesManagement onNavigate={handleNavigate} /> :
           <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;
       default:
         // If it's not a known route, redirect to home
