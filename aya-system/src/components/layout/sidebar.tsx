@@ -1,4 +1,4 @@
-import { UserCog, UserCircle, UsersRound, Menu, X, LogOut, Search, ChevronDown, ChevronUp, School, Users, Settings, Database, BookOpen, GraduationCap, BookText, UserPlus, User, Calendar, BookMarked, ClipboardList, BookOpenCheck, FileHeart, FileText, Mail, Inbox, Award } from "lucide-react";
+import { UserCog, UserCircle, UsersRound, Menu, X, LogOut, Search, ChevronDown, ChevronUp, School, Users, Settings, Database, BookOpen, GraduationCap, BookText, UserPlus, User, Calendar, BookMarked, ClipboardList, BookOpenCheck, FileHeart, FileText, Mail, Inbox, Award, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
@@ -213,7 +213,7 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
           path: "/user-management"
         },
         {
-          icon: <BookOpen className="h-5 w-5" />,
+          icon: <Image className="h-5 w-5" />,
           label: "صور البانر",
           path: "/drive-images"
         }
