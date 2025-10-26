@@ -6,6 +6,7 @@ import logoFallback from "@/assets/logo.png";
 import { fetchDriveImageBlob, fetchDriveImageDataUrl, getCachedDriveImages } from "@/lib/google-drive-image-service";
 import { fetchDriveImagesWithStatus, resolvePublicImageUrls } from "@/lib/google-drive-image-service";
 import { DashboardStatistics } from "@/components/pages/dashboard-statistics";
+import TopAchieversFrames from "@/components/TopAchieversFrames";
 import { getLabels } from "@/lib/labels";
 
 // مصفوفة الصور للبانر المتحرك
@@ -90,7 +91,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
     if (DRIVE_FOLDER_ID) {
       const cached = getCachedDriveImages(DRIVE_FOLDER_ID);
       if (cached?.meta?.images?.length && Object.keys(cached.dataUrls).length) {
-        const hiddenIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('drive_banner_hidden_ids')||'[]'); } catch { return []; } })();
+        const hiddenIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('drive_banner_hidden_ids') || '[]'); } catch { return []; } })();
         const slides: BannerSlide[] = cached.meta.images
           .filter(i => cached.dataUrls[i.id])
           .filter(i => !hiddenIds.includes(i.id))
@@ -117,8 +118,8 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
       fetchDriveImagesWithStatus(DRIVE_FOLDER_ID, GOOGLE_API_KEY, { force: true })
         .then(async ({ images, error, status, rawCount }) => {
           if (images.length) {
-            const resolved = await resolvePublicImageUrls(images);
-            const hiddenIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('drive_banner_hidden_ids')||'[]'); } catch { return []; } })();
+            const resolved = await resolvePublicImageUrls(images, 6000, GOOGLE_API_KEY);
+            const hiddenIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('drive_banner_hidden_ids') || '[]'); } catch { return []; } })();
             const dynamicSlides: BannerSlide[] = resolved.map((img, idx) => ({
               title: img.name,
               subtitle: homeLabels.banner.slides[idx]?.subtitle || '',
@@ -155,8 +156,8 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
     fetchDriveImagesWithStatus(DRIVE_FOLDER_ID, GOOGLE_API_KEY, { force: true })
       .then(async ({ images, error, status, rawCount }) => {
         if (images.length) {
-          const resolved = await resolvePublicImageUrls(images);
-          const hiddenIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('drive_banner_hidden_ids')||'[]'); } catch { return []; } })();
+          const resolved = await resolvePublicImageUrls(images, 6000, GOOGLE_API_KEY);
+          const hiddenIds: string[] = (() => { try { return JSON.parse(localStorage.getItem('drive_banner_hidden_ids') || '[]'); } catch { return []; } })();
           const dynamicSlides: BannerSlide[] = resolved.map((img, idx) => ({
             title: img.name,
             subtitle: homeLabels.banner.slides[idx]?.subtitle || '',
@@ -194,7 +195,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
   useEffect(() => {
     return () => {
       Object.values(blobUrls).forEach(url => {
-        try { URL.revokeObjectURL(url); } catch (_) {}
+        try { URL.revokeObjectURL(url); } catch (_) { }
       });
     };
   }, [blobUrls]);
@@ -209,7 +210,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
             onClick={() => onNavigate('/login')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>🔑</span> تسجيل الدخول
+            <span>🔑</span> تسجيل الدخول
           </Button>
 
           {/* زر استعلام أولياء الأمور */}
@@ -217,7 +218,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
             onClick={() => onNavigate('/parent-inquiry')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>👨‍👩‍👧‍👦</span> استعلام أولياء الأمور
+            <span>👨‍👩‍👧‍👦</span> استعلام أولياء الأمور
           </Button>
         </div>
 
@@ -233,13 +234,13 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
             onClick={() => onNavigate('/students')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>👦</span>  إدارة الطلاب
+            <span>👦</span>  إدارة الطلاب
           </Button>
           <Button
             onClick={() => onNavigate('/study-circles')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-           <span>📚</span>  حلقاتي الدراسية
+            <span>📚</span>  حلقاتي الدراسية
           </Button>
         </div>
       );
@@ -253,21 +254,21 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
             onClick={() => onNavigate('/students-list')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>👦</span>  قائمة الطلاب
+            <span>👦</span>  قائمة الطلاب
           </Button>
 
           <Button
             onClick={() => onNavigate('/guardians-list')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>👨‍👩‍👧‍👦</span>   قائمة أولياء الأمور
+            <span>👨‍👩‍👧‍👦</span>   قائمة أولياء الأمور
           </Button>
 
           <Button
             onClick={() => onNavigate('/study-circles')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>📚</span>  إدارة الحلقات الدراسية
+            <span>📚</span>  إدارة الحلقات الدراسية
           </Button>
 
           {/* زر استعلام أولياء الأمور */}
@@ -275,15 +276,15 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
             onClick={() => onNavigate('/parent-inquiry')}
             className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
           >
-          <span>👨‍👩‍👧‍👦</span> استعلام أولياء الأمور
+            <span>👨‍👩‍👧‍👦</span> استعلام أولياء الأمور
           </Button>
-          
+
           {userRole === 'superadmin' && (
             <Button
               onClick={() => onNavigate('/database-management')}
               className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
             >
-            <span>🗄️</span>  إدارة قاعدة البيانات
+              <span>🗄️</span>  إدارة قاعدة البيانات
             </Button>
           )}
 
@@ -292,7 +293,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
               onClick={() => onNavigate('/user-management')}
               className="h-8 sm:h-9 px-3 rounded-full text-sm sm:text-base font-bold border border-green-500 text-green-600 bg-white hover:bg-green-600 hover:text-white transition-colors duration-300"
             >
-            <span>👤</span>  إدارة المستخدمين
+              <span>👤</span>  إدارة المستخدمين
             </Button>
           )}
         </div>
@@ -318,174 +319,205 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
   };
 
   return (
-  <div className="w-full max-w-[1600px] mx-auto px-4 py-4 sm:py-6">
+    <div className="w-full max-w-[1600px] mx-auto px-4 py-4 sm:py-6">
       <div className="max-w-4xl mx-auto">
-{/* بانر صور متغيرة - لمسة إسلامية معاصرة */}
-<div className="mb-6 sm:mb-8 flex justify-center font-arabic">
-  <div className="w-full max-w-5xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg sm:shadow-2xl relative 
+        {/* بانر صور متغيرة - لمسة إسلامية معاصرة */}
+        <div className="mb-6 sm:mb-8 flex justify-center font-arabic">
+          <div className="w-full max-w-5xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg sm:shadow-2xl relative 
                   border-2 border-green-600 bg-gradient-to-tr from-green-950/90 via-green-800/80 to-emerald-700/70">
 
-    {/* خلفية زخرفة هندسية شفافة */}
-    <div className="absolute inset-0 bg-[url('/patterns/islamic-pattern.svg')] opacity-10 pointer-events-none" />
+            {/* خلفية زخرفة هندسية شفافة */}
+            <div className="absolute inset-0 bg-[url('/patterns/islamic-pattern.svg')] opacity-10 pointer-events-none" />
 
-    {/* صورة البانر */}
-    <div className="relative h-48 sm:h-64 md:h-80 flex items-center justify-center">
-      {(() => {
-        const length = bannerImages.length;
-        const safeIndex = length === 0 ? 0 : Math.min(currentImageIndex, length - 1);
-        const slide: BannerSlide = length === 0
-          ? { src: logoFallback, title: 'لا توجد صور', subtitle: '', sourceType: 'direct' }
-          : bannerImages[safeIndex];
-        return (
-          <img
-            src={slide.src}
-            alt={slide.title}
-            className="w-full h-full object-contain transition-all duration-700 ease-in-out drop-shadow-xl"
-            onLoad={(e) => {
-              const el = e.currentTarget as HTMLImageElement;
-              setImageDiagnostics(prev => ({ ...prev, [safeIndex]: { ...(prev[safeIndex]||{}), loaded: true, w: el.naturalWidth, h: el.naturalHeight } }));
-              console.log('[DriveBanner] Image loaded:', { index: safeIndex, src: el.src, size: el.naturalWidth + 'x' + el.naturalHeight });
-            }}
-            onError={async (e) => {
-              console.warn('[DriveBanner] فشل تحميل الصورة، محاولة جلب dataURL/Blob:', slide.src);
-              setImageDiagnostics(prev => ({ ...prev, [safeIndex]: { ...(prev[safeIndex]||{}), error: true } }));
-              if (slide.id && GOOGLE_API_KEY) {
-                // نحاول أولاً dataURL (مفيد للكاش الدائم) وإن كان كبيراً سيعود blob:
-                const dataUrl = await fetchDriveImageDataUrl(slide.id, GOOGLE_API_KEY);
-                if (dataUrl) {
-                  (e.currentTarget as HTMLImageElement).src = dataUrl;
-                  const type = dataUrl.startsWith('blob:') ? 'blob' : 'cache';
-                  if (type === 'blob') setBlobUrls(prev => ({ ...prev, [safeIndex]: dataUrl }));
-                  setBannerImages(prev => prev.map((s, i) => i === safeIndex ? { ...s, src: dataUrl, sourceType: type } : s));
-                  return;
-                }
-                // محاولة أخيرة Blob مباشر (قد يكون فشل بسبب الحجم)
-                if (slide.sourceType !== 'blob' && !imageDiagnostics[safeIndex]?.blobTried) {
-                  setImageDiagnostics(prev => ({ ...prev, [safeIndex]: { ...(prev[safeIndex]||{}), blobTried: true } }));
-                  const blobUrl = await fetchDriveImageBlob(slide.id, GOOGLE_API_KEY);
-                  if (blobUrl) {
-                    (e.currentTarget as HTMLImageElement).src = blobUrl;
-                    setBlobUrls(prev => ({ ...prev, [safeIndex]: blobUrl }));
-                    setBannerImages(prev => prev.map((s, i) => i === safeIndex ? { ...s, src: blobUrl, sourceType: 'blob' } : s));
-                    return;
-                  }
-                }
-              }
-              // fallback النهائي للشعار
-              (e.currentTarget as HTMLImageElement).src = logoFallback;
-              setBannerImages(prev => prev.map((s, i) => i === safeIndex ? { ...s, src: logoFallback, sourceType: 'fallback' } : s));
-            }}
-          />
-        );
-      })()}
+            {/* صورة البانر */}
+            <div className="relative h-48 sm:h-64 md:h-80 flex items-center justify-center">
+              {(() => {
+                const length = bannerImages.length;
+                const safeIndex = length === 0 ? 0 : Math.min(currentImageIndex, length - 1);
+                const slide: BannerSlide = length === 0
+                  ? { src: logoFallback, title: 'لا توجد صور', subtitle: '', sourceType: 'direct' }
+                  : bannerImages[safeIndex];
+                return (
+                  <img
+                    src={slide.src}
+                    alt={slide.title}
+                    className="w-full h-full object-contain transition-all duration-700 ease-in-out drop-shadow-xl"
+                    onLoad={(e) => {
+                      const el = e.currentTarget as HTMLImageElement;
+                      setImageDiagnostics(prev => ({ ...prev, [safeIndex]: { ...(prev[safeIndex] || {}), loaded: true, w: el.naturalWidth, h: el.naturalHeight } }));
+                      console.log('[DriveBanner] Image loaded:', { index: safeIndex, src: el.src, size: el.naturalWidth + 'x' + el.naturalHeight });
+                    }}
+                    onError={async (e) => {
+                      console.warn('[DriveBanner] فشل تحميل الصورة، محاولة جلب dataURL/Blob:', slide.src);
+                      setImageDiagnostics(prev => ({ ...prev, [safeIndex]: { ...(prev[safeIndex] || {}), error: true } }));
+                      if (slide.id && GOOGLE_API_KEY) {
+                        // نحاول أولاً dataURL (مفيد للكاش الدائم) وإن كان كبيراً سيعود blob:
+                        const dataUrl = await fetchDriveImageDataUrl(slide.id, GOOGLE_API_KEY);
+                        if (dataUrl) {
+                          (e.currentTarget as HTMLImageElement).src = dataUrl;
+                          const type = dataUrl.startsWith('blob:') ? 'blob' : 'cache';
+                          if (type === 'blob') setBlobUrls(prev => ({ ...prev, [safeIndex]: dataUrl }));
+                          setBannerImages(prev => prev.map((s, i) => i === safeIndex ? { ...s, src: dataUrl, sourceType: type } : s));
+                          return;
+                        }
+                        // محاولة أخيرة Blob مباشر (قد يكون فشل بسبب الحجم)
+                        if (slide.sourceType !== 'blob' && !imageDiagnostics[safeIndex]?.blobTried) {
+                          setImageDiagnostics(prev => ({ ...prev, [safeIndex]: { ...(prev[safeIndex] || {}), blobTried: true } }));
+                          const blobUrl = await fetchDriveImageBlob(slide.id, GOOGLE_API_KEY);
+                          if (blobUrl) {
+                            (e.currentTarget as HTMLImageElement).src = blobUrl;
+                            setBlobUrls(prev => ({ ...prev, [safeIndex]: blobUrl }));
+                            setBannerImages(prev => prev.map((s, i) => i === safeIndex ? { ...s, src: blobUrl, sourceType: 'blob' } : s));
+                            return;
+                          }
+                        }
+                      }
+                      // fallback النهائي للشعار
+                      (e.currentTarget as HTMLImageElement).src = logoFallback;
+                      setBannerImages(prev => prev.map((s, i) => i === safeIndex ? { ...s, src: logoFallback, sourceType: 'fallback' } : s));
+                    }}
+                  />
+                );
+              })()}
 
-      {loadingDriveImages && (
-        <div className="absolute inset-0 flex items-center justify-center bg-green-900/30 backdrop-blur-sm text-white text-sm">
-          جاري تحميل الصور...
-        </div>
-      )}
+              {loadingDriveImages && (
+                <div className="absolute inset-0 flex items-center justify-center bg-green-900/30 backdrop-blur-sm text-white text-sm">
+                  جاري تحميل الصور...
+                </div>
+              )}
 
-      {!loadingDriveImages && (!DRIVE_FOLDER_ID || !GOOGLE_API_KEY) && (
-        <div className="absolute top-2 left-2 right-2 text-center text-[11px] sm:text-xs bg-red-900/50 text-red-200 border border-red-700/40 rounded-md py-1 px-2 shadow-md">
-          إعداد الربط غير مكتمل: أضف القيم VITE_GOOGLE_DRIVE_FOLDER_ID و VITE_GOOGLE_API_KEY في ملف <code>.env</code> ثم أعد التشغيل.
-        </div>
-      )}
+              {!loadingDriveImages && (!DRIVE_FOLDER_ID || !GOOGLE_API_KEY) && (
+                <div className="absolute top-2 left-2 right-2 text-center text-[11px] sm:text-xs bg-red-900/50 text-red-200 border border-red-700/40 rounded-md py-1 px-2 shadow-md">
+                  إعداد الربط غير مكتمل: أضف القيم VITE_GOOGLE_DRIVE_FOLDER_ID و VITE_GOOGLE_API_KEY في ملف <code>.env</code> ثم أعد التشغيل.
+                </div>
+              )}
 
-      {/* طبقة تدرج لتعزيز وضوح الكتابة */}
-      <div className="absolute inset-0 bg-gradient-to-t from-green-950/70 via-green-800/20 to-transparent" />
+              {/* طبقة تدرج لتعزيز وضوح الكتابة */}
+              <div className="absolute inset-0 bg-gradient-to-t from-green-950/70 via-green-800/20 to-transparent" />
 
 
-    </div>
+            </div>
 
-    {/* أزرار التنقل بشكل زخرفة دائرية */}
-    <button
-      onClick={goToPrevImage}
-      className="absolute left-4 top-1/2 -translate-y-1/2 bg-green-700/80 border border-green-400/50 
+            {/* أزرار التنقل بشكل زخرفة دائرية */}
+            <button
+              onClick={goToPrevImage}
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-green-700/80 border border-green-400/50 
                  text-white p-4 rounded-full backdrop-blur-md hover:bg-green-600 shadow-xl 
                  transition-all transform hover:scale-110"
-  aria-label={homeLabels.banner.previous}
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" 
-           viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-      </svg>
-    </button>
+              aria-label={homeLabels.banner.previous}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
 
-    <button
-      onClick={goToNextImage}
-      className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-700/80 border border-green-400/50 
+            <button
+              onClick={goToNextImage}
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-green-700/80 border border-green-400/50 
                  text-white p-4 rounded-full backdrop-blur-md hover:bg-green-600 shadow-xl 
                  transition-all transform hover:scale-110"
-  aria-label={homeLabels.banner.next}
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" 
-           viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
+              aria-label={homeLabels.banner.next}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
 
-    {/* مؤشرات الصور بدوائر وزخرفة */}
-    <div className="absolute bottom-5 left-0 right-0 flex flex-col items-center gap-3">
-      <div className="flex justify-center gap-3">
-        {bannerImages.map((_, index) => (
-          <button
-            key={index}
-            onClick={() => setCurrentImageIndex(index)}
-            className={`h-4 w-4 rounded-full border-2 transition-all duration-300 shadow-md
-                        ${index === currentImageIndex 
-                          ? 'bg-gradient-to-r from-green-500 to-emerald-400 scale-125 border-yellow-300' 
-                          : 'bg-white/30 hover:bg-white/80 border-green-200'
-                        }`}
-            aria-label={homeLabels.banner.gotoImage(index + 1)}
-          />
-        ))}
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          title="🔄 تحديث الصور"
-          onClick={refreshDriveImages}
-          className="px-3 py-1 rounded-full text-xs font-bold bg-green-700/80 hover:bg-green-600 text-white border border-green-400/50 shadow-md transition-colors disabled:opacity-50"
-          aria-label="تحديث صور البانر"
-          disabled={loadingDriveImages}
-        >
-          {loadingDriveImages ? 'جاري التحديث...' : ''}
-        </button>
-        {driveError && (
-          <span className="text-[10px] sm:text-xs text-red-300 bg-red-900/40 px-2 py-1 rounded-md border border-red-600/40 max-w-[220px] truncate" title={driveError}>
-            {driveError}
-          </span>
-        )}
-      </div>
-      {showDebug && (
-        <div className="mt-2 max-h-40 overflow-auto w-full px-3 py-2 bg-black/70 text-[10px] text-white rounded-lg border border-white/10 space-y-1 leading-snug">
-          {bannerImages.map((b, i) => {
-            const diag = imageDiagnostics[i];
-            return (
-              <div key={i} className={i === currentImageIndex ? 'text-emerald-300 font-semibold' : ''}>
-                #{i+1}: {b.title} [{b.sourceType || 'n/a'}]{b.tried && b.tried.length ? ` (محاولات:${b.tried.length})` : ''}
-                {b.sourceType === 'blob' && <span className="ml-1 px-1 rounded bg-blue-800/40 text-blue-200">BLOB</span>}
-                {diag?.blobTried && b.sourceType !== 'blob' && <span className="ml-1 px-1 rounded bg-purple-800/40 text-purple-200">BlobAttempt</span>}
-                <div className="break-all opacity-80">{b.src}</div>
-                {diag?.loaded && !diag?.error && (
-                  <span className="ml-1 text-green-300">✔ {diag?.w}x{diag?.h}</span>
-                )}
-                {diag?.error && (
-                  <span className="ml-1 text-red-300">✖ فشل التحميل</span>
+            {/* مؤشرات الصور بدوائر وزخرفة */}
+            <div className="absolute bottom-5 left-0 right-0 flex flex-col items-center gap-3">
+              <div className="flex justify-center gap-3">
+                {bannerImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`h-4 w-4 rounded-full border-2 transition-all duration-300 shadow-md
+                        ${index === currentImageIndex
+                        ? 'bg-gradient-to-r from-green-500 to-emerald-400 scale-125 border-yellow-300'
+                        : 'bg-white/30 hover:bg-white/80 border-green-200'
+                      }`}
+                    aria-label={homeLabels.banner.gotoImage(index + 1)}
+                  />
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  title="🔄 تحديث الصور"
+                  onClick={refreshDriveImages}
+                  className="px-3 py-1 rounded-full text-xs font-bold bg-green-700/80 hover:bg-green-600 text-white border border-green-400/50 shadow-md transition-colors disabled:opacity-50"
+                  aria-label="تحديث صور البانر"
+                  disabled={loadingDriveImages}
+                >
+                  {loadingDriveImages ? 'جاري التحديث...' : ''}
+                </button>
+                {driveError && (
+                  <span className="text-[10px] sm:text-xs text-red-300 bg-red-900/40 px-2 py-1 rounded-md border border-red-600/40 max-w-[220px] truncate" title={driveError}>
+                    {driveError}
+                  </span>
                 )}
               </div>
-            );
-          })}
-          {bannerImages.length === 0 && (
-            <div className="text-red-300">لا توجد صور بعد التحميل - تحقق من صلاحيات المشاركة.</div>
-          )}
+              {showDebug && (
+                <div className="mt-2 max-h-40 overflow-auto w-full px-3 py-2 bg-black/70 text-[10px] text-white rounded-lg border border-white/10 space-y-1 leading-snug">
+                  {bannerImages.map((b, i) => {
+                    const diag = imageDiagnostics[i];
+                    return (
+                      <div key={i} className={i === currentImageIndex ? 'text-emerald-300 font-semibold' : ''}>
+                        #{i + 1}: {b.title} [{b.sourceType || 'n/a'}]{b.tried && b.tried.length ? ` (محاولات:${b.tried.length})` : ''}
+                        {b.sourceType === 'blob' && <span className="ml-1 px-1 rounded bg-blue-800/40 text-blue-200">BLOB</span>}
+                        {diag?.blobTried && b.sourceType !== 'blob' && <span className="ml-1 px-1 rounded bg-purple-800/40 text-purple-200">BlobAttempt</span>}
+                        <div className="break-all opacity-80">{b.src}</div>
+                        {diag?.loaded && !diag?.error && (
+                          <span className="ml-1 text-green-300">✔ {diag?.w}x{diag?.h}</span>
+                        )}
+                        {diag?.error && (
+                          <span className="ml-1 text-red-300">✖ فشل التحميل</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {bannerImages.length === 0 && (
+                    <div className="text-red-300">لا توجد صور بعد التحميل - تحقق من صلاحيات المشاركة.</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+
+
+          </div>
         </div>
-      )}
-    </div>
-  </div>
-</div>
 
 
 
+        {/* عرض أفضل 3 بشكل شبكة واسعة */}
+        <Card className="mb-4 sm:mb-6 relative overflow-hidden border border-emerald-300/60 shadow-lg bg-gradient-to-br from-emerald-50 via-green-50 to-emerald-100">
+          <div className="absolute inset-0 pointer-events-none opacity-10 bg-[url('/patterns/islamic-pattern.svg')]" />
+          <CardHeader className="pb-2 sm:pb-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-green-800 relative">
+              <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gradient-to-br from-yellow-300 via-amber-200 to-yellow-400 shadow ring-2 ring-yellow-400 text-lg">🏆</span>
+              <span>أفضل 3 طلاب لشهر {new Date().getMonth() + 1} / {new Date().getFullYear()}</span>
+              <span className="absolute -bottom-1 left-10 right-0 h-[2px] bg-gradient-to-r from-green-300 via-emerald-400 to-transparent rounded" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <TopAchieversFrames
+              count={3}
+              variant="compact"
+              layout="grid"
+              styleVariant="premium"
+              showTooltips={false}
+              enable3D
+              frameHeight={250}
+              aspect="square"
+              showPattern
+              imageFit="fill"
+              showRefreshButton={false}
+              showDetails={false}
+              showRankTags={true}
+            />
+          </CardContent>
+        </Card>
 
 
         <Card className="mb-4 sm:mb-6">
@@ -507,7 +539,7 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
           </CardContent>
         </Card>
 
-        {/* إضافة قسم الإحصائيات للمستخدمين المسجلين (ما عدا أولياء الأمور) */}
+        {/* قسم الإحصائيات للمستخدمين المسجلين (ما عدا أولياء الأمور) */}
         {userRole && userRole !== 'parent' && (
           <Card className="mb-4 sm:mb-6 border-islamic-green/30 shadow-md">
             <CardHeader className="pb-3 sm:pb-4">

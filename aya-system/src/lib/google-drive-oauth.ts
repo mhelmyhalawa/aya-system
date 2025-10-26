@@ -123,10 +123,11 @@ export async function listDriveFolderImages(folderId: string, accessToken: strin
 }
 
 // Upload image to folder. Returns new file id.
-export async function uploadDriveImage(file: File, folderId: string, accessToken: string): Promise<{ id: string; name: string } | null> {
+// إضافة وسيط اختياري customName لتسمية الملف عند الرفع (مثال: 202510-05.jpg)
+export async function uploadDriveImage(file: File, folderId: string, accessToken: string, customName?: string): Promise<{ id: string; name: string } | null> {
   const boundary = `====drive_${Date.now()}`;
   const metadata = {
-    name: file.name,
+    name: customName || file.name,
     parents: [folderId]
   };
   const bodyParts = [
@@ -187,6 +188,18 @@ export async function blobToDataUrl(blob: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(blob);
   });
+}
+
+// إعادة تسمية ملف (تحديث الاسم فقط)
+export async function renameDriveFile(fileId: string, newName: string, accessToken: string): Promise<boolean> {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}`;
+  const body = JSON.stringify({ name: newName });
+  const res = await authFetch(url, { method: 'PATCH', accessToken, headers: { 'Content-Type': 'application/json' }, body });
+  if (!res.ok) {
+    console.warn('Rename failed', res.status, await res.text().catch(() => ''));
+    return false;
+  }
+  return true;
 }
 
 // Example integrated flow (pseudo usage):

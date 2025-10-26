@@ -129,6 +129,11 @@ export function Sidebar({ userRole, onNavigate, onLogout, isOpen: externalIsOpen
           label: "بيانات الطلاب",
           path: "/students-list"
         },
+        canViewStudents && {
+          icon: <Award className="h-5 w-5" />,
+          label: "صور الأوائل",
+          path: "/top-achievers-manage"
+        },
       ].filter(Boolean)
     },
 

@@ -72,6 +72,12 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
         const [messageDialog, setMessageDialog] = useState<{ open: boolean; title: string; message: string; mode: 'info'|'error'|'success'; }>(
             { open: false, title: '', message: '', mode: 'info' }
         );
+    // صور أوائل المكتب (أفضل 3) من مجلد منفصل
+    const TOP_FOLDER_ID = '1MPlvec7-hntKRZWA8hkBfn8KSTyh7JZh';
+    const [topImages, setTopImages] = useState<DriveImageLite[]>([]);
+    const [loadingTop, setLoadingTop] = useState(false);
+    const [topError, setTopError] = useState<string | null>(null);
+    const [topCount, setTopCount] = useState<number>(3); // عدد الأوائل المعروض (افتراضي 3)
 
         const showMsg = (title: string, message: string, mode: 'info'|'error'|'success'='info') => {
             setMessageDialog({ open: true, title, message, mode });
@@ -156,6 +162,33 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
 
     useEffect(() => { if (resolvedFolderId) loadImages(); }, [resolvedFolderId]);
     useEffect(() => { if (accessToken && resolvedFolderId) loadImagesOAuth(); }, [accessToken, resolvedFolderId]);
+    // تحميل أوائل المكتب مع دعم العدد الديناميكي
+    const loadTop = async () => {
+        if (!apiKey) return; // لا يمكن بدون مفتاح عام
+        setLoadingTop(true); setTopError(null);
+        try {
+            const { images: topList, error: topErr } = await fetchDriveImagesWithStatus(TOP_FOLDER_ID, apiKey, { force: true });
+            if (topErr) setTopError(topErr);
+            const resolved = await resolvePublicImageUrls(topList);
+            const limited = resolved.slice(0, topCount).map(d => ({ id: d.id, name: d.name, mimeType: d.mimeType, url: d.url, debugTried: d.debugTried, sourceType: d.sourceType }));
+            setTopImages(limited);
+        } catch (e:any) {
+            setTopError(e.message || 'فشل تحميل أوائل المكتب');
+        } finally {
+            setLoadingTop(false);
+        }
+    };
+    useEffect(() => { loadTop(); }, [apiKey, topCount]);
+
+    // استخراج اسم الطالب والدرجة من اسم الملف (صيغة: اسم-درجة-أي شيء.ext أو اسم_درجة.ext)
+    const parseMeta = (fileName: string) => {
+        const base = fileName.replace(/\.[^\.]+$/, '');
+        const parts = base.split(/[-_]/).filter(Boolean);
+        if (!parts.length) return { student: base, score: null };
+        let student = parts[0];
+        let scorePart = parts.find(p => /^\d+(\.\d+)?$/.test(p));
+        return { student, score: scorePart || null };
+    };
 
     // Hide / Unhide
     const toggleHidden = (id: string) => {
@@ -614,6 +647,8 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
                     )}
                 </CardContent>
             </Card>
+
+            {/* قسم أوائل المكتب تمت إزالته هنا وتم نقله للصفحة الرئيسية */}
 
             <Card className="border-green-300 shadow-md bg-white rounded-xl">
                 <CardHeader className="pb-2 pt-3">

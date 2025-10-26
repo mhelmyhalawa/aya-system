@@ -6,7 +6,8 @@ import { warmDriveImagesCache, clearAllDriveImageCache } from './google-drive-im
 import { BUILD_VERSION } from './version';
 
 // قراءة متغيرات بيئة Google Drive للتهيئة المبكرة للصور
-const DRIVE_FOLDER_ID = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID as string | undefined;
+const DRIVE_FOLDER_ID = import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_ID as string | undefined; // صور البانر العام
+const TOP_ACHIEVERS_FOLDER_ID = import.meta.env.VITE_GOOGLE_DRIVE_TOP_ACHIEVERS_FOLDER_ID as string | undefined; // صور الأوائل
 const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
 
 // تحقق من رقم الإصدار لمسح الكاش إذا تغير
@@ -42,13 +43,21 @@ export const initializeApp = async (): Promise<void> => {
     // فحص الإصدار لمسح الكاش إذا تغير
     const versionResult = checkVersionAndInvalidateCache();
 
-    // تسخين كاش الصور (لا نوقف التهيئة في حال الفشل)
+    // تسخين كاش صور البانر
     if (DRIVE_FOLDER_ID && GOOGLE_API_KEY) {
       warmDriveImagesCache(DRIVE_FOLDER_ID, GOOGLE_API_KEY)
-        .then(count => console.log(`[DriveBanner] تم حفظ ${count} صورة في الكاش المسبق (versionChanged=${versionResult.changed})`))
-        .catch(e => console.warn('[DriveBanner] فشل تسخين كاش الصور', e));
+        .then(count => console.log(`[DriveBanner] تم حفظ ${count} صورة بانر في الكاش المسبق (versionChanged=${versionResult.changed})`))
+        .catch(e => console.warn('[DriveBanner] فشل تسخين كاش صور البانر', e));
     } else {
-      console.log('[DriveBanner] تخطي تسخين الكاش: متغيرات Google Drive غير مكتملة');
+      console.log('[DriveBanner] تخطي تسخين كاش البانر: متغيرات Google Drive غير مكتملة');
+    }
+    // تسخين كاش صور الأوائل
+    if (TOP_ACHIEVERS_FOLDER_ID && GOOGLE_API_KEY) {
+      warmDriveImagesCache(TOP_ACHIEVERS_FOLDER_ID, GOOGLE_API_KEY)
+        .then(count => console.log(`[TopAchievers] تم حفظ ${count} صورة أوائل في الكاش المسبق (versionChanged=${versionResult.changed})`))
+        .catch(e => console.warn('[TopAchievers] فشل تسخين كاش صور الأوائل', e));
+    } else {
+      console.log('[TopAchievers] تخطي تسخين كاش الأوائل: متغيرات Google Drive غير مكتملة');
     }
 
     console.log('تم تهيئة التطبيق بنجاح');

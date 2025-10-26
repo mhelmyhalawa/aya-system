@@ -23,6 +23,7 @@ import MemorizationRecords from "@/pages/MemorizationRecords";
 import StudentAssessments from "@/pages/StudentAssessments";
 import { Profile } from "@/types/profile";
 import DriveImagesManagement from "@/pages/DriveImagesManagement";
+import TopAchieversImagesManagement from "@/pages/TopAchieversImagesManagement";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const queryClient = new QueryClient();
@@ -217,6 +218,11 @@ const App = () => {
       case '/drive-images':
         return (userRole === 'admin' || userRole === 'superadmin') && currentUser ?
           <DriveImagesManagement onNavigate={handleNavigate} /> :
+          <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;
+      case '/top-achievers-images':
+      case '/top-achievers-manage': // alias للتوافق مع القائمة الجانبية
+        return (userRole === 'admin' || userRole === 'superadmin') && currentUser ?
+          <TopAchieversImagesManagement onNavigate={handleNavigate} /> :
           <Home onNavigate={handleNavigate} userRole={userRole as any} currentUser={currentUser} onLogout={handleLogout} />;
       default:
         // If it's not a known route, redirect to home

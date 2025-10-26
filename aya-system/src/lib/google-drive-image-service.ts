@@ -8,38 +8,75 @@ export type DriveImage = {
   id: string;
   name: string;
   mimeType: string;
-  url: string; // Direct view URL
+  url: string; // Direct or blob/object URL
+  size?: number; // bytes (optional if Drive returns / not fetched)
   debugTried?: string[]; // candidate URLs tried
   sourceType?: 'direct' | 'blob';
 };
 
 const buildPublicImageUrl = (id: string) => `https://drive.google.com/uc?export=view&id=${id}`;
+// Default large thumbnail (Drive auto-resizes preserving aspect ratio)
 const buildThumbnailUrl = (id: string) => `https://drive.google.com/thumbnail?id=${id}&sz=w1920`;
+// Custom sized thumbnail (smaller = faster). Google Drive supports sz=w{width}
+const buildThumbnailSizedUrl = (id: string, size: number) => `https://drive.google.com/thumbnail?id=${id}&sz=w${size}`;
 const buildUcIdUrl = (id: string) => `https://drive.google.com/uc?id=${id}`;
 const buildDownloadUrl = (id: string) => `https://drive.google.com/uc?export=download&id=${id}`;
 
 // Generate ordered list of candidate URLs for an image ID
-function candidateUrls(id: string): string[] {
+function candidateUrls(id: string, preferredThumbnailSize?: number): string[] {
+  const thumb = preferredThumbnailSize && preferredThumbnailSize > 0
+    ? buildThumbnailSizedUrl(id, preferredThumbnailSize)
+    : buildThumbnailUrl(id);
   return [
+    // Try direct public view first (often cached by browser if repeated)
     buildPublicImageUrl(id),
-    buildThumbnailUrl(id),
+    // Then a sized thumbnail to reduce bytes over network
+    thumb,
+    // Alternate UC forms
     buildUcIdUrl(id),
+    // Direct download (may trigger auth / slower but last resort for some images)
     buildDownloadUrl(id)
   ];
 }
 
 // Attempt to resolve first loadable URL for each image by probing <img> load events.
-export async function resolvePublicImageUrls(images: DriveImage[], timeoutMs: number = 4000): Promise<DriveImage[]> {
+// Added apiKey optional param to allow early blob fallback for large/direct-failing images.
+export async function resolvePublicImageUrls(
+  images: DriveImage[],
+  timeoutMs: number = 6000,
+  apiKey?: string,
+  opts?: { preferredThumbnailSize?: number }
+): Promise<DriveImage[]> {
   const resolveOne = (img: DriveImage): Promise<DriveImage> => {
     const tried: string[] = [];
+    let blobAttempted = false;
     return new Promise((resolve) => {
-      const urls = candidateUrls(img.id);
+      const urls = candidateUrls(img.id, opts?.preferredThumbnailSize);
       let settled = false;
       let idx = 0;
       const tryNext = () => {
         if (idx >= urls.length) {
+          // Final fallback: if we still haven't tried blob and apiKey exists, attempt blob once now.
+          if (!blobAttempted && apiKey) {
+            blobAttempted = true;
+            fetchDriveImageBlob(img.id, apiKey).then(b => {
+              if (!settled && b) {
+                settled = true;
+                tried.push('BLOB_FALLBACK');
+                resolve({ ...img, url: b, debugTried: tried, sourceType: 'blob' });
+              } else if (!settled) {
+                settled = true;
+                resolve({ ...img, url: buildPublicImageUrl(img.id), debugTried: tried, sourceType: 'direct' });
+              }
+            }).catch(() => {
+              if (!settled) {
+                settled = true;
+                resolve({ ...img, url: buildPublicImageUrl(img.id), debugTried: tried, sourceType: 'direct' });
+              }
+            });
+            return;
+          }
           settled = true;
-          // All direct attempts failed: resolve with last direct (will be replaced later by blob if needed)
           resolve({ ...img, url: buildPublicImageUrl(img.id), debugTried: tried, sourceType: 'direct' });
           return;
         }
@@ -48,7 +85,25 @@ export async function resolvePublicImageUrls(images: DriveImage[], timeoutMs: nu
         const imageEl = new Image();
         let timer: any = setTimeout(() => {
           imageEl.src = '';
-          if (!settled) tryNext();
+          if (!settled) {
+            // Early blob attempt after first timeout failure (for large images) before exhausting all candidates
+            if (!blobAttempted && apiKey && tried.length === 1) {
+              blobAttempted = true;
+              fetchDriveImageBlob(img.id, apiKey).then(b => {
+                if (!settled && b) {
+                  settled = true;
+                  tried.push('BLOB_EARLY_TIMEOUT');
+                  resolve({ ...img, url: b, debugTried: tried, sourceType: 'blob' });
+                } else if (!settled) {
+                  tryNext();
+                }
+              }).catch(() => {
+                if (!settled) tryNext();
+              });
+            } else {
+              tryNext();
+            }
+          }
         }, timeoutMs);
         imageEl.onload = () => {
           if (settled) return;
@@ -58,7 +113,25 @@ export async function resolvePublicImageUrls(images: DriveImage[], timeoutMs: nu
         };
         imageEl.onerror = () => {
           clearTimeout(timer);
-          if (!settled) tryNext();
+          if (!settled) {
+            // Early blob attempt after first error if direct fails fast
+            if (!blobAttempted && apiKey && tried.length === 1) {
+              blobAttempted = true;
+              fetchDriveImageBlob(img.id, apiKey).then(b => {
+                if (!settled && b) {
+                  settled = true;
+                  tried.push('BLOB_EARLY_ERROR');
+                  resolve({ ...img, url: b, debugTried: tried, sourceType: 'blob' });
+                } else if (!settled) {
+                  tryNext();
+                }
+              }).catch(() => {
+                if (!settled) tryNext();
+              });
+            } else {
+              tryNext();
+            }
+          }
         };
         imageEl.src = u;
       };
@@ -266,7 +339,7 @@ export async function fetchDriveImages(
 
   const query = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
   // نطلب روابط إضافية لمزيد من المرونة (thumbnailLink, webContentLink)
-  const fields = encodeURIComponent('files(id,name,mimeType,thumbnailLink,webContentLink)');
+  const fields = encodeURIComponent('files(id,name,mimeType,size,thumbnailLink,webContentLink)');
   const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&key=${apiKey}`;
 
   console.log('[DriveBanner] Fetching images URL:', url);
@@ -288,19 +361,21 @@ export async function fetchDriveImages(
   }
   try {
     const data = await res.json();
-    const files = (data.files || []) as Array<{ id: string; name: string; mimeType: string }>;
+  const files = (data.files || []) as Array<{ id: string; name: string; mimeType: string; size?: string | number }>;
     const images: DriveImage[] = files
       .filter(f => f.mimeType?.startsWith('image/'))
       // ترتيب حسب الاسم يضمن استقرار العرض (يمكن تعديل ترتيب مخصص لاحقاً)
       .sort((a, b) => a.name.localeCompare(b.name, 'en'))
       .map(f => {
         const direct = buildPublicImageUrl(f.id);
+        const sizeNum = typeof f.size === 'string' ? parseInt(f.size, 10) : f.size;
         return {
           id: f.id,
           name: f.name,
           mimeType: f.mimeType,
-          url: direct
-        };
+          url: direct,
+          size: Number.isFinite(sizeNum as number) ? sizeNum : undefined
+        } as DriveImage;
       });
     console.log('[DriveBanner] mapped images:', images.map(i => ({ id: i.id, name: i.name, url: i.url })));
     memoryCache[folderId] = images;
@@ -372,7 +447,7 @@ export async function fetchDriveImagesWithStatus(
   }
   // Attempt raw fetch to get status before parsing via helper (duplicate logic but gives diagnostics)
   const query = encodeURIComponent(`'${folderId}' in parents and trashed = false`);
-  const fields = encodeURIComponent('files(id,name,mimeType)');
+  const fields = encodeURIComponent('files(id,name,mimeType,size)');
   const url = `https://www.googleapis.com/drive/v3/files?q=${query}&fields=${fields}&key=${apiKey}`;
   let status: number | undefined;
   let rawCount: number | undefined;
@@ -384,7 +459,7 @@ export async function fetchDriveImagesWithStatus(
       return { images: [], error: `فشل طلب Google Drive (HTTP ${res.status})`, status };
     }
   const data = await res.json();
-  const files = (data.files || []) as Array<{ id: string; name: string; mimeType: string }>;
+  const files = (data.files || []) as Array<{ id: string; name: string; mimeType: string; size?: string | number }>;
     rawCount = files.length;
   const imageFiles = files.filter(f => f.mimeType?.startsWith('image/'));
     if (imageFiles.length === 0) {
