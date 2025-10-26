@@ -442,20 +442,14 @@ export const Home = ({ onNavigate, userRole, currentUser }: HomeProps) => {
       </div>
       <div className="flex items-center gap-2">
         <button
+          title="🔄 تحديث الصور"
           onClick={refreshDriveImages}
           className="px-3 py-1 rounded-full text-xs font-bold bg-green-700/80 hover:bg-green-600 text-white border border-green-400/50 shadow-md transition-colors disabled:opacity-50"
           aria-label="تحديث صور البانر"
           disabled={loadingDriveImages}
         >
-          {loadingDriveImages ? 'جاري التحديث...' : '🔄 تحديث الصور'}
+          {loadingDriveImages ? 'جاري التحديث...' : ''}
         </button>
-        <span className="text-[10px] sm:text-xs text-green-200 bg-green-900/40 px-2 py-1 rounded-md border border-green-700/40" title="عدد الصور المحملة من Google Drive">
-          {bannerImages.length} صور
-        </span>
-        <button
-          onClick={() => setShowDebug(d => !d)}
-          className="px-2 py-1 rounded-full text-[10px] font-semibold bg-yellow-600/80 hover:bg-yellow-500 text-white border border-yellow-300/40 shadow transition-colors"
-        >{showDebug ? 'إخفاء معلومات' : 'إظهار معلومات'}</button>
         {driveError && (
           <span className="text-[10px] sm:text-xs text-red-300 bg-red-900/40 px-2 py-1 rounded-md border border-red-600/40 max-w-[220px] truncate" title={driveError}>
             {driveError}

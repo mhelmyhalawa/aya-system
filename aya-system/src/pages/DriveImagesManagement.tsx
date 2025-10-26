@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { fetchDriveImagesWithStatus, warmDriveImagesCache, getCachedDriveImages, clearDriveImageCache, fetchDriveImageDataUrl, fetchDriveImageBlob, resolvePublicImageUrls, resolveDriveFolderId } from '@/lib/google-drive-image-service';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { FormDialog } from '@/components/ui/form-dialog';
 import { Search as SearchIcon, ZoomIn, Filter as FilterIcon, Eye, EyeOff, Trash2, Star, StarOff, CheckSquare, Square, X, ExternalLink, Copy } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { getDriveAccessToken, listDriveFolderImages, uploadDriveImage, deleteDriveFile } from '@/lib/google-drive-oauth';
@@ -67,6 +68,15 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
     const [folderResolveError, setFolderResolveError] = useState<string | null>(null);
     const [deletingBulk, setDeletingBulk] = useState(false);
     const [showBulkBar, setShowBulkBar] = useState(false);
+        // حوار رسائل بدل alert
+        const [messageDialog, setMessageDialog] = useState<{ open: boolean; title: string; message: string; mode: 'info'|'error'|'success'; }>(
+            { open: false, title: '', message: '', mode: 'info' }
+        );
+
+        const showMsg = (title: string, message: string, mode: 'info'|'error'|'success'='info') => {
+            setMessageDialog({ open: true, title, message, mode });
+        };
+        const closeMsg = () => setMessageDialog(m => ({ ...m, open: false }));
 
     // Load images from Drive
     const loadImages = async () => {
@@ -116,13 +126,14 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
     };
 
     const handleLogin = async () => {
-        try {
-            const token = await getDriveAccessToken();
-            setAccessToken(token);
-            await loadImagesOAuth();
-        } catch (e: any) {
-            alert(e.message || 'فشل تسجيل الدخول');
-        }
+            try {
+                const token = await getDriveAccessToken();
+                setAccessToken(token);
+                await loadImagesOAuth();
+                showMsg('تم الدخول','تم الحصول على صلاحية Drive بنجاح','success');
+            } catch (e:any) {
+                showMsg('خطأ تسجيل الدخول', e.message || 'فشل تسجيل الدخول','error');
+            }
     };
 
     const handleLogout = () => {
@@ -184,22 +195,23 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
 
     // Stub upload (requires OAuth or backend)
     const handleUpload = async (files: FileList | null) => {
-        if (!files || files.length === 0) return;
-        if (!accessToken || !resolvedFolderId) {
-            alert('سجل الدخول أولاً للحصول على صلاحية الرفع.');
-            return;
-        }
+            if (!files || files.length === 0) return;
+            if (!accessToken || !resolvedFolderId) {
+                showMsg('صلاحية مطلوبة','سجل الدخول أولاً للحصول على صلاحية الرفع.','error');
+                return;
+            }
         setUploading(true);
         try {
             for (const f of Array.from(files)) {
                 const result = await uploadDriveImage(f, resolvedFolderId, accessToken);
-                if (!result) {
-                    alert('فشل رفع ملف: ' + f.name);
-                }
+                    if (!result) {
+                        showMsg('رفع فاشل', 'فشل رفع ملف: ' + f.name,'error');
+                    }
             }
             await loadImagesOAuth();
+                showMsg('رفع مكتمل','انتهى رفع الملفات المحددة','success');
         } catch (e: any) {
-            alert(e.message || 'فشل الرفع');
+                showMsg('خطأ رفع', e.message || 'فشل الرفع','error');
         } finally {
             setUploading(false);
         }
@@ -207,14 +219,14 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
 
     // Stub delete (needs OAuth)
     const handleDelete = async (id: string) => {
-        if (!accessToken) { alert('يلزم تسجيل الدخول للحذف'); return; }
+            if (!accessToken) { showMsg('صلاحية مطلوبة','يلزم تسجيل الدخول للحذف','error'); return; }
         setDeletingId(id);
         try {
             const ok = await deleteDriveFile(id, accessToken);
-            if (!ok) alert('فشل الحذف');
+                if (!ok) showMsg('حذف فاشل','فشل الحذف','error'); else showMsg('تم الحذف','تم حذف الصورة بنجاح','success');
             await loadImagesOAuth();
         } catch (e: any) {
-            alert(e.message || 'خطأ أثناء الحذف');
+                showMsg('خطأ حذف', e.message || 'خطأ أثناء الحذف','error');
         } finally {
             setDeletingId(null);
         }
@@ -233,7 +245,7 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
     }, [selectedIds, showBulkBar]);
 
     const bulkDeleteSelected = async () => {
-        if (!accessToken) { alert('يلزم تسجيل الدخول للحذف'); return; }
+            if (!accessToken) { showMsg('صلاحية مطلوبة','يلزم تسجيل الدخول للحذف','error'); return; }
         if (!selectedIds.length) return;
         if (!window.confirm(`سيتم حذف ${selectedIds.length} صورة. هل أنت متأكد؟`)) return;
         setDeletingBulk(true);
@@ -245,11 +257,13 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
             }
             await loadImagesOAuth();
             setSelectedIds([]);
-            if (failures.length) {
-                alert(`تم حذف بعض الصور مع وجود أخطاء (${failures.length}).`);
-            }
+                if (failures.length) {
+                    showMsg('تحذير جزئي', `تم حذف بعض الصور مع وجود أخطاء (${failures.length}).`,'info');
+                } else {
+                    showMsg('حذف جماعي', 'تم حذف جميع الصور المحددة بنجاح','success');
+                }
         } catch (e: any) {
-            alert(e.message || 'فشل حذف جماعي');
+                showMsg('خطأ حذف جماعي', e.message || 'فشل حذف جماعي','error');
         } finally {
             setDeletingBulk(false);
         }
@@ -464,9 +478,6 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
                     {/* حالة الكاش + التحديد */}
                     <div className="flex flex-wrap items-center gap-3 text-[10px]">
                         {error && <span className="text-red-600 font-semibold">خطأ: {error}</span>}
-                        {cacheInfo && <span className="text-green-700">الكاش: {cacheInfo.cached}/{cacheInfo.totalMeta}</span>}
-                        {httpStatus !== undefined && <span className="text-blue-600">HTTP: {httpStatus}</span>}
-                        {rawCount !== undefined && <span className="text-gray-600">كل الملفات: {rawCount}</span>}
                         {images.length === 0 && rawCount && rawCount > 0 && !error && (
                             <span className="text-amber-600">تم العثور على ملفات لكن لا توجد صور (قد تكون داخل مجلدات فرعية أو ليست image/*)</span>
                         )}
@@ -848,6 +859,30 @@ export const DriveImagesManagement = ({ onNavigate }: DriveImagesManagementProps
                     {/* تمت إزالة أزرار (فتح رابط / نسخ المعرف / زر إغلاق سفلي) للاكتفاء بزر واحد */}
                 </DialogContent>
             </Dialog>
+
+                    {/* حوار الرسائل العامة بدل alert */}
+                    <FormDialog
+                        title={messageDialog.title}
+                        description={messageDialog.mode === 'error' ? 'حدث خطأ أثناء العملية' : messageDialog.mode === 'success' ? 'تمت العملية بنجاح' : ''}
+                        open={messageDialog.open}
+                        onOpenChange={(o) => { if (!o) closeMsg(); else setMessageDialog(m => ({ ...m, open: o })); }}
+                        onSave={closeMsg}
+                        saveButtonText={messageDialog.mode === 'error' ? 'إغلاق' : 'موافق'}
+                        hideCancelButton={true}
+                        mode={messageDialog.mode === 'error' ? 'edit' : 'add'}
+                        showSaveButton={true}
+                        maxWidth="380px"
+                        fullBleedBody={false}
+                        mobileFullWidth={false}
+                        mobileFlatStyle={true}
+                        mobileStickyHeader={false}
+                    >
+                        <div className="text-[12px] leading-relaxed break-words py-2 px-1">
+                            <p className={messageDialog.mode === 'error' ? 'text-red-600' : messageDialog.mode === 'success' ? 'text-green-700' : 'text-gray-700'}>
+                                {messageDialog.message}
+                            </p>
+                        </div>
+                    </FormDialog>
         </div>
     );
 };
