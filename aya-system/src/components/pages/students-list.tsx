@@ -1437,21 +1437,21 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
           },
           {
             key: 'full_name',
-            header: `🧑‍🎓 ${studentsLabels.name}`,
+            header: `🧑 ${studentsLabels.name}`,
             important: true,
             render: (item: any) => (
               <div className="flex flex-col">
-                <span className="font-medium leading-snug">{'🧑‍🎓 ' + item.full_name + ' ' + item.guardian.full_name}</span>
+                <span className="font-medium leading-snug">{'🧑 ' + item.full_name + ' ' + item.guardian.full_name}</span>
               </div>
             )
           },
           ...(userRole !== 'teacher' ? [{
             key: 'teacher',
-            header: `🧑‍🏫 ${studentsLabels.teacherColumn}`,
+            header: `👨‍🏫 ${studentsLabels.teacherColumn}`,
            
             render: (item: any) => item.study_circle?.teacher?.full_name ? (
               <div className="flex gap-1">
-                🧑‍🏫
+                👨‍🏫
                 <span className="text-xs">{item.study_circle.teacher.full_name}</span>
               </div>
             ) : <span className="text-muted-foreground">—</span>

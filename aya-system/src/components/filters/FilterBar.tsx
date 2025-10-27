@@ -390,9 +390,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                           {field.id === 'teacher'
                             ? <span className="text-[11px] leading-none">🕋</span>
                             : field.id === 'circle'
-                              ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                              ? <span className="text-[11px] leading-none">🧑</span>
                               : field.id === 'guardian'
-                                ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                                ? <span className="text-[11px] leading-none">🧑</span>
                                 : <Users className="w-3 h-3" />}
                         </span>
                       )}
@@ -608,9 +608,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                             {field.id === 'teacher'
                               ? <span className="text-[11px] leading-none">🕋</span>
                               : field.id === 'circle'
-                                ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                                ? <span className="text-[11px] leading-none">🧑</span>
                                 : field.id === 'guardian'
-                                  ? <span className="text-[11px] leading-none">🧑‍🎓</span>
+                                  ? <span className="text-[11px] leading-none">🧑</span>
                                   : <Users className="w-3 h-3" />}
                           </span>
                         )}
