@@ -236,6 +236,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
   // حوار تأكيد حذف صورة الطالب داخل العارض
   const [isDeleteImageConfirmOpen, setIsDeleteImageConfirmOpen] = useState<boolean>(false);
   const [pendingDeleteImageStudent, setPendingDeleteImageStudent] = useState<Student | null>(null);
+  const [isDeletingImageLoading, setIsDeletingImageLoading] = useState<boolean>(false);
   // خريطة صور الطلاب المستخرجة من Google Drive
   const [studentImagesMap, setStudentImagesMap] = useState<Record<string, { id: string; url: string; name: string }>>({});
   const [isLoadingStudentImages, setIsLoadingStudentImages] = useState(false);
@@ -1820,8 +1821,10 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
       <DeleteConfirmationDialog
         isOpen={isDeleteImageConfirmOpen}
         onOpenChange={setIsDeleteImageConfirmOpen}
+        isLoading={isDeletingImageLoading}
         onConfirm={async () => {
           if (!pendingDeleteImageStudent?.image_drive_id) return;
+          setIsDeletingImageLoading(true);
           try {
             const token = await getDriveAccessToken(['https://www.googleapis.com/auth/drive']);
             const deletedOk = await deleteDriveFile(pendingDeleteImageStudent.image_drive_id, token);
@@ -1850,6 +1853,8 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             }
           } catch (err: any) {
             toast({ title: 'خطأ أثناء حذف الصورة', description: err.message || 'غير معروف', variant: 'destructive' });
+          } finally {
+            setIsDeletingImageLoading(false);
           }
         }}
         title={'حذف صورة الطالب'}
