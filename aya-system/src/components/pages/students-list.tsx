@@ -38,9 +38,13 @@ import { DeleteConfirmationDialog } from "../ui/delete-confirmation-dialog";
 import { getAllStudyCircles, getStudyCirclesByTeacherId } from "@/lib/study-circle-service";
 import { getAllGuardians, addGuardian } from "@/lib/guardian-service";
 import { getteachers } from "@/lib/profile-service";
-import { createStudent, updateStudent as updateStudentWithHistory } from "@/lib/student-service";
+import { createStudent, updateStudent as updateStudentWithHistory, updateStudentImageDriveId } from "@/lib/student-service";
 import { searchStudents as searchStudentsApi, getAllStudents as getAllStudentsApi, deleteStudent } from "@/lib/supabase-service";
 import { exportStudentsToJson } from "@/lib/database-service";
+// جلب صور الطلاب من مجلد Google Drive (العام) عبر المفتاح و المجلد
+import { fetchDriveImages } from '@/lib/google-drive-image-service';
+// رفع الصورة مباشرة من الجدول
+import { getDriveAccessToken, uploadDriveImage, clearDriveAccessToken, deleteDriveFile } from '@/lib/google-drive-oauth';
 import { getteacherHistoryForStudent } from "@/lib/teacher-history-service";
 // مكون شريط فلترة المعلم والحلقة الموحد
 // استيراد شريط الفلترة الموحد الجديد
@@ -62,6 +66,9 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
 
   // حالة القائمة
   const [students, setStudents] = useState<Student[]>([]);
+  // تتبع حالة حفظ معرف الصورة في قاعدة البيانات لكل طالب
+  const [savedImageStudentIds, setSavedImageStudentIds] = useState<Set<string>>(new Set());
+  const [failedPersistImageStudentIds, setFailedPersistImageStudentIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,6 +214,98 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
     history: []
   });
   const [loadingHistory, setLoadingHistory] = useState(false);
+  // Image viewer dialog state
+  const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
+  const [imageDialogStudent, setImageDialogStudent] = useState<Student | null>(null);
+  const [imageDialogUrl, setImageDialogUrl] = useState<string | null>(null);
+  // مسارات متعددة محتملة للصورة (محاولات مختلفة)
+  const [imageViewerUrls, setImageViewerUrls] = useState<string[]>([]);
+  const [imageViewerIndex, setImageViewerIndex] = useState<number>(0);
+  // حالة وضع عرض الصورة (ملء / احتواء)
+  const [isCoverMode, setIsCoverMode] = useState<boolean>(true);
+  // تخزين رابط الصورة الناجح لكل معرف صورة لتجنب إعادة المحاولات مستقبلاً
+  const [imageUrlCache, setImageUrlCache] = useState<Record<string, string>>({});
+  // حوار رفع صورة جديدة
+  const [isUploadImageDialogOpen, setIsUploadImageDialogOpen] = useState(false);
+  const [uploadTargetStudent, setUploadTargetStudent] = useState<Student | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [lastUploadInfo, setLastUploadInfo] = useState<{ name?: string; size?: number; message?: string } | null>(null);
+  // مؤشر دوران أثناء حذف الصورة القديمة
+  const [deletingOldImage, setDeletingOldImage] = useState<boolean>(false);
+  // حوار تأكيد حذف صورة الطالب داخل العارض
+  const [isDeleteImageConfirmOpen, setIsDeleteImageConfirmOpen] = useState<boolean>(false);
+  const [pendingDeleteImageStudent, setPendingDeleteImageStudent] = useState<Student | null>(null);
+  // خريطة صور الطلاب المستخرجة من Google Drive
+  const [studentImagesMap, setStudentImagesMap] = useState<Record<string, { id: string; url: string; name: string }>>({});
+  const [isLoadingStudentImages, setIsLoadingStudentImages] = useState(false);
+
+  // تحميل قائمة الصور مرة واحدة بعد تحميل الطلاب (إذا توفر المفتاح والمجلد)
+  useEffect(() => {
+    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_STUDENT_FOLDER_ID as string | undefined;
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY as string | undefined;
+    if (!folderId || !apiKey) return; // عدم المحاولة بدون بيانات البيئة
+    if (!students.length) return;
+    // إذا كان لدينا بالفعل صور لا نكرر (يمكنك إزالة هذا الشرط لإعادة التحميل)
+    if (Object.keys(studentImagesMap).length > 0) return;
+    setIsLoadingStudentImages(true);
+    (async () => {
+      try {
+        const driveImages = await fetchDriveImages(folderId, apiKey, { force: true });
+        // نبني خريطة بالاسم الكامل => كائن الصورة، ثم نحاول ربطها بالطالب عبر: student.id + امتداد
+        const map: Record<string, { id: string; url: string; name: string }> = {};
+        driveImages.forEach(img => {
+          const lower = img.name.toLowerCase();
+          map[lower] = { id: img.id, url: img.url, name: img.name };
+        });
+        // ربط سريع بالطلاب
+        const exts = ['jpg', 'jpeg', 'png', 'webp'];
+        const updated = students.map(s => {
+          for (const ext of exts) {
+            const fname = `${s.id}.${ext}`.toLowerCase();
+            if (map[fname]) {
+              return { ...s, image_drive_id: map[fname].id };
+            }
+          }
+          return s;
+        });
+        setStudents(updated as Student[]);
+        setStudentImagesMap(map);
+      } catch (e) {
+        console.warn('تعذر تحميل صور الطلاب من Drive', e);
+      } finally {
+        setIsLoadingStudentImages(false);
+      }
+    })();
+  }, [students, studentImagesMap]);
+
+  const openImageViewer = (student: Student, url?: string | null) => {
+    let id = student.image_drive_id;
+    const candidates: string[] = [];
+    // إذا تم تمرير رابط خارجي (مباشر) اجعله الأول
+    if (url) candidates.push(url);
+    if (id) {
+      // إذا كان لدينا رابط مخزن سابقاً ناجح لهذا المعرف ضعه أولاً لتجنب إعادة المحاولات
+      const cached = imageUrlCache[id];
+      if (cached) {
+        candidates.push(cached);
+      }
+      // روابط مختلفة محتملة للعرض المباشر
+      candidates.push(
+        `https://drive.google.com/uc?export=view&id=${id}`,
+        `https://lh3.googleusercontent.com/d/${id}=w1000`,
+        `https://drive.google.com/thumbnail?id=${id}&sz=w1000`,
+        `https://drive.google.com/uc?id=${id}`
+      );
+    }
+    // إزالة التكرارات المحتملة
+    const unique = candidates.filter((v, i, a) => a.indexOf(v) === i);
+    setImageViewerUrls(unique);
+    setImageViewerIndex(0);
+    setImageDialogStudent(student);
+    setImageDialogUrl(unique.length ? unique[0] : null);
+    setIsImageDialogOpen(true);
+  };
 
   // نموذج الطالب
   const [studentId, setStudentId] = useState<string>("");
@@ -856,9 +955,19 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
           memorized_parts: data.memorized_parts,
           phone_number: data.phone_number,
           email: data.email,
+          image_drive_id: data.image_drive_id
         };
         const result = await updateStudentWithHistory(data.id!, updatedStudent);
+        if (!result.success && result.message?.includes('غير مسموحة')) {
+          // نتجاهل الفشل المتعلق بالباك اند غير المتاح ونحدث الواجهة محلياً (خصوصاً للصورة)
+          setStudents(prev => prev.map(s => s.id === data.id ? { ...s, ...updatedStudent } : s));
+          toast({ title: 'تم حفظ التعديلات (محلياً)', description: 'التحديث الدائم يتطلب تفعيل الباك اند', className: 'bg-yellow-50 border-yellow-200 text-yellow-900' });
+          setIsStudentDialogOpen(false);
+          return;
+        }
         if (result.success) {
+          // نحدث القائمة كاملة
+          setStudents(prev => prev.map(s => s.id === data.id ? { ...s, ...updatedStudent } : s));
           toast({ title: studentsLabels.updateSuccess || 'تم تحديث بيانات الطالب بنجاح', className: 'bg-green-50 border-green-200' });
           setIsStudentDialogOpen(false);
           loadStudents();
@@ -1228,7 +1337,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
                 className="flex items-center gap-1.5 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-600 text-white shadow-md hover:scale-105 transition-transform duration-200 px-3 py-1.5 text-xs font-semibold h-8"
                 title={studentsLabels.addStudent}
               >
-                <span className="text-lg">🧑‍🎓</span>
+                <span className="text-lg">🧑</span>
                 <span className="hidden sm:inline">{studentsLabels.addStudent}</span>
               </Button>
             </div>
@@ -1448,7 +1557,7 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
           ...(userRole !== 'teacher' ? [{
             key: 'teacher',
             header: `👨‍🏫 ${studentsLabels.teacherColumn}`,
-           
+
             render: (item: any) => item.study_circle?.teacher?.full_name ? (
               <div className="flex gap-1">
                 👨‍🏫
@@ -1488,8 +1597,70 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
             header: `👫 ${studentsLabels.gender || 'الجنس'}`,
             align: 'center',
             render: (item: any) => (
-              <span className="text-xs">{item.gender === 'male' ? '👦 ' + studentsLabels.genderMale : item.gender === 'female' ?  '👧 ' + studentsLabels.genderFemale : '-'}</span>
+              <span className="text-xs">{item.gender === 'male' ? '👦 ' + studentsLabels.genderMale : item.gender === 'female' ? '👧 ' + studentsLabels.genderFemale : '-'}</span>
             )
+          },
+          {
+            key: 'image',
+            header: '🖼️',
+            align: 'center',
+            width: '52px',
+            render: (item: any) => {
+              const driveId = item.image_drive_id;
+              const hasImage = !!driveId;
+              const url = driveId ? `https://drive.google.com/uc?export=view&id=${driveId}` : null;
+              return (
+                <div className="flex items-center justify-center relative">
+                  {hasImage ? (
+                    <button
+                      type="button"
+                      onClick={() => openImageViewer(item, url)}
+                      title="عرض الصورة"
+                      className="h-8 w-8 rounded-md flex items-center justify-center border bg-white border-green-300 hover:bg-green-50 transition"
+                    >
+                      🖼️
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setUploadTargetStudent(item); setIsUploadImageDialogOpen(true); setUploadError(null); setLastUploadInfo(null); }}
+                      title="إضافة صورة"
+                      className="h-8 w-8 rounded-md flex items-center justify-center border bg-gray-50 border-gray-300 hover:bg-green-50 text-green-600 transition"
+                    >
+                      ➕
+                    </button>
+                  )}
+                  {/* مؤشر نجاح حفظ الصورة */}
+                  {hasImage && savedImageStudentIds.has(item.id) && (
+                    <span className="absolute -top-1 -right-1 text-[10px] bg-green-500 text-white rounded-full px-[4px] py-[1px] shadow" title="تم الحفظ في القاعدة">✓</span>
+                  )}
+                  {/* زر إعادة المحاولة إذا فشل حفظ المعرف */}
+                  {hasImage && failedPersistImageStudentIds.has(item.id) && !savedImageStudentIds.has(item.id) && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const target = students.find(s => s.id === item.id);
+                        if (!target?.image_drive_id) return;
+                        try {
+                          const res = await updateStudentImageDriveId(item.id, target.image_drive_id || null);
+                          if (res.success) {
+                            setSavedImageStudentIds(prev => new Set([...prev, item.id]));
+                            setFailedPersistImageStudentIds(prev => { const n = new Set(prev); n.delete(item.id); return n; });
+                            toast({ title: 'تم حفظ الصورة بعد المحاولة', className: 'bg-green-50 border-green-200' });
+                          } else {
+                            toast({ title: 'فشل إعادة حفظ معرف الصورة', description: res.message || 'حاول لاحقاً', variant: 'destructive' });
+                          }
+                        } catch (err: any) {
+                          toast({ title: 'خطأ أثناء إعادة المحاولة', description: err.message || 'غير معروف', variant: 'destructive' });
+                        }
+                      }}
+                      className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-yellow-500 text-white flex items-center justify-center text-[11px] shadow hover:bg-yellow-600"
+                      title="إعادة محاولة حفظ المعرف"
+                    >↻</button>
+                  )}
+                </div>
+              );
+            }
           },
           {
             key: 'actions',
@@ -1546,6 +1717,308 @@ export function StudentsList({ onNavigate, userRole, userId }: StudentsListProps
         onLoadTeacherCircles={async (tid) => { await loadStudyCirclesForTeacher(tid); }}
         allowGuardianSelection={true}
       />
+
+      {/* حوار عرض صورة الطالب */}
+      <FormDialog
+        title={imageDialogStudent ? `صورة الطالب: ${imageDialogStudent.full_name}` : 'صورة الطالب'}
+        open={isImageDialogOpen}
+        onOpenChange={setIsImageDialogOpen}
+        // إخفاء زر الحفظ (الإغلاق) في الأسفل حسب طلب المستخدم
+        showSaveButton={false}
+        onSave={() => setIsImageDialogOpen(false)}
+        mode="edit"
+        hideCancelButton
+        maxWidth="420px"
+      >
+        {imageDialogUrl ? (
+          <div className="flex flex-col gap-2">
+            <div className="rounded-lg overflow-hidden border shadow-sm relative h-[260px] w-full max-w-full">
+              <img
+                src={imageViewerUrls[imageViewerIndex]}
+                alt={imageDialogStudent?.full_name}
+                className={`w-full h-full ${isCoverMode ? 'object-cover' : 'object-contain'} bg-black`}
+                onError={() => {
+                  // جرّب الرابط التالي
+                  const next = imageViewerIndex + 1;
+                  if (next < imageViewerUrls.length) {
+                    console.warn('🔁 فشل عرض الصورة، تجربة رابط بديل:', imageViewerUrls[next]);
+                    setImageViewerIndex(next);
+                    setImageDialogUrl(imageViewerUrls[next]);
+                  } else {
+                    console.error('❌ فشل عرض جميع الروابط المحتملة للصورة');
+                    setImageDialogUrl(null);
+                  }
+                  // إذا كان الرابط الحالي مخزن وتم فشله نحذفه من الكاش
+                  if (imageDialogStudent?.image_drive_id) {
+                    setImageUrlCache(prev => {
+                      const copy = { ...prev };
+                      if (copy[imageDialogStudent.image_drive_id] === imageViewerUrls[imageViewerIndex]) {
+                        delete copy[imageDialogStudent.image_drive_id];
+                      }
+                      return copy;
+                    });
+                  }
+                }}
+                onLoad={() => {
+                  // حفظ الرابط الناجح في الكاش إذا لم يكن محفوظاً بالفعل (فقط عند النجاح)
+                  if (imageDialogStudent?.image_drive_id) {
+                    setImageUrlCache(prev => {
+                      if (!prev[imageDialogStudent.image_drive_id]) {
+                        return { ...prev, [imageDialogStudent.image_drive_id]: imageViewerUrls[imageViewerIndex] };
+                      }
+                      return prev;
+                    });
+                  }
+                }}
+              />
+              {imageViewerUrls.length > 1 && (
+                <div className="absolute top-1 left-1 bg-white/80 backdrop-blur px-2 py-0.5 rounded text-[10px] text-gray-700 border">
+                  محاولة {imageViewerIndex + 1} / {imageViewerUrls.length}
+                </div>
+              )}
+            </div>
+            {/* أزرار الإجراءات أسفل الصورة */}
+            <div className="flex items-center justify-between gap-2 mt-1">
+              <div className="flex gap-2">
+                {imageDialogUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(imageViewerUrls[imageViewerIndex], '_blank')}
+                    className="h-8 w-8 flex items-center justify-center rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs shadow"
+                    title="فتح في تبويب جديد"
+                  >🔗</button>
+                )}
+                {/* تبديل الاحتواء/الملء */}
+                {imageDialogUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCoverMode(prev => !prev)}
+                    className="h-8 w-8 flex items-center justify-center rounded-md bg-green-600 hover:bg-green-700 text-white text-xs shadow"
+                    title={isCoverMode ? 'وضع احتواء' : 'وضع ملء'}
+                  >{isCoverMode ? '🞅' : '⬛'}</button>
+                )}
+              </div>
+              {/* زر حذف وإعادة رفع */}
+              {imageDialogStudent?.image_drive_id && (
+                <button
+                  type="button"
+                  onClick={() => { setPendingDeleteImageStudent(imageDialogStudent); setIsDeleteImageConfirmOpen(true); }}
+                  className="h-8 px-3 flex items-center justify-center rounded-md bg-red-600 hover:bg-red-700 text-white text-xs shadow"
+                  title="حذف الصورة وإعادة الرفع"
+                >🗑️</button>
+              )}
+            </div>
+            {imageDialogUrl === null && (
+              <div className="text-center text-xs text-red-600">تعذر عرض الصورة – تحقق من إعدادات المشاركة في Google Drive.</div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center text-sm text-muted-foreground py-8">لا توجد صورة محفوظة لهذا الطالب حالياً أو فشلت كل المحاولات</div>
+        )}
+      </FormDialog>
+      {/* حوار تأكيد حذف الصورة */}
+      <DeleteConfirmationDialog
+        isOpen={isDeleteImageConfirmOpen}
+        onOpenChange={setIsDeleteImageConfirmOpen}
+        onConfirm={async () => {
+          if (!pendingDeleteImageStudent?.image_drive_id) return;
+          try {
+            const token = await getDriveAccessToken(['https://www.googleapis.com/auth/drive']);
+            const deletedOk = await deleteDriveFile(pendingDeleteImageStudent.image_drive_id, token);
+            if (deletedOk) {
+              setStudents(prev => prev.map(s => s.id === pendingDeleteImageStudent.id ? { ...s, image_drive_id: null } : s));
+              setSavedImageStudentIds(prev => { const n = new Set(prev); n.delete(pendingDeleteImageStudent.id); return n; });
+              setFailedPersistImageStudentIds(prev => { const n = new Set(prev); n.delete(pendingDeleteImageStudent.id); return n; });
+              try {
+                const saveRes = await updateStudentImageDriveId(pendingDeleteImageStudent.id, null);
+                if (!saveRes.success) {
+                  toast({ title: 'تم الحذف لكن فشل تحديث القاعدة', description: saveRes.message || 'تحقق لاحقاً', variant: 'destructive' });
+                } else {
+                  toast({ title: 'تم حذف الصورة بنجاح', className: 'bg-green-50 border-green-200' });
+                }
+              } catch (persistErr: any) {
+                toast({ title: 'حذف من Drive لكن خطأ في القاعدة', description: persistErr.message || 'غير معروف', variant: 'destructive' });
+              }
+              // إغلاق عارض الصورة وفتح حوار الرفع مباشرة
+              setIsDeleteImageConfirmOpen(false);
+              setIsImageDialogOpen(false);
+              const studentAfter = students.find(s => s.id === pendingDeleteImageStudent.id) || pendingDeleteImageStudent;
+              setUploadTargetStudent({ ...studentAfter, image_drive_id: null } as Student);
+              setIsUploadImageDialogOpen(true);
+            } else {
+              toast({ title: 'تعذر حذف الصورة من Drive', description: pendingDeleteImageStudent.image_drive_id, variant: 'destructive' });
+            }
+          } catch (err: any) {
+            toast({ title: 'خطأ أثناء حذف الصورة', description: err.message || 'غير معروف', variant: 'destructive' });
+          }
+        }}
+        title={'حذف صورة الطالب'}
+        description={<div className="text-sm">سيتم حذف الصورة نهائياً من Google Drive ولن يمكن استرجاعها. هل أنت متأكد؟</div>}
+        deleteButtonText={'تأكيد الحذف'}
+        cancelButtonText={'إلغاء'}
+      />
+
+      {/* حوار رفع صورة جديدة */}
+      <FormDialog
+        title={uploadTargetStudent ? `رفع صورة للطالب: ${uploadTargetStudent.full_name}` : 'رفع صورة طالب'}
+        open={isUploadImageDialogOpen}
+        onOpenChange={(o) => { setIsUploadImageDialogOpen(o); if (!o) { setUploadTargetStudent(null); setUploadingImage(false); } }}
+        onSave={() => setIsUploadImageDialogOpen(false)}
+        mode="edit"
+        hideCancelButton
+        saveButtonText="إغلاق"
+        maxWidth="380px"
+      >
+        {uploadTargetStudent ? (
+          <div className="flex flex-col gap-3 py-1">
+            <div className="text-xs text-muted-foreground">اختر صورة (الاسم سيتم توليده: studentId.ext)</div>
+            {uploadError && <div className="text-[11px] text-destructive">{uploadError}</div>}
+            {lastUploadInfo && (
+              <div className="text-[10px] bg-muted rounded p-1 leading-4">
+                <div className="font-semibold">نتيجة الرفع:</div>
+                <div>الاسم: {lastUploadInfo.name}</div>
+                {lastUploadInfo.size !== undefined && <div>الحجم: {(lastUploadInfo.size/1024).toFixed(1)} KB</div>}
+                <div>الحالة: {lastUploadInfo.message}</div>
+              </div>
+            )}
+            <label className="relative inline-flex items-center px-3 py-1.5 rounded-md bg-islamic-green text-white text-xs cursor-pointer hover:opacity-90 disabled:opacity-50 w-fit">
+              {uploadingImage ? 'جار الرفع...' : 'اختيار صورة'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingImage}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (uploadingImage) return; // حماية من السباق
+                  setUploadingImage(true);
+                  setUploadError(null);
+                  setLastUploadInfo(null);
+                  try {
+                    let token: string | null = null;
+                    try {
+                      token = await getDriveAccessToken();
+                    } catch {
+                      clearDriveAccessToken();
+                      token = await getDriveAccessToken(['https://www.googleapis.com/auth/drive']);
+                    }
+                    if (!token) throw new Error('تعذر الحصول على صلاحيات Drive');
+                    const ext = (file.name.includes('.') ? file.name.split('.').pop() : 'jpg') || 'jpg';
+                    const customName = `${uploadTargetStudent.id}.${ext}`;
+                    const folderId = import.meta.env.VITE_GOOGLE_DRIVE_STUDENT_FOLDER_ID as string | undefined;
+                    if (!folderId) throw new Error('لم يتم ضبط متغير المجلد VITE_GOOGLE_DRIVE_STUDENT_FOLDER_ID');
+                    const previousId = uploadTargetStudent.image_drive_id;
+                    const uploaded = await uploadDriveImage(file, folderId, token, customName);
+                    if (!uploaded) {
+                      // إعادة محاولة مع صلاحيات أوسع
+                      clearDriveAccessToken();
+                      const retryToken = await getDriveAccessToken(['https://www.googleapis.com/auth/drive']);
+                      const retryUploaded = await uploadDriveImage(file, folderId, retryToken, customName);
+                      if (!retryUploaded) throw new Error('فشل رفع الصورة بعد إعادة المحاولة');
+                      const driveId = retryUploaded.id;
+                      // تأكيد حذف الصورة القديمة ثم حذفها
+                      if (previousId) {
+                        const wantDelete = window.confirm('هل تريد حذف الصورة القديمة؟');
+                        if (wantDelete) {
+                          setDeletingOldImage(true);
+                          try {
+                            const delToken = token || retryToken;
+                            const deletedOk = await deleteDriveFile(previousId, delToken);
+                            if (deletedOk) {
+                              toast({ title: 'تم حذف الصورة القديمة', className: 'bg-green-50 border-green-200' });
+                            } else {
+                              toast({ title: 'تعذر حذف الصورة القديمة', description: previousId, variant: 'destructive' });
+                            }
+                          } catch (delErr: any) {
+                            toast({ title: 'خطأ في حذف الصورة القديمة', description: delErr.message || 'غير معروف', variant: 'destructive' });
+                          } finally {
+                            setDeletingOldImage(false);
+                          }
+                        }
+                      }
+                      // تحديث واجهة المستخدم محلياً
+                      setStudents(prev => prev.map(s => s.id === uploadTargetStudent.id ? { ...s, image_drive_id: driveId } : s));
+                      setLastUploadInfo({ name: retryUploaded.name, size: file.size, message: 'تم الرفع بنجاح (إعادة محاولة)' });
+                      // حفظ في قاعدة البيانات
+                      try {
+                        const saveResult = await updateStudentImageDriveId(uploadTargetStudent.id, driveId);
+                        if (saveResult.success) {
+                          setSavedImageStudentIds(prev => new Set([...prev, uploadTargetStudent.id]));
+                          setFailedPersistImageStudentIds(prev => { const n = new Set(prev); n.delete(uploadTargetStudent.id); return n; });
+                          toast({ title: 'تم حفظ الصورة في قاعدة البيانات', className: 'bg-green-50 border-green-200' });
+                        } else {
+                          setFailedPersistImageStudentIds(prev => new Set([...prev, uploadTargetStudent.id]));
+                          toast({ title: 'تم الرفع لكن فشل حفظ معرف الصورة', description: saveResult.message || 'تحقق من الصلاحيات أو الاتصال', variant: 'destructive' });
+                        }
+                      } catch (persistErr: any) {
+                        setFailedPersistImageStudentIds(prev => new Set([...prev, uploadTargetStudent.id]));
+                        toast({ title: 'تم رفع الصورة لكن حدث خطأ أثناء الحفظ', description: persistErr.message || 'خطأ غير متوقع', variant: 'destructive' });
+                      }
+                    } else {
+                      const driveId = uploaded.id;
+                      // تأكيد حذف الصورة القديمة ثم حذفها
+                      if (previousId) {
+                        const wantDelete = window.confirm('هل تريد حذف الصورة القديمة؟');
+                        if (wantDelete) {
+                          setDeletingOldImage(true);
+                          try {
+                            const deletedOk = await deleteDriveFile(previousId, token);
+                            if (deletedOk) {
+                              toast({ title: 'تم حذف الصورة القديمة', className: 'bg-green-50 border-green-200' });
+                            } else {
+                              toast({ title: 'تعذر حذف الصورة القديمة', description: previousId, variant: 'destructive' });
+                            }
+                          } catch (delErr: any) {
+                            toast({ title: 'خطأ في حذف الصورة القديمة', description: delErr.message || 'غير معروف', variant: 'destructive' });
+                          } finally {
+                            setDeletingOldImage(false);
+                          }
+                        }
+                      }
+                      setStudents(prev => prev.map(s => s.id === uploadTargetStudent.id ? { ...s, image_drive_id: driveId } : s));
+                      setLastUploadInfo({ name: uploaded.name, size: file.size, message: 'تم الرفع بنجاح' });
+                      // حفظ في قاعدة البيانات
+                      try {
+                        const saveResult = await updateStudentImageDriveId(uploadTargetStudent.id, driveId);
+                        if (saveResult.success) {
+                          setSavedImageStudentIds(prev => new Set([...prev, uploadTargetStudent.id]));
+                          setFailedPersistImageStudentIds(prev => { const n = new Set(prev); n.delete(uploadTargetStudent.id); return n; });
+                          toast({ title: 'تم حفظ الصورة في قاعدة البيانات', className: 'bg-green-50 border-green-200' });
+                        } else {
+                          setFailedPersistImageStudentIds(prev => new Set([...prev, uploadTargetStudent.id]));
+                          toast({ title: 'تم الرفع لكن فشل حفظ معرف الصورة', description: saveResult.message || 'تحقق من الصلاحيات أو الاتصال', variant: 'destructive' });
+                        }
+                      } catch (persistErr: any) {
+                        setFailedPersistImageStudentIds(prev => new Set([...prev, uploadTargetStudent.id]));
+                        toast({ title: 'تم رفع الصورة لكن حدث خطأ أثناء الحفظ', description: persistErr.message || 'خطأ غير متوقع', variant: 'destructive' });
+                      }
+                    }
+                  } catch (err: any) {
+                    setUploadError(err.message || 'خطأ أثناء الرفع');
+                    setLastUploadInfo({ name: file.name, size: file.size, message: 'فشل الرفع' });
+                  } finally {
+                    setUploadingImage(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+            {deletingOldImage && (
+              <div className="flex items-center gap-2 text-[11px] mt-1 text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <span>جار حذف الصورة القديمة...</span>
+              </div>
+            )}
+            <p className="text-[10px] text-muted-foreground leading-relaxed">
+              تتم تسمية الملف تلقائياً بمعرف الطالب لضمان الربط: studentId.ext.
+              بعد الرفع يمكن إغلاق الحوار وستظهر الأيقونة 🖼️.
+            </p>
+          </div>
+        ) : (
+          <div className="text-center text-xs text-muted-foreground py-6">لا يوجد طالب محدد</div>
+        )}
+      </FormDialog>
 
       {/* مربع حوار تأكيد الحذف */}
       <DeleteConfirmationDialog

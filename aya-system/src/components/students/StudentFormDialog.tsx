@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, ChevronRight, UserCircle } from 'lucide-react';
 import { studentsLabels } from '@/lib/arabic-labels';
+// Google Drive helpers (OAuth + upload + list)
+// تمت إزالة منطق رفع الصورة إلى Google Drive من النموذج؛ أصبح الرفع من الجدول مباشرة
 
 /**
  * Shared student form dialog (wizard style) used for add & edit from multiple contexts
@@ -25,6 +27,10 @@ export interface StudentFormData {
   notes?: string;
   study_circle_id?: string;
   teacher_id?: string; // للسياقات الإدارية
+  // مبدئياً لا نربط صورة الطالب بقاعدة البيانات لعدم وجود حقل backend حالياً
+  // يمكن لاحقاً إضافة: image_url?: string; image_drive_id?: string;
+  image_url?: string;
+  image_drive_id?: string;
 }
 
 export interface StudentFormDialogProps {
@@ -68,12 +74,12 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
   } = props;
   const { toast } = useToast();
 
-  // wizard
-  const steps = [
+  // الخطوات أصبحت ثابتة بدون تبويب الصورة (تم نقل الرفع إلى واجهة قائمة الطلاب)
+  const steps = useMemo(() => ([
     { key: 'basic', title: 'البيانات الأساسية' },
     { key: 'associations', title: 'الارتباطات' },
-    { key: 'contact', title: 'التواصل والملاحظات' }
-  ];
+    { key: 'contact', title: 'التواصل والملاحظات' },
+  ]), []);
   const [step, setStep] = useState(0);
 
   // local state
@@ -202,7 +208,10 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
       email: email || undefined,
       notes: notes || undefined,
       study_circle_id: studyCircleId || undefined,
-      teacher_id: (isTeacher ? (currentTeacherId || undefined) : (teacherId || undefined))
+      teacher_id: (isTeacher ? (currentTeacherId || undefined) : (teacherId || undefined)),
+      // لا يتم تعديل الصورة من داخل النموذج حالياً (يتم رفعها من الجدول)
+      image_url: initialData?.image_url,
+      image_drive_id: initialData?.image_drive_id
     };
     try {
       await onSubmit(payload);
@@ -627,7 +636,7 @@ export function StudentFormDialog(props: StudentFormDialogProps) {
             </div>
           </div>
         )}
-        {step === 2 && (
+        {step === 2 && steps[2]?.key === 'contact' && (
           <div className="space-y-3 py-1">
             <div>
               <Label htmlFor="phone_number" className="mb-1 block">{studentsLabels.phoneNumber} <span className="text-muted-foreground text-xs">{studentsLabels.optionalField}</span></Label>

@@ -14,6 +14,8 @@ export interface Student {
   notes?: string;
   created_at?: string;
   updated_at?: string;
+  // صورة الطالب (مستقبلية) - تتطلب أعمدة في قاعدة البيانات إذا أردنا الحفظ الدائم
+  image_drive_id?: string; // معرف الصورة في Google Drive
   
   // Legacy fields - to maintain compatibility with existing components
   parentName?: string;

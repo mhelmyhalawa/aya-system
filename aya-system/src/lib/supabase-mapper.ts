@@ -87,12 +87,13 @@ export const mapStudentToSupabase = (student: StudentCreate): Record<string, any
     study_circle_id: student.study_circle_id,
     full_name: student.full_name,
     date_of_birth: student.date_of_birth,
-    gender: student.gender || 'male',
+  gender: student.gender, // عدم فرض قيمة افتراضية حتى لا نعيد "ذكر" بعد فشل التحديث
     phone_number: student.phone_number,
     email: student.email,
     enrollment_date: student.enrollment_date || new Date().toISOString().split('T')[0],
     grade_level: student.grade_level,
-    notes: student.notes
+    notes: student.notes,
+    image_drive_id: (student as any).image_drive_id
   };
 };
 
@@ -112,6 +113,7 @@ export const mapSupabaseToStudent = (record: Record<string, any>): Student => {
     notes: record.notes,
     created_at: record.created_at,
     updated_at: record.updated_at,
+    image_drive_id: record.image_drive_id,
     // إضافة العلاقات
     guardian: record.guardian,
     study_circle: record.study_circle,
